@@ -274,6 +274,32 @@ async def _sync_to_copyagent(
         return False
 
 
+async def _ensure_copyagent_user(user_id: str, db: Session) -> bool:
+    """Verifies that the user is marked as synced in the database; if not, performs sync."""
+    user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+    if not user:
+        return False
+    if getattr(user, 'copyagent_synced', False):
+        return True
+    
+    print(f"[Auth] Proactively syncing user {user.email} (id={user.id}) to CopyAgent...")
+    success = await _sync_to_copyagent(
+        user_id=user.id,
+        email=user.email,
+        name=user.name or user.email.split("@")[0],
+        password_hash=user.password_hash,
+        auth_provider=user.auth_provider,
+        google_id=user.google_id,
+        profile_picture=user.profile_picture,
+    )
+    if success:
+        user.copyagent_synced = True
+        db.commit()
+    return success
+
+
+
+
 # ── Request schemas ───────────────────────────────────────────────────────────
 
 class SignupRequest(BaseModel):
@@ -462,6 +488,9 @@ async def auth_login(
     if not user.password_hash or not _verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
+    # Proactively sync to CopyAgent on login if not synced
+    await _ensure_copyagent_user(user.id, db)
+
     _set_auth_cookie(response, user.id)
     return {
         "status": "success",
@@ -532,6 +561,9 @@ async def auth_google(
             password_hash=None, auth_provider="google",
             google_id=google_id, profile_picture=picture,
         )
+
+    # Proactively sync to CopyAgent on Google login/signup if not synced
+    await _ensure_copyagent_user(user_id, db)
 
     _set_auth_cookie(response, user_id)
     return {
@@ -606,6 +638,7 @@ async def chat_completions(
     request: Request,
     body: ChatRequest,
     suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
 ):
     """
     Forward a chat completion request to the Copy Agent backend.
@@ -616,6 +649,10 @@ async def chat_completions(
         user_id = _decode_jwt(suite_session)
     if not user_id:
         user_id = STATIC_USER_ID
+
+    # If it is a real Suite user, ensure they are synced in CopyAgent's DB
+    if user_id and user_id != STATIC_USER_ID:
+        await _ensure_copyagent_user(user_id, db)
 
     upstream_payload = {
         "user_message":    body.user_message,
