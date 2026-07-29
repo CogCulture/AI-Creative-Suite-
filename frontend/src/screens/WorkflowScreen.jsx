@@ -239,7 +239,7 @@ function NodeOutputPreview({ node, output, t }) {
 }
 
 // ── Config Panel ──────────────────────────────────────────────────────────────
-function ConfigPanel({ node, config, onChange, t, outputs, status }) {
+function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
   if (!node) return (
     <div style={{ padding: 24, textAlign: "center" }}>
       <Settings size={28} style={{ color: t.text3, margin: "0 auto 10px" }} />
@@ -381,6 +381,20 @@ function ConfigPanel({ node, config, onChange, t, outputs, status }) {
             <div style={{ fontSize: 11, color: t.text2 }}>Output passed to next node in pipeline.</div>
           </div>
         )}
+
+        {/* Node input / output */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 2 }}>
+          <CfgField label="Node Input" t={t}>
+            <div style={dataBoxStyle(t)}>
+              {formatNodeData(inputs?.[node.id], t)}
+            </div>
+          </CfgField>
+          <CfgField label="Node Output" t={t}>
+            <div style={dataBoxStyle(t)}>
+              {formatNodeData(outputs?.[node.id], t)}
+            </div>
+          </CfgField>
+        </div>
       </div>
     </div>
   );
@@ -412,6 +426,31 @@ function cfgSelect(t) {
     border: `1px solid ${t.border}`, background: t.bg,
     color: t.text, fontFamily: FONT, fontSize: 12.5, outline: "none",
   };
+}
+
+function dataBoxStyle(t) {
+  return {
+    padding: "9px 11px",
+    borderRadius: R.md,
+    border: `1px solid ${t.border}`,
+    background: t.surface2,
+    color: t.text2,
+    fontFamily: MONO,
+    fontSize: 10.5,
+    lineHeight: 1.55,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  };
+}
+
+function formatNodeData(data, t) {
+  if (!data) return <span style={{ color: t.text3 }}>No data available for this node yet.</span>;
+  if (typeof data === "string") return data;
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
 }
 
 // ── Tag mini-component ────────────────────────────────────────────────────────
@@ -471,6 +510,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const aiInferred = activeProject?.workflowConfig?.inferred;
 
   const [nodeStatus, setNodeStatus] = useState({});   // nodeId → 'idle'|'active'|'done'|'error'
+  const [nodeInputs, setNodeInputs] = useState({});   // nodeId → data
   const [nodeOutputs, setNodeOutputs] = useState({});  // nodeId → data
   const [masterState, setMasterState] = useState("idle"); // 'idle'|'supervising'|'approved'|'rejected'
   const [masterFeedback, setMasterFeedback] = useState("");
@@ -506,6 +546,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   }, []);
 
   const setStatus = (id, s) => setNodeStatus(prev => ({ ...prev, [id]: s }));
+  const setInput = (id, d) => setNodeInputs(prev => ({ ...prev, [id]: d }));
   const setOutput = (id, d) => setNodeOutputs(prev => ({ ...prev, [id]: d }));
 
   const updateConfig = (nodeId, field, value) => {
@@ -520,6 +561,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
     setIsRunning(true);
     setNodeStatus({});
+    setNodeInputs({});
     setNodeOutputs({});
     setMasterState("supervising");
     setMasterFeedback("Initializing pipeline supervision...");
@@ -535,6 +577,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setSelectedNodeId("brief");
       log("Node 1: Campaign Brief — locked and loaded", "info");
       await delay(600);
+      setInput("brief", { brief: configs.brief.brief, assetType: configs.brief.assetType });
       setOutput("brief", { brief, assetType: configs.brief.assetType });
       setStatus("brief", "done");
 
@@ -545,6 +588,10 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setMasterFeedback("Supervising Brief → Copy strategy handoff...");
 
       let strategyData = null;
+      setInput("agent_strategy", {
+        brief,
+        assetType: configs.brief.assetType,
+      });
       try {
         const r = await fetch("/bff/workflow/step-bridge", {
           method: "POST",
@@ -571,6 +618,11 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
       const copyPrompt = strategyData.recommended_copy_prompt || `Write high-converting ${configs.brief.assetType} copy for: ${brief}`;
       let copyData = null;
+      setInput("copy", {
+        user_message: copyPrompt,
+        llm_model: configs.copy.model,
+        temperature: configs.copy.temperature,
+      });
       try {
         const r = await fetch("/bff/chat/completions", {
           method: "POST",
@@ -598,6 +650,11 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setMasterFeedback("Supervising Art Director visual parameter selection...");
 
       let artDirData = null;
+      setInput("agent_artdir", {
+        brief,
+        copy_output: copyData.bodyText,
+        asset_type: configs.brief.assetType,
+      });
       try {
         const r = await fetch("/bff/workflow/step-bridge", {
           method: "POST",
@@ -625,6 +682,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setMasterFeedback("Supervising Genfy image rendering process...");
 
       let genfyResult = null;
+      setInput("genfy", {
+        prompt: artDirData.image_prompt,
+        model_ids: artDirData.models || ["Nanobanana 2"],
+        ratio: artDirData.ratio || configs.genfy.ratio,
+        quality: artDirData.quality || configs.genfy.quality,
+        categories: artDirData.categories || { style: "cinematic", lighting: "golden" },
+      });
       try {
         const r = await fetch("/bff/genfy/sessions", {
           method: "POST",
@@ -917,6 +981,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             config={configs[selectedNodeId] || {}}
             onChange={(field, value) => updateConfig(selectedNodeId, field, value)}
             t={t}
+            inputs={nodeInputs}
             outputs={nodeOutputs}
             status={nodeStatus[selectedNodeId]}
           />
