@@ -156,13 +156,15 @@ def _generate_otp():
     otp_hash = hashlib.sha256(otp.encode()).hexdigest()
     return otp, otp_hash
 
+COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+
 def _set_auth_cookie(response: Response, user_id: str):
     token = _create_jwt(user_id)
     response.set_cookie(
         key="suite_session",
         value=token,
         httponly=True,
-        secure=False,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=60 * 60 * 24 * JWT_EXPIRE_DAYS,
         path="/",

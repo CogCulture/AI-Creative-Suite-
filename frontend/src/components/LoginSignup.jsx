@@ -251,7 +251,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
               {isSignUp ? (
                 <>
                   <div className="inline-flex items-center gap-2 bg-brand/10 text-brand text-xs font-semibold tracking-widest uppercase px-3 py-1 rounded-full mb-3">
-                    ✦ New Account
+                    New Account
                   </div>
                   <h1 className="text-2xl font-medium font-display tracking-tight text-ink">
                     Create your account
@@ -263,13 +263,13 @@ export default function LoginSignup({ onLogin, onNavigate }) {
               ) : (
                 <>
                   <div className="inline-flex items-center gap-2 bg-ink/5 text-ink text-xs font-semibold tracking-widest uppercase px-3 py-1 rounded-full mb-3">
-                    👋 Welcome back
+                    Welcome Back
                   </div>
                   <h1 className="text-2xl font-medium font-display tracking-tight text-ink">
-                    Sign in to your suite
+                    Access your account
                   </h1>
                   <p className="text-sm text-muted mt-2 font-sans">
-                    Good to see you again — enter your credentials below.
+                    Enter your credentials to continue to the suite.
                   </p>
                 </>
               )}
