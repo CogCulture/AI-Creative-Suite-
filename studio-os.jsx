@@ -845,17 +845,35 @@ function GenfyScreen({ t, nav, showToast }) {
       finalPrompt = `${finalPrompt}, ${styleParts.join(", ")}`;
     }
 
+    // Build categories map for Genfy API
+    const categories = {};
+    if (selectedStyle) categories.style = selectedStyle;
+    if (selectedMedium) categories.medium = selectedMedium;
+    if (selectedLighting) categories.lighting = selectedLighting;
+    if (selectedComposition) categories.composition = selectedComposition;
+    if (selectedCamera) categories.camera = selectedCamera;
+    if (selectedLens) categories.lens = selectedLens;
+    if (selectedMood) categories.mood = selectedMood;
+    if (selectedColor) categories.color = selectedColor;
+    if (selectedCameraBody) categories.camera_body = selectedCameraBody;
+
     try {
+      const payload = {
+        prompt: finalPrompt,
+        model_ids: selectedModels,
+        ratio: selectedRatio,
+        quality: selectedQuality,
+        categories: categories,
+      };
+
+      if (selectedModels.includes("ChatGPT")) {
+        payload.chatgpt_model = chatgptModel;
+      }
+
       const response = await fetch("/bff/genfy/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-          model_ids: selectedModels,
-          ratio: selectedRatio,
-          quality: selectedQuality,
-          active_configs: selectedModels.includes("ChatGPT") ? { chatgpt_model: chatgptModel } : {}
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -906,7 +924,8 @@ function GenfyScreen({ t, nav, showToast }) {
         return;
       }
 
-      const editRes = await fetch(`/bff/genfy/sessions/${currentSessionId}/images/${activeImage.id}/edit`, {
+      const imgId = activeImage.image_id || activeImage.id;
+      const editRes = await fetch(`/bff/genfy/sessions/${currentSessionId}/images/${imgId}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -933,11 +952,12 @@ function GenfyScreen({ t, nav, showToast }) {
   const handleUpscale = async () => {
     if (!activeImage) return;
     showToast("Submitting upscale task...");
+    const imgId = activeImage.image_id || activeImage.id;
     try {
       const response = await fetch("/bff/genfy/upscale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_id: activeImage.id })
+        body: JSON.stringify({ image_id: imgId })
       });
       if (response.ok) {
         showToast("Upscale task started successfully!");

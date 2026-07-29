@@ -79,6 +79,15 @@ export default function GenfyScreen({ t, nav, showToast }) {
         showToast("Failed to fetch style catalog from BFF");
         setLoadingCatalog(false);
       });
+
+    try {
+      const seed = localStorage.getItem("genfy_seed_prompt");
+      if (seed) {
+        setPrompt(seed);
+        localStorage.removeItem("genfy_seed_prompt");
+        showToast("Pre-filled prompt from Copy Agent!");
+      }
+    } catch (_) {}
   }, []);
 
   // ── Poll current session ─────────────────────────────────
@@ -192,17 +201,35 @@ export default function GenfyScreen({ t, nav, showToast }) {
       finalPrompt = `${finalPrompt}, ${styleParts.join(", ")}`;
     }
 
+    // Build categories map for Genfy API
+    const categories = {};
+    if (selectedStyle) categories.style = selectedStyle;
+    if (selectedMedium) categories.medium = selectedMedium;
+    if (selectedLighting) categories.lighting = selectedLighting;
+    if (selectedComposition) categories.composition = selectedComposition;
+    if (selectedCamera) categories.camera = selectedCamera;
+    if (selectedLens) categories.lens = selectedLens;
+    if (selectedMood) categories.mood = selectedMood;
+    if (selectedColor) categories.color = selectedColor;
+    if (selectedCameraBody) categories.camera_body = selectedCameraBody;
+
     try {
+      const payload = {
+        prompt: finalPrompt,
+        model_ids: selectedModels,
+        ratio: selectedRatio,
+        quality: selectedQuality,
+        categories: categories,
+      };
+
+      if (selectedModels.includes("ChatGPT")) {
+        payload.chatgpt_model = chatgptModel;
+      }
+
       const response = await fetch("/bff/genfy/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-          model_ids: selectedModels,
-          ratio: selectedRatio,
-          quality: selectedQuality,
-          active_configs: selectedModels.includes("ChatGPT") ? { chatgpt_model: chatgptModel } : {}
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -256,7 +283,8 @@ export default function GenfyScreen({ t, nav, showToast }) {
       }
 
       // 2. Submit edit session request
-      const editRes = await fetch(`/bff/genfy/sessions/${currentSessionId}/images/${activeImage.id}/edit`, {
+      const imgId = activeImage.image_id || activeImage.id;
+      const editRes = await fetch(`/bff/genfy/sessions/${currentSessionId}/images/${imgId}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -283,11 +311,12 @@ export default function GenfyScreen({ t, nav, showToast }) {
   const handleUpscale = async () => {
     if (!activeImage) return;
     showToast("Submitting upscale task...");
+    const imgId = activeImage.image_id || activeImage.id;
     try {
       const response = await fetch("/bff/genfy/upscale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_id: activeImage.id })
+        body: JSON.stringify({ image_id: imgId })
       });
       if (response.ok) {
         showToast("Upscale task started successfully!");
@@ -627,9 +656,10 @@ export default function GenfyScreen({ t, nav, showToast }) {
                         t={t}
                         kind="secondary"
                         onClick={() => {
+                          const imgId = activeImage.image_id || activeImage.id;
                           const link = document.createElement("a");
                           link.href = activeImage.url;
-                          link.download = `genfy-${activeImage.id}.png`;
+                          link.download = `genfy-${imgId}.png`;
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
@@ -999,14 +1029,17 @@ export default function GenfyScreen({ t, nav, showToast }) {
             </span>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {generatedImages.map((img, idx) => (
-                <div
-                  key={img.id}
-                  onClick={() => setActiveImage(img)}
-                  style={{
-                    borderRadius: 10,
-                    overflow: "hidden",
-                    border: `2px solid ${activeImage && activeImage.id === img.id ? t.accent : "transparent"}`,
+              {generatedImages.map((img, idx) => {
+                const imgId = img.image_id || img.id || idx;
+                const activeImgId = activeImage ? (activeImage.image_id || activeImage.id) : null;
+                return (
+                  <div
+                    key={imgId}
+                    onClick={() => setActiveImage(img)}
+                    style={{
+                      borderRadius: 10,
+                      overflow: "hidden",
+                      border: `2px solid ${activeImgId && activeImgId === imgId ? t.accent : "transparent"}`,
                     cursor: "pointer",
                     position: "relative",
                     background: t.bg,
@@ -1028,7 +1061,8 @@ export default function GenfyScreen({ t, nav, showToast }) {
                     {img.model_id.split(" ")[0]}
                   </div>
                 </div>
-              ))}
+              );
+            })}
 
               {generatedImages.length === 0 && (
                 <div style={{ padding: "40px 0", textAlign: "center", color: t.text3, fontSize: 12.5 }}>

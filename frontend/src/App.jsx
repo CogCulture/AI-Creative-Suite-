@@ -48,6 +48,7 @@ export default function App() {
   });
   const { t, mode, toggle } = useTheme();
   const [view, setView] = useState("home");
+  const [activeProject, setActiveProject] = useState(null);
   const [toast, setToast] = useState(null);
   const [onb, setOnb] = useState(false);
   const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1300);
@@ -92,11 +93,24 @@ export default function App() {
 
   const showToast = (msg) => {
     clearTimeout(timerRef.current);
-    setToast(msg);
-    timerRef.current = setTimeout(() => setToast(null), 2800);
+    let strMsg = msg;
+    if (typeof msg !== "string") {
+      if (Array.isArray(msg)) {
+        strMsg = msg.map(m => (typeof m === "object" ? (m.msg || JSON.stringify(m)) : String(m))).join(", ");
+      } else if (typeof msg === "object" && msg !== null) {
+        strMsg = msg.detail
+          ? (typeof msg.detail === "string" ? msg.detail : JSON.stringify(msg.detail))
+          : (msg.message || JSON.stringify(msg));
+      } else {
+        strMsg = String(msg || "");
+      }
+    }
+    setToast(strMsg);
+    timerRef.current = setTimeout(() => setToast(null), 3500);
   };
 
-  const nav = (id) => {
+  const nav = (id, projectData) => {
+    if (projectData !== undefined) setActiveProject(projectData);
     setView(id);
     const s = document.getElementById("studio-scroll");
     if (s) s.scrollTo({ top: 0, behavior: "smooth" });
@@ -149,8 +163,8 @@ export default function App() {
           {view === "home"        && <HomeScreen {...shared} />}
           {view === "tools"       && <ToolsScreen {...shared} />}
           {view === "tool-detail" && <ToolDetail {...shared} />}
-          {view === "workflow"    && <WorkflowScreen {...shared} />}
-          {view === "projects"    && <ProjectsScreen {...shared} />}
+          {view === "workflow"    && <WorkflowScreen {...shared} activeProject={activeProject} setActiveProject={setActiveProject} />}
+          {view === "projects"    && <ProjectsScreen {...shared} setActiveProject={setActiveProject} />}
           {view === "brain"       && <BrainScreen {...shared} />}
           {view === "assets"      && <AssetsScreen {...shared} />}
           {view === "genfy-detail" && <GenfyScreen {...shared} />}

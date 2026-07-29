@@ -413,8 +413,11 @@ export default function ToolDetail({ t, nav, showToast }) {
                   hue={toolById("genfy").hue}
                   small
                   onClick={() => {
-                    showToast("Sent to Genfy · Image");
-                    nav("workflow");
+                    try {
+                      localStorage.setItem("genfy_seed_prompt", output);
+                    } catch (_) {}
+                    showToast("Copy transferred to Genfy Image Tool");
+                    nav("genfy-detail");
                   }}
                   style={{
                     marginLeft: "auto",
