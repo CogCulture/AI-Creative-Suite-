@@ -265,12 +265,12 @@ async def _sync_to_copyagent(
                 headers={"X-Suite-API-Key": SUITE_API_KEY},
             )
         if resp.status_code in {200, 201, 202}:
-            print(f"[Auth] CopyAgent sync OK for {email}: {resp.json().get('status')}")
+            print(f"[Auth] CopyAgent sync OK for {email}: {resp.json().get('status')}", flush=True)
             return True
-        print(f"[Auth] CopyAgent sync FAILED ({resp.status_code}) for {email}: {resp.text[:300]}")
+        print(f"[Auth] CopyAgent sync FAILED ({resp.status_code}) for {email}: {resp.text[:300]}", flush=True)
         return False
     except Exception as exc:
-        print(f"[Auth] CopyAgent sync ERROR for {email}: {exc}")
+        print(f"[Auth] CopyAgent sync ERROR for {email}: {exc}", flush=True)
         return False
 
 
@@ -699,6 +699,13 @@ async def chat_completions(
     user_id: Optional[str] = None
     if suite_session:
         user_id = _decode_jwt(suite_session)
+        if user_id:
+            # Verify user actually exists in local SQLite DB
+            local_user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+            if not local_user:
+                print(f"[Auth] Cookie user_id {user_id} does not exist in local DB. Falling back to Guest.", flush=True)
+                user_id = None
+
     if not user_id:
         user_id = STATIC_USER_ID
 
