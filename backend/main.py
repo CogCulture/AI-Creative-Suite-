@@ -298,6 +298,28 @@ async def _ensure_copyagent_user(user_id: str, db: Session) -> bool:
     return success
 
 
+async def _sync_user_forced(user_id: str, db: Session) -> bool:
+    """Forces a sync to CopyAgent regardless of the local copyagent_synced flag status."""
+    user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+    if not user:
+        return False
+    
+    print(f"[Auth] Force-syncing user {user.email} (id={user.id}) to CopyAgent...")
+    success = await _sync_to_copyagent(
+        user_id=user.id,
+        email=user.email,
+        name=user.name or user.email.split("@")[0],
+        password_hash=user.password_hash,
+        auth_provider=user.auth_provider,
+        google_id=user.google_id,
+        profile_picture=user.profile_picture,
+    )
+    if success:
+        user.copyagent_synced = True
+        db.commit()
+    return success
+
+
 
 
 # ── Request schemas ───────────────────────────────────────────────────────────
@@ -620,6 +642,36 @@ async def _stream_from_upstream(payload: dict, user_id: Optional[str]) -> AsyncG
             headers=_upstream_headers(user_id),
             json=payload,
         ) as upstream:
+            if upstream.status_code == 404 and user_id and user_id != STATIC_USER_ID:
+                # Read error body to check if it's the missing user detail
+                error_body = await upstream.aread()
+                error_text = error_body.decode("utf-8", errors="replace")
+                if "User specified in X-User-Id does not exist" in error_text:
+                    print(f"[Self-Healing Stream] User {user_id} missing from CopyAgent. Force syncing and retrying...")
+                    db_local = SuiteSessionLocal()
+                    try:
+                        await _sync_user_forced(user_id, db_local)
+                    finally:
+                        db_local.close()
+                    
+                    # Retry the connection once
+                    async with client.stream(
+                        "POST",
+                        COPYAGENT_URL,
+                        headers=_upstream_headers(user_id),
+                        json=payload,
+                    ) as retry_upstream:
+                        if retry_upstream.status_code != 200:
+                            retry_err_body = await retry_upstream.aread()
+                            retry_err_text = retry_err_body.decode("utf-8", errors="replace")
+                            err_payload = json.dumps({"error": f"Upstream retry error {retry_upstream.status_code}: {retry_err_text[:300]}"})
+                            yield f"data: {err_payload}\n\n"
+                            return
+                        async for line in retry_upstream.aiter_lines():
+                            if line:
+                                yield f"{line}\n\n"
+                        return
+
             if upstream.status_code != 200:
                 error_body = await upstream.aread()
                 error_text = error_body.decode("utf-8", errors="replace")
@@ -678,6 +730,19 @@ async def chat_completions(
                 headers=_upstream_headers(user_id),
                 json=upstream_payload,
             )
+            
+        # Self-healing retry on 404
+        if upstream.status_code == 404 and "User specified in X-User-Id does not exist" in upstream.text:
+            if user_id and user_id != STATIC_USER_ID:
+                print(f"[Self-Healing Chat] User {user_id} missing from CopyAgent. Force syncing and retrying...")
+                await _sync_user_forced(user_id, db)
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    upstream = await client.post(
+                        COPYAGENT_URL,
+                        headers=_upstream_headers(user_id),
+                        json=upstream_payload,
+                    )
+
         if not upstream.is_success:
             raise HTTPException(status_code=upstream.status_code, detail=upstream.text[:500])
         return upstream.json()
