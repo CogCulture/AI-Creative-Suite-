@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cog Culture for Enterprise — Scale Creative Output Safely</title>
+  <meta name="description"
+    content="Unify your generative AI stack. Save on subscriptions, protect your IP, and scale creative workflows globally with Cog Culture Enterprise." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#000000',
+            'brand-fg': '#ffffff',
+            ink: '#16192b',
+            surface: '#f7f8fa',
+            'surface-alt': '#dddddd',
+            border: '#e6e8ee',
+            muted: '#6b7080',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Custom footer logo opacity */
+    .footer-logo {
+      opacity: 0.3;
+    }
+    /* Custom Cursor styling */
+    #custom-cursor {
+      transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  height 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  background-color 0.2s, border 0.2s, opacity 0.2s;
+    }
+    #custom-cursor.active {
+      width: 40px;
+      height: 40px;
+      background-color: transparent;
+      border: 1.5px solid #ffffff;
+    }
+    /* Hide default cursor on desktop */
+    @media (hover: hover) and (pointer: fine) {
+      html, body, a, button, select, input, textarea, summary, [role="button"], .suite-tab {
+        cursor: none !important;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-white text-ink font-sans">
+
+  <!-- Custom Black Dot Cursor (inverts on dark bg for visibility) -->
+  <div id="custom-cursor" class="pointer-events-none fixed z-[9999] rounded-full bg-white mix-blend-difference opacity-0" style="width: 16px; height: 16px; top: 0; left: 0; transform: translate3d(-50%, -50%, 0);"></div>
+
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-50 w-full border-b border-border/70 bg-white/85 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-[70px]">
+      <a href="index.html" class="flex items-center">
+        <img src="images/Cog%20logo%20full%20(1).svg" alt="Cog Logo" class="h-40 w-40" />
+      </a>
+      <nav class="hidden lg:flex items-center gap-1">
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            AI Intelligence Suite
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-[640px] -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl grid grid-cols-4 gap-8">
+              <!-- Column 1: Create -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Create</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Image</a>
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Video</a>
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Copy</a>
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Presentation</a>
+                </div>
+              </div>
+              <!-- Column 2: Manage -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Manage</span>
+                <div class="space-y-[4px]">
+                  <a href="dashboard/hr.html" class="block text-sm text-muted hover:text-ink transition font-sans">HR</a>
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Manage</a>
+                </div>
+              </div>
+              <!-- Column 3: Research -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Research</span>
+                <div class="space-y-[4px]">
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Marketplace</a>
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Dam</a>
+                </div>
+              </div>
+              <!-- Column 4: Build -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Build</span>
+                <div class="space-y-[4px]">
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Website</a>
+                  <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">App</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            Resources
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl">
+              <span class="block text-sm font-semibold text-ink mb-3 font-display">Resources</span>
+              <div class="space-y-[4px]">
+                <a href="marketplace.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Marketplace</a>
+                <a href="company.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Company</a>
+                <a href="blog.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Blog</a>
+                <a href="support.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Support</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <a href="enterprise.html" class="px-3 py-2 text-sm font-medium text-ink/85 hover:text-ink font-semibold">Enterprise</a>
+        <a href="pricing.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Pricing</a>
+      </nav>
+      <div class="hidden lg:flex items-center gap-2">
+        <a href="/?login=true" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Login</a>
+        <a href="pricing.html"
+          class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Get Started</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+      <button id="mobile-toggle" class="lg:hidden" aria-label="Menu">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-border bg-white px-[70px] py-4">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">AI Intelligence Suite</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="#">Create</a>
+        <a href="index.html#suite">Manage</a>
+        <a href="index.html#suite">Research</a>
+        <a href="index.html#suite">Build</a>
+      </div>
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Resources</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="marketplace.html">Marketplace</a><a href="company.html">Company</a><a href="blog.html">Blog</a><a href="support.html">Support</a>
+      </div>
+      <div class="grid gap-2 border-t border-border pt-4 text-sm">
+        <a href="enterprise.html" class="font-medium">Enterprise</a>
+        <a href="pricing.html" class="font-medium">Pricing</a>
+        <a href="/?login=true" class="font-medium">Login</a>
+        <a href="pricing.html"
+          class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-center font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Get Started</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="w-full h-[550px] md:h-[750px] overflow-hidden bg-black relative">
+    <video id="hero-video" autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover scale-[1.15]">
+      <source src="videos/0630.mp4" type="video/mp4">
+    </video>
+    <div class="absolute inset-0 z-10 flex items-center bg-black/25">
+      <div class="mx-auto max-w-7xl w-full px-[70px]">
+        <h1 class="text-[48px] font-medium tracking-tight text-white leading-tight font-display max-w-3xl text-left">
+          Build the AI-First Enterprise
+        </h1>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXECUTION SECTION -->
+  <section class="bg-white py-16">
+    <div class="mx-auto max-w-7xl px-[70px] grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+      <!-- Left: Heading and Paragraph -->
+      <div class="lg:col-span-6 space-y-6">
+        <h2 class="text-4xl md:text-5xl font-medium tracking-tight font-display text-ink leading-tight">
+          AI isn't your advantage anymore. Execution is.
+        </h2>
+        <p class="text-sm leading-relaxed text-muted font-sans max-w-xl">
+          Most organizations already have access to AI. The real challenge is moving beyond isolated tools to AI systems that are secure, scalable, and aligned with the way your business operates.
+        </p>
+      </div>
+      
+      <!-- Right: Graphic Card with Stats -->
+      <div class="lg:col-span-6 flex justify-center lg:justify-end">
+        <div class="w-full max-w-[360px] aspect-[4/5] relative overflow-hidden rounded-none p-6 flex items-center justify-center">
+          <!-- Background Image -->
+          <img src="images/Frame%202610520.png" alt="Enterprise Data Background" class="absolute inset-0 w-full h-full object-cover z-0" />
+          
+          <!-- Frosted Glass Card -->
+          <div class="relative z-10 w-full h-full border border-white/10 bg-white/5 backdrop-blur-xl p-6 flex flex-col justify-between text-white rounded-none">
+            <div class="space-y-4 py-2">
+              <div>
+                <div class="text-3xl font-semibold font-display">60%</div>
+                <div class="text-xs text-white/80 font-sans mt-0.5">Enterprise AI adoption</div>
+              </div>
+              <div>
+                <div class="text-3xl font-semibold font-display">25%</div>
+                <div class="text-xs text-white/80 font-sans mt-0.5">Pilots reach production</div>
+              </div>
+              <div>
+                <div class="text-3xl font-semibold font-display">84%</div>
+                <div class="text-xs text-white/80 font-sans mt-0.5">Jobs not redesigned</div>
+              </div>
+              <div>
+                <div class="text-3xl font-semibold font-display">74%</div>
+                <div class="text-xs text-white/80 font-sans mt-0.5">Planning Agentic AI</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY ENTERPRISES CHOOSE COG CULTURE -->
+  <section class="bg-white pb-16">
+    <div class="mx-auto max-w-7xl px-[70px]">
+      
+      <!-- Header -->
+      <div class="mx-auto max-w-3xl text-center mb-16">
+        <h2 class="text-4xl md:text-5xl font-medium tracking-tight font-display text-ink">
+          Why Enterprises Choose Cog Culture
+        </h2>
+        <p class="mt-6 text-sm leading-relaxed text-muted font-sans max-w-2xl mx-auto">
+          Most organizations already have access to AI. The real challenge is moving beyond isolated tools to AI systems that are secure, scalable, and aligned with the way your business operates.
+        </p>
+      </div>
+
+      <!-- 3-Column Cards Grid -->
+      <div class="grid gap-6 md:grid-cols-3">
+        <!-- Card 1 -->
+        <div class="bg-[#dddddd] p-8 py-12 rounded-none text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-300 ease-in-out hover:bg-black hover:-translate-y-1 hover:shadow-md group">
+          <h3 class="text-base font-semibold font-display text-ink group-hover:text-white mb-3 transition-colors duration-300">Scalable by Design</h3>
+          <p class="text-xs leading-relaxed text-muted group-hover:text-white/80 font-sans max-w-[220px] transition-colors duration-300">
+            Built for production, not just prototypes.
+          </p>
+        </div>
+        
+        <!-- Card 2 -->
+        <div class="bg-[#dddddd] p-8 py-12 rounded-none text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-300 ease-in-out hover:bg-black hover:-translate-y-1 hover:shadow-md group">
+          <h3 class="text-base font-semibold font-display text-ink group-hover:text-white mb-3 transition-colors duration-300">Sovereign AI</h3>
+          <p class="text-xs leading-relaxed text-muted group-hover:text-white/80 font-sans max-w-[220px] transition-colors duration-300">
+            Your data stays yours. Private deployment, private models, complete ownership.
+          </p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bg-[#dddddd] p-8 py-12 rounded-none text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-300 ease-in-out hover:bg-black hover:-translate-y-1 hover:shadow-md group">
+          <h3 class="text-base font-semibold font-display text-ink group-hover:text-white mb-3 transition-colors duration-300">Brand-Coherent AI</h3>
+          <p class="text-xs leading-relaxed text-muted group-hover:text-white/80 font-sans max-w-[220px] transition-colors duration-300">
+            Every output follows your brand guidelines automatically.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CTA / SALES FORM -->
+  <section id="contact" class="bg-[#dddddd] py-16 text-ink">
+    <div class="mx-auto max-w-7xl px-[70px]">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+        
+        <!-- Left Side: Heading & Text -->
+        <div class="lg:col-span-5 space-y-6">
+          <h2 class="text-3xl font-medium leading-[1.05] tracking-tight md:text-5xl font-display text-ink">
+            Let's talk Enterprise
+          </h2>
+          <p class="text-sm leading-relaxed text-black font-sans max-w-md">
+            Get the most from the Creative Suite, with advanced capabilities made for companies like yours. Want to know more? Fill out the form and our team will reach out.
+          </p>
+        </div>
+
+        <!-- Right Side: Form Card -->
+        <div class="lg:col-span-7">
+          <div class="bg-white rounded-none p-8 md:p-10 shadow-sm border border-border/70">
+            <form class="space-y-5 text-left">
+              
+              <!-- Reason -->
+              <div>
+                <label class="block text-xs font-semibold text-ink/85 mb-2">Reason</label>
+                <div class="relative">
+                  <select class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink appearance-none focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition">
+                    <option value="" disabled selected>Select a reason</option>
+                    <option value="sales">Evaluate Cog Culture for my team</option>
+                    <option value="demo">Request a custom enterprise demo</option>
+                    <option value="pricing">Discuss custom pricing and licensing</option>
+                    <option value="security">Security, compliance or SSO inquiries</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <!-- First Name / Last Name -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-ink/85 mb-2">First name</label>
+                  <input type="text" placeholder="Clara" class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-ink/85 mb-2">Last name</label>
+                  <input type="text" placeholder="Rockmore" class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition" />
+                </div>
+              </div>
+
+              <!-- Job Title -->
+              <div>
+                <label class="block text-xs font-semibold text-ink/85 mb-2">Job title</label>
+                <input type="text" placeholder="Your role at the company" class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition" />
+              </div>
+
+              <!-- Business Email -->
+              <div>
+                <label class="block text-xs font-semibold text-ink/85 mb-2">Business email</label>
+                <input type="email" placeholder="name@company.com" class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition" />
+              </div>
+
+              <!-- Phone (optional) -->
+              <div>
+                <label class="block text-xs font-semibold text-ink/85 mb-2">Phone (optional)</label>
+                <div class="grid grid-cols-12 gap-3">
+                  <div class="col-span-4 relative">
+                    <select class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink appearance-none focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition">
+                      <option value="" disabled selected>Country</option>
+                      <option value="us">US (+1)</option>
+                      <option value="uk">UK (+44)</option>
+                      <option value="in">IN (+91)</option>
+                      <option value="ca">CA (+1)</option>
+                      <option value="au">AU (+61)</option>
+                      <option value="de">DE (+49)</option>
+                      <option value="fr">FR (+33)</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted">
+                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="col-span-8">
+                    <input type="tel" placeholder="Phone number" class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Company -->
+              <div>
+                <label class="block text-xs font-semibold text-ink/85 mb-2">Company</label>
+                <input type="text" placeholder="Your company" class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition" />
+              </div>
+
+              <!-- Company Size -->
+              <div>
+                <label class="block text-xs font-semibold text-ink/85 mb-2">Company size</label>
+                <div class="relative">
+                  <select class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink appearance-none focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition">
+                    <option value="" disabled selected>Select size</option>
+                    <option value="1-10">1-10 employees</option>
+                    <option value="11-50">11-50 employees</option>
+                    <option value="51-200">51-200 employees</option>
+                    <option value="201-500">201-500 employees</option>
+                    <option value="501-1000">501-1000 employees</option>
+                    <option value="1001+">1001+ employees</option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Message -->
+              <div>
+                <label class="block text-xs font-semibold text-ink/85 mb-2">Message</label>
+                <textarea rows="4" placeholder="Tell us what you need. Please be as detailed as you can." class="w-full bg-white border border-border rounded-none px-4 py-3 text-sm text-ink placeholder-muted/60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition resize-none"></textarea>
+              </div>
+
+              <!-- Disclaimer -->
+              <p class="text-xs leading-relaxed text-muted font-sans pt-2">
+                Cog Culture will process your data for the purpose of maintaining a professional contact, for the management of pre-contractual measures, and, where appropriate, the conclusion of an agreement with you, based on our legitimate interest. Your data will not be communicated to third parties and will be transferred outside the EU under the terms of the privacy policy. You can find out how to exercise your rights and more information in the <a href="#" class="text-blue-600 underline hover:text-blue-800">Privacy Policy</a>.
+              </p>
+
+              <!-- Submit Button -->
+              <div>
+                <button type="submit" class="w-full bg-brand hover:brightness-110 text-white font-semibold py-4 rounded-none transition duration-300 shadow-sm mt-4 text-center">
+                  Submit
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-[#dddddd] pt-16">
+    <div class="mx-auto max-w-7xl px-[70px] pb-16">
+
+      <!-- Footer Grid -->
+      <div class="grid gap-12 sm:grid-cols-2 lg:grid-cols-4 items-start w-full">
+        
+        <!-- Column 1: AI Suite -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">AI Intelligence Suite</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Create</a></li>
+            <li><a href="index.html#suite" class="hover:underline">Manage</a></li>
+            <li><a href="index.html#suite" class="hover:underline">Research</a></li>
+            <li><a href="index.html#suite" class="hover:underline">Build</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 2: Support -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Support</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Help Centre</a></li>
+            <li><a href="#" class="hover:underline">Download and install</a></li>
+            <li><a href="#" class="hover:underline">Cog Community</a></li>
+            <li><a href="#" class="hover:underline">Cog Learn</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 3: Enterprise -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Enterprise</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Marketplace</a></li>
+            <li><a href="company.html" class="hover:underline">Company</a></li>
+            <li><a href="blog.html" class="hover:underline">Blog</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 4: Company -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Company</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Careers</a></li>
+            <li><a href="#" class="hover:underline">Contact</a></li>
+            <li><a href="#" class="hover:underline">Press</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Bottom Bar (Black Bar with white text) -->
+    <div class="bg-black py-8">
+      <div class="mx-auto max-w-7xl px-[70px] flex flex-col md:flex-row justify-between items-start md:items-center text-xs text-white/80">
+        <p class="uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white">COPYRIGHT COG CULTURE <span id="year"></span></p>
+        <div class="flex gap-5 mt-4 md:mt-0">
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Privacy</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Terms</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Cookies</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Mobile menu toggle
+    const mobileToggle = document.getElementById('mobile-toggle');
+    if (mobileToggle) {
+      mobileToggle.addEventListener('click', () => {
+        document.getElementById('mobile-menu').classList.toggle('hidden');
+      });
+    }
+
+    // Custom Cursor logic
+    const cursor = document.getElementById('custom-cursor');
+    if (cursor) {
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        if (cursor.style.opacity !== '1') {
+          cursor.style.opacity = '1';
+        }
+      });
+      document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+      });
+      document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+      });
+      // Handle page visibility/focus changes
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          cursor.style.opacity = '0';
+        }
+      });
+      // Add active state on hover over interactive elements (using delegation)
+      document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.add('active');
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.remove('active');
+        }
+      });
+    }
+
+    // Smooth Parallax for Video Hero
+    (function() {
+      const video = document.getElementById('hero-video');
+      if (!video) return;
+      window.addEventListener('scroll', () => {
+        const currentScrollY = window.scrollY;
+        // Apply vertical parallax translation to the video
+        // (video is scaled 1.15x, allowing up to 15% translation)
+        video.style.transform = `translate3d(0, ${currentScrollY * 0.12}px, 0) scale(1.15)`;
+      }, { passive: true });
+    })();
+  </script>
+</body>
+
+</html>

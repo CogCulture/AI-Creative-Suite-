@@ -1,0 +1,52 @@
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; color:#16192b; background:#fff; }
+h1, h2, h3, h4 { font-family: 'Inter Tight', Inter, system-ui, sans-serif; letter-spacing:-0.02em; }
+.dropdown:hover .dropdown-panel { visibility:visible; opacity:1; }
+.dropdown-panel { visibility:hidden; opacity:0; transition: all .15s; }
+.dropdown:hover .dropdown-caret { transform: rotate(180deg); }
+.dropdown-caret { transition: transform .15s; }
+.card-hover { position: relative; overflow: hidden; }
+.card-hover::after { content: ""; position: absolute; inset: 0; background: black; transform: scaleY(0); transform-origin: bottom; transition: transform 0.4s ease; z-index: 0; }
+.card-hover:hover::after { transform: scaleY(1); }
+.card-hover > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure text color becomes white on hover, overriding utility classes */
+.card-hover:hover .text-muted {
+  color: white !important;
+}
+
+/* Ensure any other text color utilities are overridden */
+.card-hover:hover .text-ink {
+  color: white !important;
+}
+
+/* Ensure icons inherit white color */
+.card-hover:hover .inline-flex {
+  color: white !important;
+}
+details > summary { list-style: none; cursor:pointer; }
+details > summary::-webkit-details-marker { display:none; }
+details[open] .faq-plus { transform: rotate(45deg); }
+.faq-plus { transition: transform .15s; }
+.tab-btn.active { background:#000000; color:#fff; }
+/* Updated continuous sliding animation */
+.slide-container {
+  overflow: hidden;
+}
+.slide-track {
+  display: flex;
+  width: calc(200%);
+}
+.slide-track img {
+  width: 50%;
+  flex-shrink: 0;
+}
+@keyframes slide-continuous {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-slide-continuous { animation: slide-continuous 30s linear infinite; }
+

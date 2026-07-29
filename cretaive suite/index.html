@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cog Culture — One AI Suite for Every Creator</title>
+  <meta name="description"
+    content="Generate images, videos, copy, presentations, websites and apps with the Cog Culture AI Intelligence Suite. One subscription, infinite possibilities." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#000000',
+            'brand-fg': '#ffffff',
+            ink: '#16192b',
+            surface: '#f7f8fa',
+            'surface-alt': '#dddddd',
+            border: '#e6e8ee',
+            muted: '#6b7080',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Slide left infinite animation */
+    @keyframes slide-left {
+      0% {
+        transform: translateX(100%);
+      }
+
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+
+    .animate-slide-left {
+      animation: slide-left 12s linear infinite;
+    }
+
+    /* Continuous sliding with duplicated images */
+    .slide-container {
+      overflow: hidden;
+    }
+
+    .slide-track {
+      display: flex;
+      width: max-content;
+    }
+
+    .slide-track img {
+      flex-shrink: 0;
+    }
+
+    @keyframes slide-left-continuous {
+      0% {
+        transform: translateX(0);
+      }
+
+      100% {
+        transform: translateX(-50%);
+      }
+    }
+
+    .animate-slide-continuous {
+      animation: slide-left-continuous 30s linear infinite;
+    }
+
+    .animate-slide-slow {
+      animation: slide-left-continuous 45s linear infinite;
+    }
+
+    /* Hide scrollbar */
+    .scrollbar-none::-webkit-scrollbar {
+      display: none;
+    }
+
+    .scrollbar-none {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Interactive Suite Transitions */
+    .suite-tab-content {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, margin-top 0.4s ease;
+    }
+
+    .suite-tab.active .suite-tab-content {
+      max-height: 200px;
+      opacity: 1;
+      margin-top: 8px;
+    }
+
+    /* Animated Border Spin keyframes */
+    @keyframes border-spin {
+      100% {
+        transform: translate(-50%, -50%) rotate(360deg);
+      }
+    }
+
+    .animate-border-spin {
+      animation: border-spin 4s linear infinite;
+    }
+
+    /* Workflow Card Custom Interactions */
+    .workflow-card {
+      width: 260px;
+      height: 540px;
+      background-color: transparent;
+      border: 0.5px solid rgba(22, 25, 43, 0.25);
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.6s;
+      will-change: width, background-color;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .workflow-card:hover {
+      width: 480px;
+      background-color: #000000;
+      border-color: #000000;
+    }
+    .workflow-card h3, .workflow-card h4 {
+      color: #16192b;
+      transition: color 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: color;
+    }
+    .workflow-card p {
+      color: #4b5563;
+      transition: color 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: color;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .workflow-card:hover h3, .workflow-card:hover h4 {
+      color: #ffffff;
+    }
+    .workflow-card:hover p {
+      color: #d1d5db;
+      -webkit-line-clamp: unset;
+    }
+    /* Footer Logo Opacity */
+    .footer-logo {
+      opacity: 0.3;
+    }
+    /* Custom Cursor styling */
+    #custom-cursor {
+      transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  height 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  background-color 0.2s, border 0.2s, opacity 0.2s;
+    }
+    #custom-cursor.active {
+      width: 40px;
+      height: 40px;
+      background-color: transparent;
+      border: 1.5px solid #ffffff;
+    }
+    /* Hide default cursor on desktop */
+    @media (hover: hover) and (pointer: fine) {
+      html, body, a, button, select, input, textarea, summary, [role="button"], .suite-tab {
+        cursor: none !important;
+      }
+    }
+
+    /* Spectrum Glow effect */
+    .spectrum-glow {
+      position: absolute;
+      pointer-events: none;
+      border-radius: 9999px;
+      filter: blur(140px);
+      will-change: transform, opacity;
+      z-index: 0;
+    }
+    .spectrum-glow-1 {
+      background: radial-gradient(circle at 30% 30%, rgba(236, 72, 153, 0.45) 0%, rgba(168, 85, 247, 0.35) 30%, rgba(59, 130, 246, 0.25) 60%, rgba(6, 182, 212, 0.15) 100%);
+    }
+    .spectrum-glow-2 {
+      background: radial-gradient(circle at 70% 30%, rgba(6, 182, 212, 0.45) 0%, rgba(20, 184, 166, 0.35) 30%, rgba(234, 179, 8, 0.2) 60%, rgba(249, 115, 22, 0.15) 100%);
+    }
+    .spectrum-glow-3 {
+      background: radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.45) 0%, rgba(236, 72, 153, 0.35) 35%, rgba(168, 85, 247, 0.25) 70%, rgba(59, 130, 246, 0.1) 100%);
+    }
+    .spectrum-glow-rainbow {
+      background: radial-gradient(circle, 
+        rgba(239, 68, 68, 0.45) 0%,     /* Red */
+        rgba(249, 115, 22, 0.40) 18%,    /* Orange */
+        rgba(234, 179, 8, 0.35) 35%,    /* Yellow */
+        rgba(34, 197, 94, 0.30) 50%,    /* Green */
+        rgba(59, 130, 246, 0.25) 68%,   /* Blue */
+        rgba(99, 102, 241, 0.20) 82%,   /* Indigo */
+        rgba(168, 85, 247, 0.15) 100%   /* Violet */
+      );
+    }
+    .spectrum-rainbow-top {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 950px;
+      height: 650px;
+      border-radius: 9999px;
+      background: radial-gradient(circle at center, 
+        rgba(239, 68, 68, 0.45) 0%,     /* Red */
+        rgba(249, 115, 22, 0.40) 18%,    /* Orange */
+        rgba(234, 179, 8, 0.35) 35%,    /* Yellow */
+        rgba(34, 197, 94, 0.30) 50%,    /* Green */
+        rgba(59, 130, 246, 0.25) 68%,   /* Blue */
+        rgba(99, 102, 241, 0.20) 82%,   /* Indigo */
+        rgba(168, 85, 247, 0.15) 100%   /* Violet */
+      );
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.3;
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-white text-ink font-sans overflow-x-hidden">
+
+  <!-- Custom Black Dot Cursor (inverts on dark bg for visibility) -->
+  <div id="custom-cursor" class="pointer-events-none fixed z-[9999] rounded-full bg-white mix-blend-difference opacity-0" style="width: 16px; height: 16px; top: 0; left: 0; transform: translate3d(-50%, -50%, 0);"></div>
+
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-50 w-full border-b border-border/70 bg-white/85 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-[70px]">
+      <a href="index.html" class="flex items-center">
+        <img src="images/Cog%20logo%20full%20(1).svg" alt="Cog Logo" class="h-40 w-40" />
+
+      </a>
+      <nav class="hidden lg:flex items-center gap-1">
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            AI Intelligence Suite
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-[640px] -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl grid grid-cols-4 gap-8">
+              <!-- Column 1: Create -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Create</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Image</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Video</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Copy</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Presentation</a>
+                </div>
+              </div>
+              <!-- Column 2: Manage -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Manage</span>
+                <div class="space-y-[4px]">
+                  <a href="dashboard/hr.html" class="block text-sm text-muted hover:text-ink transition font-sans">HR</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Manage</a>
+                </div>
+              </div>
+              <!-- Column 3: Research -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Research</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Marketplace</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Dam</a>
+                </div>
+              </div>
+              <!-- Column 4: Build -->
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Build</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Website</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">App</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            Resources
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl">
+              <span class="block text-sm font-semibold text-ink mb-3 font-display">Resources</span>
+              <div class="space-y-[4px]">
+                <a href="marketplace.html" class="block text-sm text-muted hover:text-ink transition font-sans">Marketplace</a>
+                <a href="company.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Company</a>
+                <a href="blog.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans font-sans">Blog</a>
+                <a href="support.html" class="block text-sm text-muted hover:text-ink transition font-sans">Support</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <a href="enterprise.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Enterprise</a>
+        <a href="pricing.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Pricing</a>
+      </nav>
+      <div class="hidden lg:flex items-center gap-2">
+        <a href="#" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Login</a>
+        <a href="#"
+          class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+      <button id="mobile-toggle" class="lg:hidden" aria-label="Menu">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-border bg-white px-[70px] py-4">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">AI Intelligence Suite</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="#">Create</a>
+        <a href="#">Manage</a>
+        <a href="#">Research</a>
+        <a href="#">Build</a>
+      </div>
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Resources</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="marketplace.html">Marketplace</a><a href="company.html">Company</a><a href="blog.html">Blog</a><a href="support.html">Support</a>
+      </div>
+      <div class="grid gap-2 border-t border-border pt-4 text-sm">
+        <a href="enterprise.html" class="font-medium">Enterprise</a>
+        <a href="pricing.html" class="font-medium">Pricing</a>
+        <a href="#" class="font-medium">Login</a>
+        <a href="#"
+          class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-center font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+
+  <section class="relative bg-white pt-16 pb-6">
+    <!-- Upper Gradient Fade (7 Colors Mix) -->
+    <div class="spectrum-rainbow-top"></div>
+
+    <!-- Spectrum Glow BG (Upgraded to Rainbow Mix with higher visibility) -->
+    <div class="spectrum-glow spectrum-glow-rainbow w-[650px] h-[650px] -top-[150px] -right-[150px] opacity-35"></div>
+    <div class="spectrum-glow spectrum-glow-rainbow w-[450px] h-[450px] top-[120px] -left-[150px] opacity-25"></div>
+    <div class="relative z-10 mx-auto grid max-w-7xl gap-12 px-[70px] lg:grid-cols-3 lg:items-center">
+      <div class="lg:col-span-1">
+        <h1 class="text-3xl font-medium leading-[1.05] tracking-tight md:text-5xl font-display text-ink">
+          One AI suite.<br><span class="text-brand">Infinite ways to create.</span>
+        </h1>
+        <p class="mt-6 max-w-xl text-sm leading-relaxed text-muted font-sans">Turn ideas into images, videos, copy, presentations, websites and
+          apps all from one simple place. No new skills to learn. Just describe what you want, and start creating.</p>
+        <div class="mt-8 flex gap-3 max-w-[380px] w-full">
+          <a href="trial.html"
+            class="group/btn inline-flex items-center justify-center gap-2 rounded-none bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110 w-1/2 whitespace-nowrap">
+            <span>Start free trial</span>
+            <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+          </a>
+          <a href="#suite"
+            class="inline-flex items-center justify-center rounded-none border-[0.5px] border-black bg-white px-4 py-3 text-sm font-semibold text-ink transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] hover:bg-[#dddddd] w-1/2 whitespace-nowrap text-center">
+            Explore the suite
+          </a>
+        </div>
+        <p class="mt-4 text-xs text-muted font-sans">Free 14-day trial · No credit card required</p>
+      </div>
+      <div class="lg:col-span-2"><video src="videos/Banner-low.mp4" autoplay loop muted
+          class="border border-border w-full h-auto object-cover"></video></div>
+    </div>
+    <div class="relative z-10" style="overflow:hidden;padding:36px 0 0 0;">
+      <div style="display:flex;width:max-content;" class="animate-slide-continuous">
+        <img src="images/Logos@3x.png" alt="Logo" style="height:80px;width:auto;flex-shrink:0;display:block;" />
+        <img src="images/Logos@3x.png" alt="Logo" style="height:80px;width:auto;flex-shrink:0;display:block;" />
+        <img src="images/Logos@3x.png" alt="Logo" style="height:80px;width:auto;flex-shrink:0;display:block;" />
+        <img src="images/Logos@3x.png" alt="Logo" style="height:80px;width:auto;flex-shrink:0;display:block;" />
+      </div>
+    </div>
+  </section>
+
+
+
+  <!-- SUITE -->
+  <section id="suite" class="relative bg-white pt-10 pb-16">
+    <!-- Alternating Rainbow side glow: Left -->
+    <div class="spectrum-glow spectrum-glow-rainbow w-[450px] h-[450px] top-[10%] -left-[180px] opacity-25"></div>
+    <div class="relative z-10 mx-auto max-w-7xl px-[70px]">
+      <div class="mx-auto max-w-2xl text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">AI INTELLIGENCE SUITE</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">The AI Creative Suite for Everything You Create</h2>
+      </div>
+
+      <!-- Unified Interactive Grid -->
+      <div
+        class="grid grid-cols-1 lg:grid-cols-12 gap-[7px] bg-white items-stretch border border-border overflow-hidden lg:h-[480px]">
+        <!-- Left side: vertical tabs (3 columns on large screens) with dddddd background -->
+        <div class="lg:col-span-3 bg-[#dddddd] p-8 lg:p-12 space-y-6 flex flex-col justify-center">
+
+          <!-- Create -->
+          <div class="suite-tab group cursor-pointer" data-index="0">
+            <h3 class="text-lg font-semibold font-display text-ink transition-colors duration-200">Create</h3>
+
+            <div class="suite-tab-content">
+              <p class="mt-2 text-sm leading-relaxed text-muted font-sans">
+                Generate original content across every creative medium from visuals to motion, writing, and beyond.
+              </p>
+              <a href="#"
+                class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink/80 hover:text-ink transition-colors duration-200">
+                <span>Explore Create</span>
+                <span class="transition-transform duration-200 group-hover:translate-x-1">→</span>
+              </a>
+            </div>
+
+            <!-- Progress Bar Line -->
+            <div class="mt-4 w-[180px] h-[1px] bg-[#c0c0c0] relative">
+              <div class="suite-progress absolute left-0 bg-black w-0" style="height: 2px; top: -0.5px;"></div>
+            </div>
+          </div>
+
+          <!-- Manage -->
+          <div class="suite-tab group cursor-pointer" data-index="1">
+            <h3 class="text-lg font-semibold font-display text-ink transition-colors duration-200">Manage</h3>
+
+            <div class="suite-tab-content">
+              <p class="mt-2 text-sm leading-relaxed text-muted font-sans">
+                Craft polished digital experiences, brand assets, interfaces, and layouts with intelligent design tools.
+              </p>
+              <a href="#"
+                class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink/80 hover:text-ink transition-colors duration-200">
+                <span>Explore Manage</span>
+                <span class="transition-transform duration-200 group-hover:translate-x-1">→</span>
+              </a>
+            </div>
+
+            <!-- Progress Bar Line -->
+            <div class="mt-4 w-[180px] h-[1px] bg-[#c0c0c0] relative">
+              <div class="suite-progress absolute left-0 bg-black w-0" style="height: 2px; top: -0.5px;"></div>
+            </div>
+          </div>
+
+          <!-- Research -->
+          <div class="suite-tab group cursor-pointer" data-index="2">
+            <h3 class="text-lg font-semibold font-display text-ink transition-colors duration-200">Research</h3>
+
+            <div class="suite-tab-content">
+              <p class="mt-2 text-sm leading-relaxed text-muted font-sans">
+                Transform ideas into fully functional websites, apps, and interactive products without starting from
+                scratch.
+              </p>
+              <a href="#"
+                class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink/80 hover:text-ink transition-colors duration-200">
+                <span>Explore Research</span>
+                <span class="transition-transform duration-200 group-hover:translate-x-1">→</span>
+              </a>
+            </div>
+
+            <!-- Progress Bar Line -->
+            <div class="mt-4 w-[180px] h-[1px] bg-[#c0c0c0] relative">
+              <div class="suite-progress absolute left-0 bg-black w-0" style="height: 2px; top: -0.5px;"></div>
+            </div>
+          </div>
+
+          <!-- Build -->
+          <div class="suite-tab group cursor-pointer" data-index="3">
+            <h3 class="text-lg font-semibold font-display text-ink transition-colors duration-200">Build</h3>
+
+            <div class="suite-tab-content">
+              <p class="mt-2 text-sm leading-relaxed text-muted font-sans">
+                Develop strategies, optimize discoverability, and accelerate growth with AI-powered insights.
+              </p>
+              <a href="#"
+                class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink/80 hover:text-ink transition-colors duration-200">
+                <span>Explore Build</span>
+                <span class="transition-transform duration-200 group-hover:translate-x-1">→</span>
+              </a>
+            </div>
+
+            <!-- Progress Bar Line -->
+            <div class="mt-4 w-[180px] h-[1px] bg-[#c0c0c0] relative">
+              <div class="suite-progress absolute left-0 bg-black w-0" style="height: 2px; top: -0.5px;"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right side: large video container (9 columns on large screens) -->
+        <div class="lg:col-span-9 w-full flex items-center justify-center bg-black">
+          <video id="suite-video" autoplay loop muted playsinline class="w-full h-full object-cover">
+            <source src="videos/2nd video.mp4" type="video/mp4">
+          </video>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKFLOW TABS SECTION -->
+  <section class="relative bg-white py-16">
+    <!-- Alternating Rainbow side glow: Right -->
+    <div class="spectrum-glow spectrum-glow-rainbow w-[450px] h-[450px] top-[15%] -right-[180px] opacity-25"></div>
+    <div class="relative z-10 mx-auto max-w-7xl px-[70px]">
+      <!-- Header -->
+      <div class="mx-auto max-w-3xl text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">BUILT FOR THE WAY YOU WORK</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">Less juggling tools.
+          <br class="hidden sm:inline">More making things.
+        </h2>
+      </div>
+
+      <!-- 3-Column Card Layout (Single line on desktop) -->
+      <div class="flex flex-col md:flex-row justify-center items-center md:items-start gap-[7px] max-w-[1150px] mx-auto">
+
+          <!-- Card 1 -->
+          <div class="workflow-card group hover:shadow-lg flex flex-col shrink-0 text-left items-start overflow-hidden">
+            <!-- Top label -->
+            <div class="px-5 pt-5 pb-3 w-full">
+              <h3 class="text-xs font-semibold uppercase tracking-[0.2em]">For Creators</h3>
+            </div>
+            <!-- Video (Full-width, fixed height) -->
+            <div class="w-full h-[340px] bg-transparent overflow-hidden">
+              <video src="videos/cosmos_162575666.mp4" loop muted playsinline class="w-full h-full object-cover"></video>
+            </div>
+            <!-- Bottom content -->
+            <div class="px-5 pt-4 pb-5 w-full flex-grow flex flex-col justify-start overflow-hidden">
+              <h4 class="text-lg font-semibold font-display mb-2 w-full">Make more, faster without the busywork.</h4>
+              <p class="text-sm leading-relaxed text-muted font-sans">Create, refine, and ship faster with connected tools and reusable brand assets that keep every project consistent.</p>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="workflow-card group hover:shadow-lg flex flex-col shrink-0 text-left items-start overflow-hidden">
+            <!-- Top label -->
+            <div class="px-5 pt-5 pb-3 w-full">
+              <h3 class="text-xs font-semibold uppercase tracking-[0.2em]">For Marketers</h3>
+            </div>
+            <!-- Video (Full-width, fixed height) -->
+            <div class="w-full h-[340px] bg-transparent overflow-hidden">
+              <video src="videos/101010.mp4" loop muted playsinline class="w-full h-full object-cover"></video>
+            </div>
+            <!-- Bottom content -->
+            <div class="px-5 pt-4 pb-5 w-full flex-grow flex flex-col justify-start overflow-hidden">
+              <h4 class="text-lg font-semibold font-display mb-2 w-full">Launch campaigns in days, not months.</h4>
+              <p class="text-sm leading-relaxed text-muted font-sans">Launch complete campaigns faster, test winning variations instantly, and keep every message perfectly on-brand.</p>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="workflow-card group hover:shadow-lg flex flex-col shrink-0 text-left items-start overflow-hidden">
+            <!-- Top label -->
+            <div class="px-5 pt-5 pb-3 w-full">
+              <h3 class="text-xs font-semibold uppercase tracking-[0.2em]">For Teams</h3>
+            </div>
+            <!-- Video (Full-width, fixed height) -->
+            <div class="w-full h-[340px] bg-transparent overflow-hidden">
+              <video src="videos/123456.mp4" loop muted playsinline class="w-full h-full object-cover"></video>
+            </div>
+            <!-- Bottom content -->
+            <div class="px-5 pt-4 pb-5 w-full flex-grow flex flex-col justify-start overflow-hidden">
+              <h4 class="text-lg font-semibold font-display mb-2 w-full">One workspace your whole team will love.</h4>
+              <p class="text-sm leading-relaxed text-muted font-sans">Collaborate in real time, stay organized with roles and permissions, and keep every version and approval in one place.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Centered Button -->
+        <div class="mt-12 flex justify-center">
+          <a href="pricing.html"
+            class="group/btn inline-flex items-center justify-center gap-2 rounded-none bg-brand px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+            <span>See how it works</span>
+            <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+          </a>
+        </div>
+      </div>
+  </section>
+
+  <!-- CUSTOMERS SECTION -->
+  <section class="relative bg-[#dddddd] py-16">
+    <!-- Alternating Rainbow side glow: Left (blend multiply on grey) -->
+    <div class="spectrum-glow spectrum-glow-rainbow w-[400px] h-[400px] top-[10%] -left-[150px] opacity-20 mix-blend-multiply"></div>
+    <div class="relative z-10 mx-auto max-w-7xl px-[70px]">
+      
+      <!-- Centered Section Header -->
+      <div class="mx-auto max-w-2xl text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">OUR CUSTOMERS</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">Why ambitious brands choose Cog Culture</h2>
+      </div>
+
+      <!-- Carousel Slider Outer Wrap with Gradient Fades -->
+      <div class="relative w-full">
+        <!-- Left Fade Overlay -->
+        <div class="absolute left-0 top-0 bottom-0 w-4 md:w-8 z-10 pointer-events-none bg-gradient-to-r from-[#dddddd] via-[#dddddd]/50 to-[#dddddd]/0"></div>
+        
+        <!-- Slider Container -->
+        <div class="relative w-full overflow-hidden" id="customer-slider-container">
+          <!-- Slider Track -->
+          <div id="customer-slider-track" class="flex transition-transform duration-500 ease-in-out gap-5">
+            
+            <!-- Card 1 (Bharti) - Clone Set 1 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/bb.png" alt="Bharti Real Estate testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+            <!-- Card 2 (Panasonic) - Clone Set 1 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/pp.png" alt="Panasonic testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+            <!-- Card 3 (Cashfree) - Clone Set 1 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/cp.png" alt="Cashfree Payments testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+
+            <!-- Card 1 (Bharti) - Original Set 2 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/bb.png" alt="Bharti Real Estate testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+            <!-- Card 2 (Panasonic) - Original Set 2 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/pp.png" alt="Panasonic testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+            <!-- Card 3 (Cashfree) - Original Set 2 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/cp.png" alt="Cashfree Payments testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+
+            <!-- Card 1 (Bharti) - Clone Set 3 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/bb.png" alt="Bharti Real Estate testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+            <!-- Card 2 (Panasonic) - Clone Set 3 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/pp.png" alt="Panasonic testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+            <!-- Card 3 (Cashfree) - Clone Set 3 -->
+            <div class="slider-card flex-shrink-0 w-[80%] md:w-[65%] lg:w-[50%] aspect-[2/1] rounded-none overflow-hidden select-none bg-white">
+              <img src="images/cp.png" alt="Cashfree Payments testimonial card" class="w-full h-full object-cover pointer-events-none" />
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right Fade Overlay -->
+        <div class="absolute right-0 top-0 bottom-0 w-4 md:w-8 z-10 pointer-events-none bg-gradient-to-l from-[#dddddd] via-[#dddddd]/50 to-[#dddddd]/0"></div>
+      </div>
+
+    </div>
+  </section>
+
+
+
+
+  <!-- BRAND SAFETY / ENTERPRISE -->
+  <section id="enterprise" class="relative bg-white py-16">
+    <!-- Alternating Rainbow side glow: Right -->
+    <div class="spectrum-glow spectrum-glow-rainbow w-[450px] h-[450px] top-[10%] -right-[180px] opacity-25"></div>
+    <div class="relative z-10 mx-auto max-w-7xl px-[70px]">
+      
+      <!-- Centered Header -->
+      <div class="mx-auto max-w-3xl text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">MADE FOR YOUR BRAND</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">AI that knows your brand and respects your data.</h2>
+        <p class="mt-6 text-sm leading-relaxed text-muted font-sans mx-auto max-w-2xl">Upload your logos, fonts, colors and tone of voice once. Every image, video and word Cog Culture creates will feel unmistakably yours.</p>
+        
+        <!-- Action Button -->
+        <div class="mt-8 flex justify-center">
+          <a href="enterprise.html#contact"
+            class="group/btn inline-flex items-center justify-center gap-2 rounded-none bg-brand px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+            <span>Talk to our team</span>
+            <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 3-Column Features Grid -->
+      <div class="grid gap-12 sm:grid-cols-3 mt-16 max-w-5xl mx-auto w-full">
+        <!-- Feature 1 -->
+        <div class="flex flex-col items-center text-center">
+          <div class="mb-4 text-black">
+            <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <polyline points="9 11 11 13 15 9"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold font-display text-ink mb-2">Data Ownership</h3>
+          <p class="text-sm leading-relaxed text-muted font-sans">Your work stays yours. Always.</p>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="flex flex-col items-center text-center">
+          <div class="mb-4 text-black">
+            <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="6" height="6" rx="1"/>
+              <rect x="15" y="3" width="6" height="6" rx="1"/>
+              <rect x="9" y="15" width="6" height="6" rx="1"/>
+              <path d="M6 9v3h12V9"/>
+              <path d="M12 12v3"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold font-display text-ink mb-2">Brand Alignment</h3>
+          <p class="text-sm leading-relaxed text-muted font-sans">Trained on your brand, not the open internet.</p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="flex flex-col items-center text-center">
+          <div class="mb-4 text-black">
+            <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <line x1="17.5" y1="15" x2="17.5" y2="20" />
+              <line x1="15" y1="17.5" x2="20" y2="17.5" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold font-display text-ink mb-2">Enterprise Security</h3>
+          <p class="text-sm leading-relaxed text-muted font-sans">Enterprise-grade security, ready when you scale.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- RESOURCES -->
+  <section class="relative bg-white py-16">
+    <!-- Alternating Rainbow side glow: Left -->
+    <div class="spectrum-glow spectrum-glow-rainbow w-[450px] h-[450px] top-[15%] -left-[180px] opacity-25"></div>
+    <div class="relative z-10 mx-auto max-w-7xl px-[70px]">
+      <div class="mx-auto max-w-2xl text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">RESOURCES</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">Learn, get inspired, and level up.</h2>
+      </div>
+      <div class="grid gap-[7px] md:grid-cols-3">
+        <a href="#" class="group overflow-hidden bg-transparent border-[0.5px] border-[#16192b]/25 hover:border-[#16192b]/60 transition duration-300">
+          <div class="aspect-[16/10]"><video src="videos/cosmos_396628657.mp4" autoplay muted loop
+              class="w-full h-full object-cover"></video></div>
+          <div class="p-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">Guide</p>
+            <h3 class="mt-2 text-lg font-semibold font-display text-ink">How to brief AI like a creative director</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted font-sans">5 prompts that make every <br>generation 10x better.</p>
+            <div class="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:text-brand">Read more →
+            </div>
+          </div>
+        </a>
+        <a href="#" class="group overflow-hidden bg-transparent border-[0.5px] border-[#16192b]/25 hover:border-[#16192b]/60 transition duration-300">
+          <div class="aspect-[16/10]"><img src="images/cosmos_953824387.gif" alt="Story" class="w-full h-full object-cover" />
+          </div>
+          <div class="p-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">Story</p>
+            <h3 class="mt-2 text-lg font-semibold font-display text-ink">From idea to launched product in 9 days</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted font-sans">How one founder used the full <br>Cog Culture suite.</p>
+            <div class="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:text-brand">Read more →
+            </div>
+          </div>
+        </a>
+        <a href="#" class="group overflow-hidden bg-transparent border-[0.5px] border-[#16192b]/25 hover:border-[#16192b]/60 transition duration-300">
+          <div class="aspect-[16/10]"><video src="videos/cosmos_850585915.mp4" autoplay muted loop
+              class="w-full h-full object-cover"></video></div>
+          <div class="p-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">Playbook</p>
+            <h3 class="mt-2 text-lg font-semibold font-display text-ink">The new marketing stack, simplified</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted font-sans">Replace the patchwork. Move <br>faster as a team.</p>
+            <div class="mt-4 inline-flex items-center gap-1 text-sm font-semibold group-hover:text-brand">Read more →
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+
+
+  <!-- FAQ -->
+
+  <section class="relative bg-white py-16">
+    <!-- Alternating Rainbow side glow: Right -->
+    <div class="spectrum-glow spectrum-glow-rainbow w-[450px] h-[450px] top-[10%] -right-[180px] opacity-25"></div>
+    <div class="relative z-10 mx-auto max-w-6xl px-[70px]">
+      <div class="text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">FAQ</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">Questions? We have answers.</h2>
+      </div>
+      <div id="faq">
+
+        <details open>
+          <summary
+            class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">What is Cog Culture?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">Cog Culture is an all-in-one AI suite that helps
+            you create images, videos, copy, presentations, websites and apps — without juggling a dozen different
+            tools.</p>
+        </details>
+
+        <details>
+          <summary
+            class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">Do I need any design or coding skills?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">Not at all. If you can describe what you want,
+            Cog Culture can make it. Everything is built for beginners, with plenty of room for pros to go deeper.</p>
+        </details>
+
+        <details>
+          <summary
+            class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">Can I try it for free?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">Yes. Every plan starts with a free trial so you
+            can explore the full suite before you commit.</p>
+        </details>
+
+        <details>
+          <summary
+            class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">Is my work and data private?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">Always. Your prompts, files and brand assets stay
+            yours. We never train public models on your private content.</p>
+        </details>
+
+        <details>
+          <summary
+            class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">Does it work for teams?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">Yes. Invite teammates, share brand kits and
+            collaborate in real time on any project across the suite.</p>
+        </details>
+
+        <details>
+          <summary
+            class="flex w-full items-center justify-between gap-4 py-5 border-t border-border border-b cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">Can I cancel anytime?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">Of course. Plans are month-to-month and you can
+            upgrade, downgrade or cancel whenever you like.</p>
+        </details>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="relative overflow-hidden py-16 text-center text-white">
+    <!-- Full-section background video -->
+    <video autoplay muted loop playsinline
+      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:right;z-index:0;"
+      src="videos/1234567.mp4"></video>
+    <!-- Dark overlay -->
+    <div style="position:absolute;inset:0;background:rgba(10,12,28,0.60);z-index:1;"></div>
+    <!-- Content -->
+    <div style="position:relative;z-index:2;max-width:720px;margin:0 auto;padding:0 70px;">
+      <h2 class="text-3xl font-medium tracking-tight md:text-5xl font-display text-white">Ready to make something great?</h2>
+      <p class="mx-auto mt-6 max-w-xl text-sm leading-relaxed text-white/85 font-sans">Join thousands of
+        creators and teams already building faster with Cog Culture. Your first 14 days are on us.</p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="trial.html"
+          class="inline-flex items-center justify-center rounded-none border-[0.5px] border-black bg-white px-10 py-3 text-sm font-semibold text-ink transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] hover:bg-[#dddddd]">
+          Start free trial
+        </a>
+        <a href="pricing.html"
+          class="rounded-none border border-white/30 px-10 py-3 text-sm font-semibold text-white hover:bg-white/10 transition">See
+          pricing</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-[#dddddd] pt-16">
+    <div class="mx-auto max-w-7xl px-[70px] pb-16">
+
+      <!-- Footer Grid -->
+      <div class="grid gap-12 sm:grid-cols-2 lg:grid-cols-4 items-start w-full">
+        
+        <!-- Column 1: AI Suite -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">AI Intelligence Suite</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Create</a></li>
+            <li><a href="#" class="hover:underline">Manage</a></li>
+            <li><a href="#" class="hover:underline">Research</a></li>
+            <li><a href="#" class="hover:underline">Build</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 2: Support -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Support</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Help Centre</a></li>
+            <li><a href="#" class="hover:underline">Download and install</a></li>
+            <li><a href="#" class="hover:underline">Cog Community</a></li>
+            <li><a href="#" class="hover:underline">Cog Learn</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 3: Enterprise -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Enterprise</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Marketplace</a></li>
+            <li><a href="company.html" class="hover:underline">Company</a></li>
+            <li><a href="blog.html" class="hover:underline">Blog</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 4: Company -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Company</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Careers</a></li>
+            <li><a href="#" class="hover:underline">Contact</a></li>
+            <li><a href="#" class="hover:underline">Press</a></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Bottom Bar (Black Bar with white text) -->
+    <div class="bg-black py-8">
+      <div class="mx-auto max-w-7xl px-[70px] flex flex-col md:flex-row justify-between items-start md:items-center text-xs text-white/80">
+        <p class="uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white">COPYRIGHT COG CULTURE <span id="year"></span></p>
+        <div class="flex gap-5 mt-4 md:mt-0">
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Privacy</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Terms</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Cookies</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Mobile menu
+    const mobileToggle = document.getElementById('mobile-toggle');
+    if (mobileToggle) {
+      mobileToggle.addEventListener('click', () => {
+        document.getElementById('mobile-menu').classList.toggle('hidden');
+      });
+    }
+
+    // Interactive Suite Swapping Logic
+    let suiteInterval = null;
+    let currentSuiteIndex = 0;
+    const suiteTabs = document.querySelectorAll('.suite-tab');
+
+    function playSuiteTab(index) {
+      if (suiteInterval) clearTimeout(suiteInterval);
+
+      suiteTabs.forEach((tab, i) => {
+        const prog = tab.querySelector('.suite-progress');
+        prog.style.transition = 'none';
+        prog.style.width = '0%';
+
+        if (i === index) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+
+      // Force browser reflow to reset progress bar state
+      void suiteTabs[index].offsetWidth;
+
+      // Start progress bar animation
+      currentSuiteIndex = index;
+      const activeProg = suiteTabs[index].querySelector('.suite-progress');
+      activeProg.style.transition = 'width 5s linear';
+      activeProg.style.width = '100%';
+
+      // Set auto-swap timer
+      suiteInterval = setTimeout(() => {
+        let nextIndex = (currentSuiteIndex + 1) % suiteTabs.length;
+        playSuiteTab(nextIndex);
+      }, 5000);
+    }
+
+    // Setup tab click event listeners
+    suiteTabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => {
+        playSuiteTab(i);
+      });
+    });
+
+    // Start the slider once loaded
+    playSuiteTab(0);
+
+    // Play/pause workflow card videos on hover
+    document.querySelectorAll('.workflow-card').forEach(card => {
+      const video = card.querySelector('video');
+      if (video) {
+        video.pause();
+        card.addEventListener('mouseenter', () => {
+          video.play().catch(err => console.log('Video playback error:', err));
+        });
+        card.addEventListener('mouseleave', () => {
+          video.pause();
+        });
+      }
+    });
+
+    // FAQ
+    const faqs = [
+      { q: "What is Cog Culture?", a: "Cog Culture is an all-in-one AI suite that helps you create images, videos, copy, presentations, websites and apps — without juggling a dozen different tools." },
+      { q: "Do I need any design or coding skills?", a: "Not at all. If you can describe what you want, Cog Culture can make it. Everything is built for beginners, with plenty of room for pros to go deeper." },
+      { q: "Can I try it for free?", a: "Yes. Every plan starts with a free trial so you can explore the full suite before you commit." },
+      { q: "Is my work and data private?", a: "Always. Your prompts, files and brand assets stay yours. We never train public models on your private content." },
+      { q: "Does it work for teams?", a: "Yes. Invite teammates, share brand kits and collaborate in real time on any project across the suite." },
+      { q: "Can I cancel anytime?", a: "Of course. Plans are month-to-month and you can upgrade, downgrade or cancel whenever you like." },
+    ];
+    document.getElementById('faq').innerHTML = faqs.map((f, i) => `
+    <details ${i === 0 ? 'open' : ''}>
+      <summary class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none ${i === faqs.length - 1 ? 'border-b' : ''}">
+        <span class="text-lg font-semibold font-display text-ink">${f.q}</span>
+        <span class="faq-plus text-xl text-muted font-sans">+</span>
+      </summary>
+      <p class="pb-5 text-sm leading-relaxed text-muted font-sans">${f.a}</p>
+    </details>
+    `).join('');    // Customer Slider Carousel Logic
+    let customerActiveIndex = 3;
+    let customerIsTransitioning = false;
+    let customerAutoPlayTimer = null;
+
+    function updateCustomerSlider(animate = true) {
+      const track = document.getElementById('customer-slider-track');
+      if (!track) return;
+      const container = document.getElementById('customer-slider-container');
+      if (!container) return;
+      const cards = track.children;
+      if (cards.length === 0) return;
+
+      const containerWidth = container.getBoundingClientRect().width;
+      const cardWidth = cards[0].getBoundingClientRect().width;
+      const gap = 20; // Matches Tailwind's gap-5 (1.25rem = 20px)
+      const offset = customerActiveIndex * (cardWidth + gap) - (containerWidth - cardWidth) / 2;
+
+      if (animate) {
+        track.style.transition = 'transform 0.4s ease-in-out';
+        customerIsTransitioning = true;
+      } else {
+        track.style.transition = 'none';
+        customerIsTransitioning = false;
+      }
+      track.style.transform = `translateX(-${offset}px)`;
+    }
+
+    function nextCustomerSlide() {
+      if (customerIsTransitioning) return;
+      customerActiveIndex++;
+      updateCustomerSlider(true);
+    }
+
+    function startCustomerAutoPlay() {
+      if (customerAutoPlayTimer) clearInterval(customerAutoPlayTimer);
+      customerAutoPlayTimer = setInterval(nextCustomerSlide, 3000);
+    }
+
+    function stopCustomerAutoPlay() {
+      if (customerAutoPlayTimer) clearInterval(customerAutoPlayTimer);
+    }
+
+    // Initialize Slider
+    const customerTrack = document.getElementById('customer-slider-track');
+    const customerContainer = document.getElementById('customer-slider-container');
+    if (customerTrack) {
+      // Set to starting index 3 (first card of original set) without transition
+      updateCustomerSlider(false);
+      setTimeout(() => {
+        updateCustomerSlider(false);
+      }, 100);
+      
+      // Recalculate on load and resize to ensure correct width calculations
+      window.addEventListener('load', () => {
+        updateCustomerSlider(false);
+      });
+      window.addEventListener('resize', () => {
+        updateCustomerSlider(false);
+      });
+
+      // Event listener for loop wrapping
+      customerTrack.addEventListener('transitionend', (e) => {
+        if (e.propertyName !== 'transform') return;
+        customerIsTransitioning = false;
+
+        // Wrap around seamlessly
+        if (customerActiveIndex >= 6) {
+          customerActiveIndex = 3;
+          updateCustomerSlider(false);
+        } else if (customerActiveIndex <= 0) {
+          customerActiveIndex = 3;
+          updateCustomerSlider(false);
+        }
+      });
+
+      // Hover to pause/resume
+      if (customerContainer) {
+        customerContainer.addEventListener('mouseenter', stopCustomerAutoPlay);
+        customerContainer.addEventListener('mouseleave', startCustomerAutoPlay);
+      }
+
+      // Start autoplay
+      startCustomerAutoPlay();
+    }
+
+
+    // Custom Cursor logic
+    const cursor = document.getElementById('custom-cursor');
+    if (cursor) {
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        if (cursor.style.opacity !== '1') {
+          cursor.style.opacity = '1';
+        }
+      });
+      document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+      });
+      document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+      });
+      // Handle page visibility/focus changes
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          cursor.style.opacity = '0';
+        }
+      });
+      // Add active state on hover over interactive elements (using delegation)
+      document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.add('active');
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.remove('active');
+        }
+      });
+    }
+   </script>
+</body>
+
+</html>

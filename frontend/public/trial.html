@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cog Culture - Creation Studio</title>
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#000000',
+            'brand-fg': '#ffffff',
+            ink: '#16192b',
+            surface: '#f7f8fa',
+            border: '#e6e8ee',
+            muted: '#6b7080',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  
+  <style>
+    /* Heading Font Style overrides */
+    h1, h2, h3, h4, .font-display {
+      font-family: 'Inter Tight', 'Inter', sans-serif;
+    }
+
+    /* Prevent Scrollbar Clutter */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #e6e8ee;
+      border-radius: 0px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #muted;
+    }
+  </style>
+</head>
+<body class="bg-white text-ink font-sans antialiased h-screen overflow-hidden flex">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="w-64 bg-[#f8f9fa] border-r border-border h-full flex flex-col justify-between flex-shrink-0">
+    <!-- Branding Header -->
+    <div>
+      <div class="flex items-center gap-3 px-6 py-6 border-b border-border">
+        <img src="images/logo-black.svg" class="h-6 w-auto" alt="Cog Logo">
+        <span class="font-display font-bold text-lg tracking-tight">Cog Culture</span>
+      </div>
+      
+      <!-- Nav Content -->
+      <div class="p-4 flex flex-col gap-6">
+        <!-- New Generation Button -->
+        <button onclick="resetStudio()" class="w-full bg-brand text-white font-semibold py-3 px-4 rounded-none hover:bg-neutral-800 transition active:scale-[0.98] text-center text-sm tracking-wide">
+          + New Generation
+        </button>
+        
+        <!-- Navigation Links -->
+        <nav class="flex flex-col gap-1">
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-none bg-surface text-ink transition-colors">
+            <!-- Studio Icon (Grid) -->
+            <svg class="h-4 w-4 text-ink" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+            Studio
+          </a>
+          
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-none text-ink/75 hover:bg-surface hover:text-ink transition-colors">
+            <!-- Storyboard Icon -->
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            Storyboard
+          </a>
+          
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-none text-ink/75 hover:bg-surface hover:text-ink transition-colors">
+            <!-- Upscale Icon -->
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+            </svg>
+            Upscale
+          </a>
+          
+          <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-none text-ink/75 hover:bg-surface hover:text-ink transition-colors">
+            <!-- History Icon -->
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div class="flex flex-col">
+              <span>History</span>
+              <span class="text-[10px] text-muted font-normal mt-0.5">No history yet</span>
+            </div>
+          </a>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Sidebar Bottom Links -->
+    <div class="p-4 flex flex-col gap-1 border-t border-border">
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-none text-ink/75 hover:bg-surface hover:text-ink transition-colors">
+        <!-- Dark Theme Icon -->
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+        Dark Theme
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-none text-ink/75 hover:bg-surface hover:text-ink transition-colors">
+        <!-- Settings Icon -->
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        Settings
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="flex-1 bg-[#fafbfe] h-full overflow-y-auto p-8 md:p-12 flex flex-col items-center">
+    <div class="w-full max-w-[960px] flex flex-col gap-8">
+      
+      <!-- Greeting Header -->
+      <div class="text-center">
+        <h1 class="text-2xl md:text-3xl font-medium font-display tracking-tight text-ink mb-2">
+          Good afternoon, Akhil Kushwaha
+        </h1>
+        <p class="text-sm text-muted font-sans">
+          What would you like to Create today?
+        </p>
+      </div>
+
+      <!-- MAIN PROMPT CONTAINER -->
+      <div class="bg-white border border-border rounded-none p-5 flex flex-col gap-4 relative">
+        <!-- Text Area -->
+        <textarea id="prompt-input" class="w-full bg-transparent border-none text-ink text-sm placeholder-muted/60 font-sans focus:outline-none resize-none h-24" placeholder="Type a prompt..."></textarea>
+        
+        <!-- Controls Footer Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/60">
+          
+          <!-- Dropdown Option Selectors -->
+          <div class="flex items-center gap-2">
+            
+            <!-- Ratio Selector -->
+            <div class="relative">
+              <button onclick="toggleDropdown('ratio-menu')" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-surface border border-border text-ink hover:bg-neutral-100 transition rounded-none">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z" />
+                </svg>
+                <span id="selected-ratio">Ratio: 16:9</span>
+              </button>
+              <div id="ratio-menu" class="hidden absolute left-0 bottom-full mb-1 z-30 bg-white border border-border shadow-md py-1 min-w-[120px] rounded-none">
+                <button onclick="selectOption('ratio', '16:9')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">16:9</button>
+                <button onclick="selectOption('ratio', '1:1')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">1:1</button>
+                <button onclick="selectOption('ratio', '4:3')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">4:3</button>
+                <button onclick="selectOption('ratio', '9:16')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">9:16</button>
+              </div>
+            </div>
+
+            <!-- Quality Selector -->
+            <div class="relative">
+              <button onclick="toggleDropdown('quality-menu')" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-surface border border-border text-ink hover:bg-neutral-100 transition rounded-none">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="selected-quality">Quality: SD</span>
+              </button>
+              <div id="quality-menu" class="hidden absolute left-0 bottom-full mb-1 z-30 bg-white border border-border shadow-md py-1 min-w-[120px] rounded-none">
+                <button onclick="selectOption('quality', 'SD')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">SD (Standard)</button>
+                <button onclick="selectOption('quality', 'HD')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">HD (High)</button>
+                <button onclick="selectOption('quality', 'Ultra')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">Ultra (4K)</button>
+              </div>
+            </div>
+
+            <!-- Model Selector -->
+            <div class="relative">
+              <button onclick="toggleDropdown('model-menu')" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-surface border border-border text-ink hover:bg-neutral-100 transition rounded-none">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z" />
+                </svg>
+                <span id="selected-model">Model: Nanobanana 2</span>
+              </button>
+              <div id="model-menu" class="hidden absolute left-0 bottom-full mb-1 z-30 bg-white border border-border shadow-md py-1 min-w-[150px] rounded-none">
+                <button onclick="selectOption('model', 'Nanobanana 2')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">Nanobanana 2</button>
+                <button onclick="selectOption('model', 'Cog AI v2')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">Cog AI v2</button>
+                <button onclick="selectOption('model', 'Dreamer XL')" class="w-full text-left px-3 py-1.5 text-xs hover:bg-surface text-ink font-sans">Dreamer XL</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Generate Action Button -->
+          <button onclick="generateImage()" id="generate-btn" class="bg-brand text-white font-semibold py-2.5 px-6 rounded-none hover:brightness-110 active:scale-[0.98] transition-all text-sm">
+            Generate
+          </button>
+
+        </div>
+        
+        <!-- Mock Generation Progress Overlay -->
+        <div id="progress-container" class="hidden absolute inset-0 bg-white/95 flex flex-col justify-center items-center px-8 z-20">
+          <div class="w-full max-w-md flex flex-col gap-3">
+            <div class="flex justify-between items-center text-xs font-semibold text-ink">
+              <span id="progress-status">Initializing model...</span>
+              <span id="progress-percent">0%</span>
+            </div>
+            <div class="w-full bg-[#e6e8ee] h-1.5 rounded-none overflow-hidden">
+              <div id="progress-bar" class="bg-brand h-full w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- STYLE SELECTION TABS -->
+      <div class="flex flex-wrap gap-2 justify-center py-2 border-y border-border/60">
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-border bg-white text-ink hover:bg-surface transition rounded-none">Visual Style</button>
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-border bg-white text-ink hover:bg-surface transition rounded-none">Medium</button>
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-border bg-white text-ink hover:bg-surface transition rounded-none">Lighting</button>
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-border bg-white text-ink hover:bg-surface transition rounded-none">Composition</button>
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-brand bg-brand text-white transition rounded-none font-semibold">Camera Angle</button>
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-border bg-white text-ink hover:bg-surface transition rounded-none">Lens</button>
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-border bg-white text-ink hover:bg-surface transition rounded-none">Mood</button>
+        <button onclick="toggleTab(this)" class="px-4 py-1.5 text-xs font-medium border border-border bg-white text-ink hover:bg-surface transition rounded-none">Color Palette</button>
+      </div>
+
+      <!-- CAMERA ANGLE GRID (All 8 in 1 row on Desktop) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 w-full" id="style-grid">
+        
+        <!-- Card 1: Worm's Eye View -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/black_building_showcase.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Worm's Eye">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Worm's Eye View</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Looking straight up</p>
+          </div>
+        </div>
+
+        <!-- Card 2: Dutch Angle -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/fantasy_warrior_showcase.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Dutch Angle">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Dutch Angle</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Tilted dramatic frame</p>
+          </div>
+        </div>
+
+        <!-- Card 3: Bird's Eye -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/living_room_showcase.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Bird's Eye">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Bird's Eye</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Looking down from above</p>
+          </div>
+        </div>
+
+        <!-- Card 4: Extreme Close-Up -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/perfume_showcase.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Extreme Close-Up">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Extreme Close-Up</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Macro extreme detail</p>
+          </div>
+        </div>
+
+        <!-- Card 5: Wide Shot -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/woman_coat_showcase.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Wide Shot">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Wide Shot</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Full environment view</p>
+          </div>
+        </div>
+
+        <!-- Card 6: Medium Shot -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/nike_sneakers_showcase.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Medium Shot">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Medium Shot</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Waist-up portrait</p>
+          </div>
+        </div>
+
+        <!-- Card 7: Close-Up -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/ChatGPT%20Image%20Jul%209,%202026,%2005_34_22%20PM.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Close-Up">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Close-Up</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Face or detail fill</p>
+          </div>
+        </div>
+
+        <!-- Card 8: Low Angle -->
+        <div onclick="selectCard(this)" class="group relative aspect-[3/4] overflow-hidden border border-border rounded-none cursor-pointer bg-neutral-900 transition hover:border-black flex flex-col justify-end p-2.5">
+          <img src="images/ChatGPT%20Image%20Jul%209,%202026,%2005_34_38%20PM.png" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 z-0" alt="Low Angle">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10"></div>
+          <div class="relative z-20 text-white">
+            <h4 class="text-[11px] font-bold tracking-tight leading-tight">Low Angle</h4>
+            <p class="text-[9px] text-white/70 mt-0.5 leading-tight">Looking up, heroic</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MOCK GENERATION RESULT (Initially Hidden) -->
+      <div id="generation-result" class="hidden flex flex-col gap-4 border border-border bg-white p-6 rounded-none">
+        <div class="flex justify-between items-center border-b border-border pb-3">
+          <h4 class="text-sm font-bold tracking-tight font-display text-ink">Generation Result</h4>
+          <button onclick="closeResult()" class="text-muted hover:text-ink transition text-xs font-semibold">✕ Dismiss</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+          <div class="aspect-[4/3] overflow-hidden border border-border rounded-none bg-neutral-100">
+            <img id="result-img" src="" class="w-full h-full object-cover" alt="Generated Output">
+          </div>
+          <div class="flex flex-col gap-3">
+            <span class="text-[11px] font-semibold tracking-wider text-muted uppercase">Prompt Specifications</span>
+            <p id="result-prompt-text" class="text-sm text-ink leading-relaxed italic"></p>
+            <div class="grid grid-cols-3 gap-2 text-center text-xs mt-2">
+              <div class="bg-surface py-2 border border-border"><p class="text-[10px] text-muted">Ratio</p><p class="font-bold text-ink mt-0.5" id="result-ratio"></p></div>
+              <div class="bg-surface py-2 border border-border"><p class="text-[10px] text-muted">Quality</p><p class="font-bold text-ink mt-0.5" id="result-quality"></p></div>
+              <div class="bg-surface py-2 border border-border"><p class="text-[10px] text-muted">Model</p><p class="font-bold text-ink mt-0.5" id="result-model"></p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // --- DROPDOWN LOGIC ---
+    function toggleDropdown(menuId) {
+      // Close other dropdowns
+      const dropdowns = ['ratio-menu', 'quality-menu', 'model-menu'];
+      dropdowns.forEach(id => {
+        if (id !== menuId) {
+          document.getElementById(id).classList.add('hidden');
+        }
+      });
+      
+      const menu = document.getElementById(menuId);
+      menu.classList.toggle('hidden');
+    }
+
+    // Close dropdowns on document click
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.relative')) {
+        ['ratio-menu', 'quality-menu', 'model-menu'].forEach(id => {
+          document.getElementById(id).classList.add('hidden');
+        });
+      }
+    });
+
+    function selectOption(type, value) {
+      if (type === 'ratio') {
+        document.getElementById('selected-ratio').innerText = 'Ratio: ' + value;
+        document.getElementById('ratio-menu').classList.add('hidden');
+      } else if (type === 'quality') {
+        document.getElementById('selected-quality').innerText = 'Quality: ' + value;
+        document.getElementById('quality-menu').classList.add('hidden');
+      } else if (type === 'model') {
+        document.getElementById('selected-model').innerText = 'Model: ' + value;
+        document.getElementById('model-menu').classList.add('hidden');
+      }
+    }
+
+    // --- TAB TOGGLE LOGIC ---
+    function toggleTab(button) {
+      // Find all sibling buttons in the container
+      const siblings = button.parentElement.children;
+      for (let btn of siblings) {
+        btn.classList.remove('bg-brand', 'text-white', 'border-brand', 'font-semibold');
+        btn.classList.add('bg-white', 'text-ink', 'border-border', 'hover:bg-surface');
+      }
+      
+      // Highlight selected tab
+      button.classList.add('bg-brand', 'text-white', 'border-brand', 'font-semibold');
+      button.classList.remove('bg-white', 'text-ink', 'border-border', 'hover:bg-surface');
+    }
+
+    // --- CARD SELECTION LOGIC ---
+    let selectedImageSrc = 'images/black_building_showcase.png';
+    let selectedStyleName = "Worm's Eye View";
+
+    function selectCard(card) {
+      // Clear borders on all cards
+      const cards = card.parentElement.children;
+      for (let c of cards) {
+        c.classList.remove('ring-2', 'ring-brand', 'border-brand');
+        c.classList.add('border-border');
+      }
+      
+      // Select clicked card
+      card.classList.add('ring-2', 'ring-brand', 'border-brand');
+      card.classList.remove('border-border');
+      
+      // Store card specifications
+      const img = card.querySelector('img');
+      const h4 = card.querySelector('h4');
+      if (img) selectedImageSrc = img.getAttribute('src');
+      if (h4) selectedStyleName = h4.innerText;
+    }
+
+    // Initialize first card as selected
+    document.addEventListener("DOMContentLoaded", () => {
+      const firstCard = document.getElementById('style-grid').firstElementChild;
+      if (firstCard) selectCard(firstCard);
+    });
+
+    // --- MOCK GENERATION FLOW ---
+    function generateImage() {
+      const promptInput = document.getElementById('prompt-input');
+      const prompt = promptInput.value.trim() || "A gorgeous cinematic environment, masterpiece style.";
+      
+      const ratio = document.getElementById('selected-ratio').innerText.replace('Ratio: ', '');
+      const quality = document.getElementById('selected-quality').innerText.replace('Quality: ', '');
+      const model = document.getElementById('selected-model').innerText.replace('Model: ', '');
+      
+      // Show progress overlay
+      const progressContainer = document.getElementById('progress-container');
+      const progressBar = document.getElementById('progress-bar');
+      const progressStatus = document.getElementById('progress-status');
+      const progressPercent = document.getElementById('progress-percent');
+      
+      progressContainer.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      progressPercent.innerText = '0%';
+      
+      let progress = 0;
+      const statuses = [
+        "Allocating cloud GPU resources...",
+        "Parsing specifications and style parameters...",
+        "Diffusing noise fields (Step 15/40)...",
+        "Diffusing noise fields (Step 32/40)...",
+        "Decoding latents to tensor channels...",
+        "Upscaling and color grading final render...",
+        "Generation complete!"
+      ];
+      
+      const interval = setInterval(() => {
+        progress += 4;
+        progressBar.style.width = progress + '%';
+        progressPercent.innerText = progress + '%';
+        
+        // Dynamic status texts
+        const statusIdx = Math.min(Math.floor((progress / 100) * statuses.length), statuses.length - 1);
+        progressStatus.innerText = statuses[statusIdx];
+        
+        if (progress >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            // Hide progress overlay
+            progressContainer.classList.add('hidden');
+            
+            // Populate and show final generation result block
+            const resultBlock = document.getElementById('generation-result');
+            const resultImg = document.getElementById('result-img');
+            const resultPrompt = document.getElementById('result-prompt-text');
+            const resultR = document.getElementById('result-ratio');
+            const resultQ = document.getElementById('result-quality');
+            const resultM = document.getElementById('result-model');
+            
+            resultImg.src = selectedImageSrc;
+            resultPrompt.innerText = `"${prompt}" — customized with ${selectedStyleName} rendering angles.`;
+            resultR.innerText = ratio;
+            resultQ.innerText = quality;
+            resultM.innerText = model;
+            
+            resultBlock.classList.remove('hidden');
+            resultBlock.scrollIntoView({ behavior: 'smooth' });
+          }, 300);
+        }
+      }, 100);
+    }
+
+    function closeResult() {
+      document.getElementById('generation-result').classList.add('hidden');
+    }
+
+    function resetStudio() {
+      document.getElementById('prompt-input').value = '';
+      closeResult();
+    }
+  </script>
+
+</body>
+</html>

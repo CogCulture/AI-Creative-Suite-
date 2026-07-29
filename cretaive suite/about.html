@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>About Cog Culture — Scale Creative Output Safely</title>
+  <meta name="description" content="Learn more about Cog Culture." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#000000',
+            'brand-fg': '#ffffff',
+            ink: '#16192b',
+            surface: '#f7f8fa',
+            'surface-alt': '#dddddd',
+            border: '#e6e8ee',
+            muted: '#6b7080',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Custom Cursor styling */
+    #custom-cursor {
+      transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  height 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  background-color 0.2s, border 0.2s, opacity 0.2s;
+    }
+    #custom-cursor.active {
+      width: 40px;
+      height: 40px;
+      background-color: transparent;
+      border: 1.5px solid #ffffff;
+    }
+    /* Hide default cursor on desktop */
+    @media (hover: hover) and (pointer: fine) {
+      html, body, a, button, select, input, textarea, summary, [role="button"], .suite-tab {
+        cursor: none !important;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-white text-ink font-sans">
+
+  <!-- Custom Black Dot Cursor -->
+  <div id="custom-cursor" class="pointer-even ts-none fixed z-[9999] rounded-full bg-white mix-blend-difference opacity-0" style="width: 16px; height: 16px; top: 0; left: 0; transform: translate3d(-50%, -50%, 0);"></div>
+
+  <!-- SCROLL SEQUENCE MAIN -->
+  <main class="relative bg-black text-white select-none">
+    <!-- Loader Screen -->
+    <div id="loader" class="fixed inset-0 flex flex-col items-center justify-center bg-black text-white z-40 transition-opacity duration-700">
+      <div class="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+    </div>
+
+    <!-- Scroll track -->
+    <div class="relative h-[450vh] w-full" id="scroll-track">
+      <!-- Sticky Canvas Container -->
+      <div class="sticky top-0 left-0 w-full h-screen overflow-hidden flex items-center justify-center bg-black">
+        <canvas id="sequence-canvas" class="w-full h-full object-cover opacity-0 transition-opacity duration-700"></canvas>
+        
+        <!-- Centered Text Overlay -->
+        <div class="absolute inset-0 z-20 flex items-center justify-center pointer-events-none p-6">
+          <div id="text-overlay" class="text-center transition-opacity duration-150 opacity-0">
+            <h1 class="text-4xl md:text-6xl font-medium font-display uppercase tracking-[2px] bg-gradient-to-b from-neutral-100 via-neutral-400 to-neutral-600 bg-clip-text text-transparent">
+              YOUR TABLE IS NOW READY
+            </h1>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Custom Cursor logic
+    const cursor = document.getElementById('custom-cursor');
+    if (cursor) {
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        if (cursor.style.opacity !== '1') {
+          cursor.style.opacity = '1';
+        }
+      });
+      document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+      });
+      document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          cursor.style.opacity = '0';
+        }
+      });
+      document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.add('active');
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.remove('active');
+        }
+      });
+    }
+
+    // Canvas Scroll Sequence logic
+    const canvas = document.getElementById('sequence-canvas');
+    const ctx = canvas.getContext('2d');
+    const totalFrames = 786;
+    const step = 3; // Progressive loading step size
+
+    const frameIndices = [];
+    for (let i = 1; i < totalFrames; i += step) {
+      frameIndices.push(i);
+    }
+    if (frameIndices[frameIndices.length - 1] !== totalFrames) {
+      frameIndices.push(totalFrames);
+    }
+
+    const images = {};
+    let loadedCount = 0;
+    let loaderActive = true;
+
+    // Canvas Cover fit math
+    function drawCoverImage(img, ctx, canvas) {
+      const imgRatio = img.width / img.height;
+      const canvasRatio = canvas.width / canvas.height;
+      
+      let drawWidth, drawHeight, drawX, drawY;
+      
+      if (imgRatio > canvasRatio) {
+        drawHeight = canvas.height;
+        drawWidth = canvas.height * imgRatio;
+        drawX = (canvas.width - drawWidth) / 2;
+        drawY = 0;
+      } else {
+        drawWidth = canvas.width;
+        drawHeight = canvas.width / imgRatio;
+        drawX = 0;
+        drawY = (canvas.height - drawHeight) / 2;
+      }
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    function getClosestLoadedFrame(targetIndex) {
+      let closest = -1;
+      let minDiff = Infinity;
+      
+      for (let i = 0; i < frameIndices.length; i++) {
+        const idx = frameIndices[i];
+        if (images[idx]) {
+          const diff = Math.abs(idx - targetIndex);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = idx;
+          }
+        }
+      }
+      return closest;
+    }
+
+    function hideLoader() {
+      loaderActive = false;
+      const loader = document.getElementById('loader');
+      loader.classList.add('opacity-0');
+      setTimeout(() => loader.classList.add('hidden'), 700);
+      canvas.classList.remove('opacity-0');
+    }
+
+    // Resize handler
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const closestIdx = getClosestLoadedFrame(Math.round(currentFrameIndex));
+      if (closestIdx !== -1 && images[closestIdx]) {
+        drawCoverImage(images[closestIdx], ctx, canvas);
+      }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Load images
+    frameIndices.forEach((index) => {
+      const img = new Image();
+      const pathNum = String(index).padStart(3, '0');
+      img.src = `rrrr/frame_${pathNum}.jpg`;
+      img.onload = () => {
+        images[index] = img;
+        loadedCount++;
+        
+        // Display canvas as soon as we have enough starter frames loaded
+        if (loadedCount >= 25 && loaderActive) {
+          hideLoader();
+        }
+      };
+    });
+
+    // Interpolation Animation Loop (Lerp)
+    let targetFrameIndex = 1;
+    let currentFrameIndex = 1;
+
+    window.addEventListener('scroll', () => {
+      const track = document.getElementById('scroll-track');
+      const maxScroll = track.scrollHeight - window.innerHeight;
+      if (maxScroll <= 0) return;
+      
+      const scrollPercent = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+      targetFrameIndex = 1 + Math.round(scrollPercent * (totalFrames - 1));
+    });
+
+    function animate() {
+      // Lerping target frame index for inertia scroll ease
+      currentFrameIndex += (targetFrameIndex - currentFrameIndex) * 0.08;
+      
+      const drawIndex = Math.round(currentFrameIndex);
+      const closestIdx = getClosestLoadedFrame(drawIndex);
+      if (closestIdx !== -1 && images[closestIdx]) {
+        drawCoverImage(images[closestIdx], ctx, canvas);
+      }
+
+      // Fade in/out logic for centered text overlay (frame 1 to 80)
+      const textOverlay = document.getElementById('text-overlay');
+      if (textOverlay) {
+        let opacity = 0;
+        if (currentFrameIndex >= 1 && currentFrameIndex <= 80) {
+          if (currentFrameIndex < 20) {
+            opacity = (currentFrameIndex - 1) / 19; // fade in from frame 1 to 20
+          } else if (currentFrameIndex > 60) {
+            opacity = (80 - currentFrameIndex) / 20; // fade out from frame 60 to 80
+          } else {
+            opacity = 1; // hold peak opacity
+          }
+        }
+        textOverlay.style.opacity = Math.max(0, Math.min(1, opacity));
+      }
+
+      animateId = requestAnimationFrame(animate);
+    }
+
+    // Start rendering loop
+    let animateId = requestAnimationFrame(animate);
+  </script>
+</body>
+
+</html>

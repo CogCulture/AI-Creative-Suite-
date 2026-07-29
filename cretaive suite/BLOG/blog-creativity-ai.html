@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Who Wins Creativity? Brands, Ideas and the Age of AI | Cog Culture</title>
+    <meta charset="utf-8">
+    <meta name="description" content="Who Wins Creativity? Brands, Ideas and the Age of AI.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+    <link rel="stylesheet" type="text/css" href="css/responisve.css">
+    <link rel="icon" type="images/png" href="https://www.cogculture.agency/images/favicon1.png" >
+    <link rel="shortcut icon" href="https://www.cogculture.agency/images/favicon1.ico" type="image/x-icon">
+    <link rel="icon" href="https://www.cogculture.agency/images/favicon1.ico" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"  />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .close-btn {
+            position: absolute;
+            top: 40px;
+            right: var(--container-h-padding);
+            font-size: 32px;
+            color: #000;
+            text-decoration: none;
+            z-index: 10;
+            transition: opacity 0.2s;
+            line-height: 1;
+        }
+        .close-btn:hover {
+            opacity: 0.6;
+            color: #000;
+        }
+        .article-title {
+            font-size: 56px;
+            line-height: 1.15;
+            font-weight: bold !important;
+            letter-spacing: -0.03em !important;
+            margin-top: 0;
+            margin-bottom: 0;
+            text-align: left;
+        }
+        @media (max-width: 991px) {
+            .article-title {
+                font-size: 40px;
+            }
+        }
+        @media (max-width: 575px) {
+            .article-title {
+                font-size: 32px;
+            }
+        }
+        .article-header-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 40px;
+        }
+        .article-date-top {
+            font-size: 14px;
+            font-weight: 500;
+            color: #000;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-bottom: 8px;
+            white-space: nowrap;
+            transform: translateX(155px);
+        }
+        @media (max-width: 768px) {
+            .article-header-wrapper {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .article-date-top {
+                padding-bottom: 0;
+                transform: none;
+            }
+        }
+        
+        /* Full Bleed Image Container */
+        .image-container-full {
+            width: 100%;
+            position: relative;
+            margin-bottom: 50px;
+            overflow: hidden;
+        }
+        .image-container-full img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        /* Date Badge overlay on image */
+        .date-badge {
+            position: absolute;
+            bottom: 30px;
+            left: var(--container-h-padding);
+            background: #ffffff;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            border-radius: 0px; /* matching the card design's border radius */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            z-index: 5;
+        }
+        @media (max-width: 768px) {
+            .date-badge {
+                bottom: 15px;
+                padding: 8px 12px;
+            }
+        }
+        .date-number {
+            font-size: 36px;
+            font-weight: bold;
+            line-height: 1;
+            color: #000;
+            margin-right: 10px;
+        }
+        @media (max-width: 768px) {
+            .date-number {
+                font-size: 28px;
+                margin-right: 8px;
+            }
+        }
+        .date-text {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .date-month, .date-year {
+            font-size: 11px;
+            font-weight: bold;
+            color: #9B9B9B;
+            text-transform: uppercase;
+            line-height: 1.1;
+            letter-spacing: 0.05em;
+        }
+        @media (max-width: 768px) {
+            .date-month, .date-year {
+                font-size: 9px;
+            }
+        }
+        
+        .article-content-wrapper {
+            max-width: 100%;
+            margin-bottom: 80px;
+        }
+        .article-body {
+            text-align: left;
+        }
+        .article-body p {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #333;
+            margin-bottom: 30px;
+            font-weight: 500 !important;
+            font-family: 'Helvetica Now', sans-serif !important;
+        }
+        .divider-line {
+            border-top: 1px solid #dcd8d0;
+            margin: 40px 0;
+        }
+        .share-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 45px;
+            margin-top: 40px;
+            margin-bottom: 80px;
+            font-family: 'Helvetica Now', sans-serif;
+            font-size: 16px;
+            width: fit-content;
+            transform: translateX(-360px);
+        }
+        .share-label {
+            font-weight: bold;
+            color: #cdcecf;
+        }
+        .share-item {
+            color: #000 !important;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+        .share-item:hover {
+            text-decoration: underline;
+            opacity: 0.8;
+        }
+        @media (max-width: 768px) {
+            .share-container {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="custom-cursor"></div>
+
+<nav class="navbar fixed-top navbar-expand-lg grey">
+  <div class="container">
+    <a class="navbar-brand" href="index.html"><img src="../images/logo-black.svg" ></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse justify-content-end" id="navbarSupportedContent">
+      <ul class="navbar-nav me-0 ">
+          <li class="nav-item">
+          <a class="nav-link " aria-current="page" href="about.html">About Us</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " aria-current="page" href="https://webtestinglink.net/cc/work">Work</a>
+        </li>
+        <li class="nav-item nav-dropdown">
+          <a class="nav-link dropdown-hover" aria-disabled="true" href="#">Expertise</a>
+          <div class="dropdown_xl container">
+              <ul>
+                  <li><a href="https://webtestinglink.net/cc/brand-work.php">Brand Work</a></li>
+                  <span class="circle"></span>
+                  <li><a href="https://webtestinglink.net/cc/tech-work.php">Tech Work</a></li>
+                  <span class="circle"></span>
+                  <li><a href="https://webtestinglink.net/cc/media-work.php">Media Work</a></li>
+                  <span class="circle"></span>
+                  <li><a href="https://webtestinglink.net/cc/ai-work.php">AI Work</a></li>
+              </ul>
+          </div>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" aria-disabled="true" href="https://webtestinglink.net/b2b-agency-live/" target="_blank"> B2B </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" aria-disabled="true" href="https://webtestinglink.net/cc/public-relations.php" >  Public Relations </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" aria-disabled="true" href="https://webtestinglink.net/cc/career.php">Career</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" aria-disabled="true" href="https://webtestinglink.net/cc/contact-us.php">Contact</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid grey banner top41" style="margin-top: 80px; padding-bottom: 30px; padding-top: 50px;">
+  <div class="container">
+    <div class="article-header-wrapper">
+        <h1 class="article-title">
+            <span style="color: #D9D9D9;">Who Wins Creativity?</span><br>
+            <span style="color: #ABABAB;">Brands, Ideas and the Age of AI.</span>
+        </h1>
+        <span class="article-date-top">14 April 2026</span>
+    </div>
+  </div>
+</div>
+
+<!-- Full Bleed Image Container -->
+<div class="image-container-full">
+    <img src="../images/ai age.png" alt="Who Wins Creativity?">
+</div>
+
+<!-- Content Container -->
+<div class="container">
+    <div class="article-content-wrapper">
+        <div class="article-body">
+            <p>For decades, the advertising industry's biggest stages celebrated one thing above all else: the campaign.</p>
+            <p>The most memorable film. The smartest print ad. The cleverest headline. Creative excellence was often measured by what happened during a campaign window.</p>
+            <p>Today, that definition is changing.</p>
+            
+            <p style="font-weight: bold !important; font-size: 22px; margin-top: 40px; margin-bottom: 20px; color: #000;">Beyond the Campaign: Creativity Has Expanded</p>
+            <p>Awards such as Cannes Lions increasingly recognise work that extends far beyond advertising. Winning ideas are no longer confined to thirty seconds of storytelling or a striking visual. They're embedded in products, experiences, technology, culture and business itself.</p>
+            <p>The strongest brands don't simply communicate a message, they create value people can participate in.</p>
+            <p>Today's most celebrated work often lives across multiple dimensions:</p>
+            
+            <ul style="font-family: 'Helvetica Now', sans-serif; font-size: 18px; line-height: 1.8; color: #333; margin-bottom: 30px; padding-left: 20px; font-weight: 500;">
+                <li style="margin-bottom: 10px;"><strong>Products</strong> that solve real problems.</li>
+                <li style="margin-bottom: 10px;"><strong>Experiences</strong> that people remember.</li>
+                <li style="margin-bottom: 10px;"><strong>Technology</strong> that enables new possibilities.</li>
+                <li style="margin-bottom: 10px;"><strong>Culture</strong> that shapes conversations.</li>
+                <li style="margin-bottom: 10px;"><strong>Business</strong> innovation that creates lasting impact.</li>
+            </ul>
+            
+            <p>In many ways, creativity has become less about interruption and more about integration.</p>
+            <p>This evolution reflects a broader shift in consumer expectations. Audiences no longer judge brands solely by what they say. They pay attention to what they build, how they behave and the role they play in culture. Creativity is increasingly measured by relevance, usefulness and lasting impact.</p>
+            
+            <p style="font-weight: bold !important; font-size: 22px; margin-top: 40px; margin-bottom: 20px; color: #000;">The AI Question: Tool or Threat?</p>
+            <p>Into this changing landscape arrives artificial intelligence.</p>
+            <p>Few innovations have sparked as much excitement or as much debate.</p>
+            <p>For some, AI represents the democratisation of creativity. It enables individuals and small teams to produce ideas, visuals and experiences that once required significant time and resources. It lowers barriers, accelerates execution and allows creative professionals to spend more time thinking than producing.</p>
+            <p>For others, AI raises uncomfortable questions. If anyone can generate beautiful imagery or compelling copy within seconds, what becomes truly valuable? Does creativity lie in execution or in the thinking behind it? Can originality exist when machines are trained on existing human work?</p>
+            <p>Perhaps the answer isn't found at either extreme.</p>
+            <p>History suggests that every technological leap has reshaped creative expression rather than replacing it. Photography didn't eliminate painting. Digital tools didn't end filmmaking. The internet didn't diminish storytelling. Instead, each innovation expanded the possibilities for those willing to explore it.</p>
+            <p>AI is likely to follow the same path.</p>
+            
+            <p style="font-weight: bold !important; font-size: 22px; margin-top: 40px; margin-bottom: 20px; color: #000;">What Will Creativity Reward Next?</p>
+            <p>The real differentiator will no longer be access to tools; it will be clarity of thought. The strongest ideas will continue to come from human insight, empathy and imagination. AI may accelerate the process, but it cannot define the purpose behind the work.</p>
+            <p>As the industry's definition of creativity continues to evolve, so too will the benchmarks for excellence.</p>
+            <p>The future won't belong to brands that simply create better advertising.</p>
+            <p>It will belong to those that create better reasons to be remembered.</p>
+        </div>
+
+        
+        <div class="share-container">
+            <span class="share-label">Share</span>
+            <a href="https://twitter.com/intent/tweet?url=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-creativity-ai.html&text=Who%20Wins%20Creativity%3F" target="_blank" class="share-item">X</a>
+            <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-creativity-ai.html" target="_blank" class="share-item">Facebook</a>
+            <a href="https://www.linkedin.com/shareArticle?url=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-creativity-ai.html" target="_blank" class="share-item">LinkedIn</a>
+            <a href="mailto:?subject=Who%20Wins%20Creativity%3F&body=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-creativity-ai.html" class="share-item">Email</a>
+            <a href="#" class="share-item" id="copy-link-btn">Copy Link</a>
+        </div>
+    </div>
+</div>
+
+<!-- Related Insights Section -->
+<div class="casestudies grey pad80 border-top">
+	<div class="container">
+		<h2 class="h4">Insights</h2>
+		<div class="row mt-5">
+			<div class="col-md-6 col-lg-4 m-0">
+				<a href="blog-future-of-b2b.html" class="case-box d-block">
+					<div class="overflow-hidden">
+						<img src="../images/b2b image.jpg" class="w-100">
+					</div>
+					<div class="casestudies-links">
+						<div class="case_date">
+						<span>14 April 2026</span>
+					</div>
+					<p>The Future of B2B Isn't B2B</p>
+					<span class="btns2">Read More</span>
+					</div>
+				</a>
+			</div>
+			<div class="col-md-6 col-lg-4 m-0">
+				<a href="blog-thinking-machine.html" class="case-box d-block">
+					<div class="overflow-hidden">
+						<img src="../images/thinking machine image.jpg" class="w-100">
+					</div>
+					<div class="casestudies-links">
+						<div class="case_date">
+						<span>14 April 2026</span>
+					</div>
+					<p>The Thinking Machine: And what it means for thinking humans</p>
+					<span class="btns2">Read More</span>
+					</div>
+				</a>
+			</div>
+		</div>
+	</div>
+</div>
+
+<footer class="footer-section grey pad80 pb-0 border-top">
+    <div class="container">
+        <div class="row align-items-end mb-5">
+            <div class="col-lg-8">
+                <h2 class="h4 mb-0">
+                    We build high-impact digital experiences that drive growth and elevate brands
+                </h2>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+                <div class="social-icons">
+                    <a target="_blank" href="https://www.linkedin.com/company/cogcultureagency/" class="me-3 text-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+                          <rect x="8" y="8" width="32" height="32" rx="8" stroke="black" stroke-width="2.5"/>
+                          <path d="M17 20H21V32H17V20ZM19 14.5C17.9 14.5 17 15.4 17 16.5C17 17.6 17.9 18.5 19 18.5C20.1 18.5 21 17.6 21 16.5C21 15.4 20.1 14.5 19 14.5ZM24 20H27.8V21.7H27.9C28.4 20.7 29.7 19.7 31.7 19.7C35.1 19.7 36 21.8 36 25.1V32H32V25.9C32 24.4 32 22.6 30.1 22.6C28.2 22.6 27.9 24.1 27.9 25.8V32H24V20Z" fill="black"/>
+                        </svg>
+                    </a>
+                    <a target="_blank" href="https://www.instagram.com/cogcultureagency/" class="me-3 text-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+                          <rect x="8" y="8" width="32" height="32" rx="8" stroke="black" stroke-width="2.5"/>
+                          <circle cx="24" cy="24" r="7" stroke="black" stroke-width="2.5"/>
+                          <circle cx="31.5" cy="16.5" r="1.8" fill="black"/>
+                        </svg>
+                    </a>
+                    <a target="_blank" href="https://www.facebook.com/cogcultureagency/" class="text-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+                          <rect x="8" y="8" width="32" height="32" rx="8" stroke="black" stroke-width="2.5"/>
+                          <path d="M27.5 18H30V14H27.1C23.8 14 22 15.9 22 19.2V22H19V26H22V34H26V26H29.4L30 22H26V19.7C26 18.6 26.4 18 27.5 18Z" fill="black"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <hr class="m-0">
+
+        <div class="row pt-5 pb-5 small_menu">
+            <div class="col-lg-2 col-md-6 mb-4">
+                <h6 class="text-uppercase text-secondary fw-semibold mb-3">Studio</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2"><a href="about.html" class="text-dark text-decoration-none">About</a></li>
+                    <li class="mb-2"><a href="https://webtestinglink.net/cc/work" class="text-dark text-decoration-none">Work</a></li>
+                    <li class="mb-2"><a href="All blogs.html" class="text-dark text-decoration-none">Blogs</a></li>
+                    <li class="mb-2"><a href="https://webtestinglink.net/cc/brand-work.php" class="text-dark text-decoration-none">Expertise</a></li>
+                    <li><a href="#" class="text-dark text-decoration-none">B2B</a></li>
+                </ul>
+            </div>
+            <div class="col-lg-2 col-md-6 mb-4">
+                <h6 class="text-uppercase text-secondary fw-semibold mb-3">Opportunities</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2"><a href="https://webtestinglink.net/cc/career.php" class="text-dark text-decoration-none">Careers</a></li>
+                    <li><a href="https://webtestinglink.net/cc/contact-us.php" class="text-dark text-decoration-none">Contact Us</a></li>
+                </ul>
+            </div>
+            <div class="col-lg-8 text-lg-end">
+                <div class="mb-5">
+                    <h6 class="text-uppercase text-secondary fw-semibold mb-3 reach_us">Reach Us</h6>
+                    <a href="mailto:hello@cogculture.agency" class="display-custom fw-bold text-dark text-decoration-none">hello@cogculture.agency</a>
+                </div>
+                <div>
+                    <h6 class="text-uppercase text-secondary fw-semibold mb-3 reach_us">Visit Us</h6>
+                    <p class="fs-custom mb-0">
+                        18th Floor, Emaar Colonnade, Golf Course<br>
+                        Extension Road, Sector - 66, Gurgaon - 122018.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <hr class="m-0">
+        
+        <div class="row copyright align-items-center pb-3 pt-3">
+            <div class="col-lg-8 col-md-6">
+               <div class="navbar-brand"> <img src="../images/logo-black.svg" /></div>
+            </div>
+            <div class="col-lg-4 col-md-6 text-lg-end mt-4 mt-lg-0">
+                <div class="social-icons">
+                    <p class="mb-0">All rights reserved Cog Culture</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="js/custom.js"></script>
+<script>
+document.getElementById('copy-link-btn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const originalText = this.innerText;
+        this.innerText = 'Copied!';
+        setTimeout(() => {
+            this.innerText = originalText;
+        }, 2000);
+    });
+});
+</script>
+
+</body>
+</html>

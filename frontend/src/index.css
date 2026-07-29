@@ -1,0 +1,705 @@
+/* ============================================================
+   STUDIO OS — Global CSS
+   Warm amber accent · neutral gray base · light + dark tokens
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Studio OS inner shell is always overflow:hidden */
+.studio-shell {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Animations ───────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastSlideUp {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes travel {
+  from { left: -16px; }
+  to { left: 100%; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── Spinner utility (used by Loader2 icons throughout the app) ── */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ── Accessibility: reduced motion ───────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── Scrollbar styling ───────────────────────────────────── */
+.studio-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.studio-scroll::-webkit-scrollbar-thumb {
+  border-radius: 20px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ── Responsive layout helpers ───────────────────────────── */
+@media (max-width: 1080px) {
+  .two-col,
+  .detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .proj-row {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Focus ring ──────────────────────────────────────────── */
+button:focus-visible {
+  outline: 2px solid #E8850C;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Streaming cursor ────────────────────────────────────── */
+.streaming-cursor::after {
+  content: "▍";
+  animation: blink 1s step-end infinite;
+  margin-left: 1px;
+}
+
+/* ── Message content prose ───────────────────────────────── */
+.message-prose {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.65;
+}
+
+/* ============================================================
+   LANDING PAGE STYLES
+   ============================================================ */
+
+/* Scoped override to match landing design system precisely without global pollution */
+.landing-page-root * {
+  border-radius: 0px !important;
+  box-shadow: none !important;
+}
+
+#custom-cursor {
+  border-radius: 50% !important;
+}
+
+/* Scatter out animation for copywriting snippets */
+.scatter-item {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  border-radius: 0px !important;
+  transition: transform 1.5s ease-out, opacity 1.2s ease-out;
+  white-space: normal;
+  mask-image: var(--mask, linear-gradient(to bottom, #000 65%, transparent 100%));
+  -webkit-mask-image: var(--mask, linear-gradient(to bottom, #000 65%, transparent 100%));
+}
+
+.scatter-active .scatter-item {
+  opacity: 0.95 !important;
+  transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--rot));
+}
+
+/* Vertical scroll animation for inline words */
+@keyframes scroll-vertical {
+  0%, 18% { transform: translateY(0); }
+  22%, 40% { transform: translateY(-20%); }
+  44%, 62% { transform: translateY(-40%); }
+  66%, 84% { transform: translateY(-60%); }
+  88%, 100% { transform: translateY(-80%); }
+}
+
+.animate-scroll-vertical {
+  animation: scroll-vertical 8s cubic-bezier(0.76, 0, 0.24, 1) infinite;
+}
+
+/* Customer cards marquee scroll */
+@keyframes marqueeScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(calc(-50% - 12px)); }
+}
+
+/* Slide left infinite animation */
+@keyframes slide-left {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-slide-left {
+  animation: slide-left 12s linear infinite;
+}
+
+/* Continuous sliding with duplicated images */
+.slide-container {
+  overflow: hidden;
+}
+
+.slide-track {
+  display: flex;
+  width: max-content;
+}
+
+.slide-track img {
+  flex-shrink: 0;
+}
+
+@keyframes slide-left-continuous {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-slide-continuous {
+  animation: slide-left-continuous 20s linear infinite;
+}
+
+.animate-slide-slow {
+  animation: slide-left-continuous 12s linear infinite;
+}
+
+/* Hide scrollbar */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Interactive Suite Transitions */
+.suite-tab-content {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, margin-top 0.4s ease;
+}
+
+.suite-tab.active .suite-tab-content {
+  max-height: 200px;
+  opacity: 1;
+  margin-top: 8px;
+}
+
+/* Animated Border Spin keyframes */
+@keyframes border-spin {
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.animate-border-spin {
+  animation: border-spin 4s linear infinite;
+}
+
+/* Workflow Card Custom Interactions */
+.workflow-card {
+  width: 260px;
+  height: 540px;
+  background-color: transparent;
+  border: 0.5px solid rgba(22, 25, 43, 0.25);
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.6s;
+  will-change: width, background-color;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.workflow-card:hover {
+  width: 480px;
+  background-color: #000000;
+  border-color: #000000;
+}
+
+.workflow-card h3,
+.workflow-card h4 {
+  color: #16192b;
+  transition: color 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: color;
+}
+
+.workflow-card p {
+  color: #4b5563;
+  transition: color 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: color;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workflow-card:hover h3,
+.workflow-card:hover h4 {
+  color: #ffffff;
+}
+
+.workflow-card:hover p {
+  color: #d1d5db;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+/* Footer Logo Opacity */
+.footer-logo {
+  opacity: 0.3;
+}
+
+/* Typing cursor animation for pillars */
+.typing-cursor-pillar {
+  display: inline-block;
+  width: 1.5px;
+  height: 15px;
+  background-color: #0d0d0d;
+  margin-left: 1px;
+  animation: cursor-blink-pillar 1s step-end infinite;
+  vertical-align: middle;
+}
+
+@keyframes cursor-blink-pillar {
+  from, to { background-color: transparent }
+  50% { background-color: #0d0d0d; }
+}
+
+/* Folder mockups styling */
+.folder-wrapper {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.folder-back {
+  position: absolute;
+  bottom: 10px;
+  width: 240px;
+  height: 160px;
+  background-color: #f59e0b;
+  border-radius: 12px 24px 12px 12px !important;
+  z-index: 1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.folder-tab {
+  position: absolute;
+  top: -15px;
+  left: 0;
+  width: 80px;
+  height: 20px;
+  background-color: #f59e0b;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.folder-front {
+  position: absolute;
+  bottom: 10px;
+  width: 240px;
+  height: 135px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9) 0%, rgba(251, 191, 36, 0.85) 100%);
+  backdrop-filter: blur(4px);
+  border-radius: 12px !important;
+  z-index: 5;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.25);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.folder-asset {
+  position: absolute;
+  bottom: 50px;
+  width: 100px;
+  height: 135px;
+  background-color: #ffffff;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  z-index: 3;
+  transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.5s ease;
+  opacity: 0;
+  transform: translateY(120px) rotate(0deg) scale(0.9);
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.landing-page-root #insight-container.active .asset-1 {
+  transform: translate(-70px, -45px) rotate(-14deg) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 2;
+}
+
+.landing-page-root #insight-container.active .asset-2 {
+  transform: translate(-25px, -70px) rotate(-5deg) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 3;
+}
+
+.landing-page-root #insight-container.active .asset-3 {
+  transform: translate(25px, -65px) rotate(6deg) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 4;
+}
+
+.landing-page-root #insight-container.active .asset-4 {
+  transform: translate(70px, -40px) rotate(15deg) scale(1) !important;
+  opacity: 1 !important;
+  z-index: 2;
+}
+
+/* Brain puzzle mockup animations */
+.brain-puzzle-wrapper {
+  position: relative;
+  width: 280px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.puzzle-piece-3d {
+  position: absolute;
+  width: 68px;
+  height: 76px;
+  z-index: 10;
+  left: 100px;
+  top: 60px;
+  transform: translate(38px, 18px) rotate(16deg) scale(1.05);
+  filter: drop-shadow(10px 18px 12px rgba(116, 173, 232, 0.45));
+  transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), filter 1.2s ease;
+}
+
+.landing-page-root #fw-container.active .puzzle-piece-3d {
+  transform: translate(0px, 0px) rotate(0deg) scale(1) !important;
+  filter: drop-shadow(0px 2px 3px rgba(116, 173, 232, 0.15)) !important;
+}
+
+.puzzle-piece-3d .piece-depth {
+  transform: translate(0px, 8px);
+  transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.landing-page-root #fw-container.active .puzzle-piece-3d .piece-depth {
+  transform: translate(0px, 6px) !important;
+}
+
+/* LLM bar animations */
+.llm-bar {
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 0%;
+}
+
+.landing-page-root #llm-container.active .llm-bar-1 {
+  width: 95% !important;
+}
+
+.landing-page-root #llm-container.active .llm-bar-2 {
+  width: 88% !important;
+}
+
+.landing-page-root #llm-container.active .llm-bar-3 {
+  width: 82% !important;
+}
+
+/* Team collab cursor animations */
+.collab-cursor {
+  position: absolute;
+  transition: all 2s ease-in-out;
+}
+
+.landing-page-root #collab-container.active .cursor-1 {
+  left: 30% !important;
+  top: 40% !important;
+}
+
+.landing-page-root #collab-container.active .cursor-2 {
+  left: 65% !important;
+  top: 65% !important;
+}
+
+.cursor-1 {
+  left: 10%;
+  top: 70%;
+}
+
+.cursor-2 {
+  left: 80%;
+  top: 20%;
+}
+
+/* Brand Voice visualizer/waveform animation on How It Works section */
+@keyframes pulse-irr-v1 {
+  0%, 100% { height: 16px; }
+  15% { height: 48px; }
+  30% { height: 20px; }
+  45% { height: 60px; }
+  60% { height: 28px; }
+  75% { height: 50px; }
+  90% { height: 22px; }
+}
+
+@keyframes pulse-irr-v2 {
+  0%, 100% { height: 20px; }
+  20% { height: 52px; }
+  40% { height: 64px; }
+  60% { height: 24px; }
+  80% { height: 56px; }
+}
+
+@keyframes pulse-irr-v3 {
+  0%, 100% { height: 10px; }
+  25% { height: 38px; }
+  50% { height: 14px; }
+  75% { height: 44px; }
+}
+
+.wave-bar-v {
+  width: 5px;
+  background-color: #86efac;
+  border-radius: 9999px !important;
+  transition: all 0.3s ease;
+}
+
+.brand-voice-active .voice-wave-wrapper-v {
+  animation: fade-out-wave-v 0.5s forwards;
+  animation-delay: 2.2s;
+}
+
+.brand-voice-active .voice-text-card-v {
+  animation: slide-in-bounce-v 0.6s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation-delay: 2.7s;
+}
+
+@keyframes fade-out-wave-v {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes slide-in-bounce-v {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Typewriter loader blink animation */
+@keyframes typewriter-cursor-blink {
+  from, to { border-color: transparent }
+  50% { border-color: #1f2937 }
+}
+
+/* ============================================================
+   LANDING / AUTH PAGE STYLES — spectrum glows, dropdowns
+   ============================================================ */
+
+/* Spectrum Glow BG */
+.spectrum-glow {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(140px);
+  will-change: transform, opacity;
+  z-index: 0;
+}
+
+.spectrum-glow-1 {
+  background: radial-gradient(circle at 30% 30%, rgba(236, 72, 153, 0.45) 0%, rgba(168, 85, 247, 0.35) 30%, rgba(59, 130, 246, 0.25) 60%, rgba(6, 182, 212, 0.15) 100%);
+}
+
+.spectrum-glow-2 {
+  background: radial-gradient(circle at 70% 30%, rgba(6, 182, 212, 0.45) 0%, rgba(20, 184, 166, 0.35) 30%, rgba(234, 179, 8, 0.2) 60%, rgba(249, 115, 22, 0.15) 100%);
+}
+
+.spectrum-glow-3 {
+  background: radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.45) 0%, rgba(236, 72, 153, 0.35) 35%, rgba(168, 85, 247, 0.25) 70%, rgba(59, 130, 246, 0.1) 100%);
+}
+
+.spectrum-glow-rainbow {
+  background: radial-gradient(circle,
+    rgba(239, 68, 68, 0.45) 0%,
+    rgba(249, 115, 22, 0.40) 18%,
+    rgba(234, 179, 8, 0.35) 35%,
+    rgba(34, 197, 94, 0.30) 50%,
+    rgba(59, 130, 246, 0.25) 68%,
+    rgba(99, 102, 241, 0.20) 82%,
+    rgba(168, 85, 247, 0.15) 100%
+  );
+}
+
+.spectrum-rainbow-top {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 950px;
+  height: 650px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at center,
+    rgba(239, 68, 68, 0.45) 0%,
+    rgba(249, 115, 22, 0.40) 18%,
+    rgba(234, 179, 8, 0.35) 35%,
+    rgba(34, 197, 94, 0.30) 50%,
+    rgba(59, 130, 246, 0.25) 68%,
+    rgba(99, 102, 241, 0.20) 82%,
+    rgba(168, 85, 247, 0.15) 100%
+  );
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.3;
+}
+
+/* Navbar Dropdown */
+.dropdown-panel {
+  display: none;
+  pointer-events: none;
+}
+
+.dropdown:hover .dropdown-panel {
+  display: block;
+  pointer-events: auto;
+}
+
+.dropdown:hover .dropdown-caret {
+  transform: rotate(180deg);
+}
+
+.dropdown-caret {
+  transition: transform 0.2s ease;
+}
+
+/* Custom cursor — hide native on desktop for landing pages */
+@media (hover: hover) and (pointer: fine) {
+  .landing-page-root, .login-signup-root {
+    cursor: none !important;
+  }
+  .landing-page-root *, .login-signup-root * {
+    cursor: none !important;
+  }
+}
+
+/* Landing page font classes for Tailwind-in-React compat */
+.font-display {
+  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif !important;
+}
+
+.font-sans {
+  font-family: 'Inter', system-ui, sans-serif !important;
+}
+
+.text-ink { color: #16192b; }
+.text-muted { color: #6b7080; }
+.text-brand { color: #000000; }
+.bg-brand { background-color: #000000; }
+.bg-surface { background-color: #f7f8fa; }
+.border-border { border-color: #e6e8ee; }
+
+/* Premium black card & shine hover effect */
+.workflow-card-premium {
+  position: relative;
+  overflow: hidden;
+  background: #000000 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease !important;
+}
+
+.workflow-card-premium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    transparent
+  );
+  transform: skewX(-20deg);
+  transition: 0.75s;
+  pointer-events: none;
+}
+
+.workflow-card-premium:hover::before {
+  left: 150%;
+}
+
+/* Slim horizontal scrollbar */
+.studio-scroll-horizontal-slim::-webkit-scrollbar {
+  height: 5px;
+}
+.studio-scroll-horizontal-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.studio-scroll-horizontal-slim::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 120, 0.25);
+  border-radius: 10px;
+}
+.studio-scroll-horizontal-slim::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 120, 0.45);
+}
+
+

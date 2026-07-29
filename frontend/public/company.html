@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Company — Cog Culture</title>
+  <meta name="description" content="Cog Culture is an integrated 360° agency combining strategy, creativity, technology and AI to deliver business results." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#000000',
+            'brand-fg': '#ffffff',
+            ink: '#16192b',
+            surface: '#f7f8fa',
+            'surface-alt': '#dddddd',
+            border: '#e6e8ee',
+            muted: '#6b7080',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Odometer Styles */
+    .odo-number-wrapper {
+      display: inline-flex;
+      align-items: flex-end;
+      overflow: hidden;
+      line-height: 1.0;
+      vertical-align: bottom;
+    }
+    .odo-digit-container {
+      display: inline-block;
+      height: 1em;
+      overflow: hidden;
+      position: relative;
+      vertical-align: bottom;
+    }
+    .odo-digit-strip {
+      display: inline-flex;
+      flex-direction: column;
+      transition: transform 5s cubic-bezier(0.16, 1, 0.3, 1);
+      transform: translateY(0);
+    }
+    .odo-digit-strip span {
+      display: block;
+      height: 1em;
+      line-height: 1.0;
+      text-align: center;
+    }
+    /* Custom Cursor styling */
+    #custom-cursor {
+      transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  height 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  background-color 0.2s, border 0.2s, opacity 0.2s;
+    }
+    #custom-cursor.active {
+      width: 40px;
+      height: 40px;
+      background-color: transparent;
+      border: 1.5px solid #ffffff;
+    }
+    /* Hide default cursor on desktop */
+    @media (hover: hover) and (pointer: fine) {
+      html, body, a, button, select, input, textarea, summary, [role="button"], .suite-tab {
+        cursor: none !important;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-white text-ink font-sans">
+
+  <!-- Custom Black Dot Cursor -->
+  <div id="custom-cursor" class="pointer-events-none fixed z-[9999] rounded-full bg-white mix-blend-difference opacity-0" style="width: 16px; height: 16px; top: 0; left: 0; transform: translate3d(-50%, -50%, 0);"></div>
+
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-50 w-full border-b border-border/70 bg-white/85 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-[70px]">
+      <a href="index.html" class="flex items-center">
+        <img src="images/Cog logo full (1).svg" alt="Cog Logo" class="h-40 w-40" />
+      </a>
+      <nav class="hidden lg:flex items-center gap-1">
+        <!-- AI Intelligence Suite -->
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            AI Intelligence Suite
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-[640px] -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl grid grid-cols-4 gap-8">
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Create</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Image</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Video</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Copy</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Presentation</a>
+                </div>
+              </div>
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Manage</span>
+                <div class="space-y-[4px]">
+                  <a href="dashboard/hr.html" class="block text-sm text-muted hover:text-ink transition font-sans">HR</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Manage</a>
+                </div>
+              </div>
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Research</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Marketplace</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Dam</a>
+                </div>
+              </div>
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Build</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Website</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">App</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resources -->
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            Resources
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl">
+              <span class="block text-sm font-semibold text-ink mb-3 font-display">Resources</span>
+              <div class="space-y-[4px]">
+                <a href="marketplace.html" class="block text-sm text-muted hover:text-ink transition font-sans">Marketplace</a>
+                <a href="company.html" class="block text-sm text-muted hover:text-ink transition font-sans font-semibold text-black">Company</a>
+                <a href="blog.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans font-sans">Blog</a>
+                <a href="support.html" class="block text-sm text-muted hover:text-ink transition font-sans">Support</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <a href="enterprise.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Enterprise</a>
+        <a href="pricing.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Pricing</a>
+      </nav>
+      <div class="hidden lg:flex items-center gap-3">
+        <a href="/?login=true" class="px-3 py-2 text-sm font-medium text-ink/85 hover:text-ink">Login</a>
+        <a href="#" class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+      <!-- Mobile Menu Button -->
+      <button id="mobile-toggle" class="lg:hidden" aria-label="Menu">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-border bg-white px-[70px] py-4">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">AI Intelligence Suite</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="#">Create</a>
+        <a href="#">Manage</a>
+        <a href="#">Research</a>
+        <a href="#">Build</a>
+      </div>
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Resources</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="marketplace.html">Marketplace</a>
+        <a href="company.html">Company</a>
+        <a href="blog.html">Blog</a>
+        <a href="support.html">Support</a>
+      </div>
+      <div class="grid gap-2 border-t border-border pt-4 text-sm">
+        <a href="enterprise.html" class="font-medium">Enterprise</a>
+        <a href="pricing.html" class="font-medium">Pricing</a>
+        <a href="/?login=true" class="font-medium">Login</a>
+        <a href="#" class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-center font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Quote Section -->
+  <section class="bg-white py-16 border-b border-border/50">
+    <div class="mx-auto max-w-7xl px-[70px]">
+      <div class="mb-6 opacity-80">
+        <svg width="44" height="36" viewBox="0 0 528 432" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 0H224L176 432H40L0 0Z" fill="#E9E9E9"/>
+          <path d="M304 0H528L480 432H344L304 0Z" fill="#E9E9E9"/>
+        </svg>
+      </div>
+      <h1 class="text-3xl md:text-5xl lg:text-6xl font-medium font-display leading-[1.15] tracking-tight max-w-5xl">
+        <span class="text-neutral-300">The best client-agency relationships are true partnerships.</span><br>
+        <span class="text-neutral-500">By working as an extension of our clients' teams, we combine strategy, creativity, technology, AI and business insight</span><br>
+        <span class="text-ink">to deliver measurable business results.</span>
+      </h1>
+      <p class="text-sm font-semibold uppercase tracking-wider text-muted mt-8 font-sans">
+        — Anoop Dixit, CEO
+      </p>
+    </div>
+  </section>
+
+  <!-- Showreel Section -->
+  <section class="w-full bg-black overflow-hidden flex items-center justify-center aspect-[21/9]">
+    <video loop muted autoplay playsinline class="w-full h-full object-cover">
+      <source src="videos/COMPANY VIDEO.mp4" type="video/mp4">
+    </video>
+  </section>
+
+  <!-- Our Story & Stats Section -->
+  <section class="bg-white py-16">
+    <div class="mx-auto max-w-7xl px-[70px] grid gap-16 lg:grid-cols-3">
+      <!-- Left side heading -->
+      <div class="lg:col-span-1">
+        <h2 class="text-xs font-semibold uppercase tracking-[0.25em] text-black font-sans">Company Story</h2>
+      </div>
+      
+      <!-- Right side story copy & stats cards -->
+      <div class="lg:col-span-2 space-y-12">
+        <div class="space-y-6 text-base leading-relaxed text-neutral-600 font-sans">
+          <p class="font-medium text-neutral-800">
+            Cog Culture began in 2012 as a digital-first agency with a simple philosophy: work so closely with clients that we become an extension of their team.
+          </p>
+          <p>
+            Since then, we've evolved into a fully integrated 360° agency, expanding our capabilities across strategy, creativity, technology and AI. We've grown to a team of over 150, partnered with leading Indian and global brands, and earned recognition through prestigious national and international awards.
+          </p>
+          <p>
+            We've grown in every way imaginable, but the way we work hasn't changed. Our clients don't see us as an agency. They see us as an extension of their team.
+          </p>
+        </div>
+        
+        <!-- Stats Cards Grid -->
+        <div class="grid gap-6 sm:grid-cols-3">
+          <!-- Card 1: Experience -->
+          <div class="bg-surface border border-[#dddddd] p-6 flex flex-col justify-between aspect-[1/1] hover:border-black transition-all">
+            <span class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Years of Experience</span>
+            <div class="text-5xl font-semibold tracking-tighter text-black font-display mt-auto">
+              <span class="odometer-num" data-value="12">12</span><span class="text-black font-light">+</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Clients -->
+          <div class="bg-surface border border-[#dddddd] p-6 flex flex-col justify-between aspect-[1/1] hover:border-black transition-all">
+            <span class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Total Clients</span>
+            <div class="text-5xl font-semibold tracking-tighter text-black font-display mt-auto">
+              <span class="odometer-num" data-value="56">56</span><span class="text-black font-light">+</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Projects -->
+          <div class="bg-surface border border-[#dddddd] p-6 flex flex-col justify-between aspect-[1/1] hover:border-black transition-all">
+            <span class="text-xs font-semibold uppercase tracking-wider text-muted font-sans">Total Projects</span>
+            <div class="text-5xl font-semibold tracking-tighter text-black font-display mt-auto">
+              <span class="odometer-num" data-value="120">120</span><span class="text-black font-light">+</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Awards and Recognition Section -->
+  <section class="bg-white py-16 border-t border-border/60">
+    <div class="mx-auto max-w-7xl px-[70px]">
+      <h2 class="text-2xl font-semibold tracking-tight text-black font-display mb-12">Awards And Recognitions</h2>
+      
+      <!-- Custom grid system mimicking a border grid -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 border-t border-l border-neutral-300">
+        <!-- Row 1 -->
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/one-show.svg" alt="The One Show" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/canne-lion.svg" alt="Cannes Lions" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/spikes-asia.svg" alt="Spikes Asia" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/archive.svg" alt="Lürzer's Archive" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/kyoorious.svg" alt="Kyoorius Design Awards" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        
+        <!-- Row 2 -->
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/newyork-festivals.svg" alt="New York Festivals" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/communication-arts.svg" alt="Communication Arts" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/goafest.svg" alt="Goafest" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/awwards.svg" alt="Awwwards" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/Graphis.svg" alt="Graphis" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        
+        <!-- Row 3 -->
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/golden-award.svg" alt="Golden Award of Montreux" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/design-museum-of-zurich.svg" alt="Design Museum of Zurich" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <div class="border-r border-b border-neutral-300 flex items-center justify-center p-8 bg-white aspect-[4/3] hover:bg-neutral-50 transition-colors">
+          <img src="images/spiritz.svg" alt="Spiritz" class="max-w-[70%] max-h-[70%] object-contain opacity-100">
+        </div>
+        <!-- Empty spacers to fill grid -->
+        <div class="border-r border-b border-neutral-300 bg-white aspect-[4/3] hidden lg:block"></div>
+        <div class="border-r border-b border-neutral-300 bg-white aspect-[4/3] hidden lg:block"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- High-Impact Digital Experiences Banner -->
+  <section class="bg-white py-16">
+    <div class="mx-auto max-w-7xl px-[70px] flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+      <h2 class="text-3xl md:text-[50px] font-medium tracking-tight text-ink font-display max-w-4xl leading-[1.15]">
+        We build high-impact digital experiences that drive growth and elevate brands.
+      </h2>
+      <div class="flex gap-4 items-center">
+        <!-- LinkedIn -->
+        <a target="_blank" href="https://www.linkedin.com/company/cogcultureagency/" class="text-ink hover:text-ink/75 transition-colors">
+          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.8v8h2.8v-4.87c0-.26.05-.5.14-.68a1.14 1.14 0 0 1 1-.77c.76 0 1 .56 1 1.34v5zM7.78 7.57a1.62 1.62 0 1 0 1.63 1.62 1.63 1.63 0 0 0-1.63-1.62m1.4 11v-8h-2.8v8z"/>
+          </svg>
+        </a>
+        <!-- Instagram -->
+        <a target="_blank" href="https://www.instagram.com/cogcultureagency/" class="text-ink hover:text-ink/75 transition-colors">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+            <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" />
+            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+          </svg>
+        </a>
+        <!-- Facebook -->
+        <a target="_blank" href="https://www.facebook.com/cogcultureagency/" class="text-ink hover:text-ink/75 transition-colors">
+          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7v-7h-2v-3h2V8.5A3.5 3.5 0 0 1 15.5 5H18v3h-1.5a1 1 0 0 0-1 1v2h2.5l-.5 3h-2v7h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-[#dddddd] pt-16">
+    <div class="mx-auto max-w-7xl px-[70px] pb-16">
+
+      <!-- Footer Grid -->
+      <div class="grid gap-12 sm:grid-cols-2 lg:grid-cols-4 items-start w-full">
+        
+        <!-- Column 1: AI Suite -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">AI Intelligence Suite</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Create</a></li>
+            <li><a href="dashboard/hr.html" class="hover:underline">Manage</a></li>
+            <li><a href="#" class="hover:underline">Research</a></li>
+            <li><a href="#" class="hover:underline">Build</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 2: Support -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Support</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Help Centre</a></li>
+            <li><a href="#" class="hover:underline">Download and install</a></li>
+            <li><a href="#" class="hover:underline">Cog Community</a></li>
+            <li><a href="#" class="hover:underline">Cog Learn</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 3: Enterprise -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Enterprise</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Marketplace</a></li>
+            <li><a href="company.html" class="hover:underline">Company</a></li>
+            <li><a href="blog.html" class="hover:underline">Blog</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 4: Company -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Company</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Careers</a></li>
+            <li><a href="#" class="hover:underline">Contact</a></li>
+            <li><a href="#" class="hover:underline">Press</a></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Bottom Bar (Black Bar with white text) -->
+    <div class="bg-black py-8">
+      <div class="mx-auto max-w-7xl px-[70px] flex flex-col md:flex-row justify-between items-start md:items-center text-xs text-white/80">
+        <p class="uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white">COPYRIGHT COG CULTURE <span id="year"></span></p>
+        <div class="flex gap-5 mt-4 md:mt-0">
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Privacy</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Terms</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Cookies</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Custom Cursor logic
+    const cursor = document.getElementById('custom-cursor');
+    if (cursor) {
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        if (cursor.style.opacity !== '1') {
+          cursor.style.opacity = '1';
+        }
+      });
+      document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+      });
+      document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          cursor.style.opacity = '0';
+        }
+      });
+      document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.add('active');
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.remove('active');
+        }
+      });
+    }
+
+    // Set Copyright Year
+    const yearSpan = document.getElementById('year');
+    if (yearSpan) {
+      yearSpan.textContent = new Date().getFullYear();
+    }
+
+    // Mobile menu toggle
+    const mobileToggle = document.getElementById('mobile-toggle');
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (mobileToggle && mobileMenu) {
+      mobileToggle.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden');
+      });
+    }
+
+    // Odometer animation logic
+    document.addEventListener("DOMContentLoaded", () => {
+      const odometers = document.querySelectorAll(".odometer-num");
+      
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const odo = entry.target;
+            if (odo.classList.contains("odo-animated")) return;
+            odo.classList.add("odo-animated");
+            
+            const val = odo.getAttribute("data-value") || odo.textContent.trim();
+            odo.innerHTML = "";
+            
+            const digits = val.split("");
+            digits.forEach((char, idx) => {
+              if (/\d/.test(char)) {
+                const digitContainer = document.createElement("span");
+                digitContainer.className = "odo-digit-container";
+                
+                const digitStrip = document.createElement("span");
+                digitStrip.className = "odo-digit-strip";
+                
+                for (let i = 0; i < 20; i++) {
+                  const span = document.createElement("span");
+                  span.textContent = i % 10;
+                  digitStrip.appendChild(span);
+                }
+                
+                digitContainer.appendChild(digitStrip);
+                odo.appendChild(digitContainer);
+                
+                digitStrip.getBoundingClientRect();
+                
+                const targetDigit = parseInt(char, 10);
+                const delay = (digits.length - 1 - idx) * 300;
+                
+                setTimeout(() => {
+                  digitStrip.style.transform = `translateY(-${(10 + targetDigit) * 5}%)`;
+                }, delay);
+              } else {
+                const span = document.createElement("span");
+                span.textContent = char;
+                odo.appendChild(span);
+              }
+            });
+            
+            observer.unobserve(odo);
+          }
+        });
+      }, { threshold: 0.1 });
+      
+      odometers.forEach(odo => {
+        if (!odo.getAttribute("data-value")) {
+          odo.setAttribute("data-value", odo.textContent.trim());
+        }
+        observer.observe(odo);
+      });
+    });
+  </script>
+
+</body>
+
+</html>

@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cog Culture Pricing — Unlimited Creation for Every Budget</title>
+  <meta name="description"
+    content="Choose the right plan for your creative output. Starter, Pro, and Enterprise tiers designed to scale as you grow. No hidden fees." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#000000',
+            'brand-fg': '#ffffff',
+            ink: '#16192b',
+            surface: '#f7f8fa',
+            'surface-alt': '#dddddd',
+            border: '#e6e8ee',
+            muted: '#6b7080',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Custom footer logo opacity */
+    .footer-logo {
+      opacity: 0.3;
+    }
+    
+    /* Interactive details arrows */
+    details[open] .faq-plus {
+      transform: rotate(45deg);
+    }
+    .faq-plus {
+      transition: transform 0.15s;
+    }
+    
+    /* Highlight gradient border for popular plan */
+    @keyframes border-spin {
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    .animate-border-spin {
+      animation: border-spin 4s linear infinite;
+    }
+    /* Custom Cursor styling */
+    #custom-cursor {
+      transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  height 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  background-color 0.2s, border 0.2s, opacity 0.2s;
+    }
+    #custom-cursor.active {
+      width: 40px;
+      height: 40px;
+      background-color: transparent;
+      border: 1.5px solid #ffffff;
+    }
+    /* Hide default cursor on desktop */
+    @media (hover: hover) and (pointer: fine) {
+      html, body, a, button, select, input, textarea, summary, [role="button"], .suite-tab {
+        cursor: none !important;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-white text-ink font-sans">
+
+  <!-- Custom Black Dot Cursor (inverts on dark bg for visibility) -->
+  <div id="custom-cursor" class="pointer-events-none fixed z-[9999] rounded-full bg-white mix-blend-difference opacity-0" style="width: 16px; height: 16px; top: 0; left: 0; transform: translate3d(-50%, -50%, 0);"></div>
+
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-50 w-full border-b border-border/70 bg-white/85 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-[70px]">
+      <a href="index.html" class="flex items-center">
+        <img src="images/Cog%20logo%20full%20(1).svg" alt="Cog Logo" class="h-40 w-40" />
+      </a>
+      <nav class="hidden lg:flex items-center gap-1">
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            AI Intelligence Suite
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-2">
+            <div class="rounded-xl border border-border bg-white p-6 shadow-xl">
+              <span class="block text-sm font-semibold text-ink mb-3 font-display">AI Intelligence Suite</span>
+              <div class="space-y-[4px]">
+                <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Create</a>
+                <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Manage</a>
+                <a href="dashboard/hr.html" class="block text-sm text-muted hover:text-ink transition font-sans">HR</a>
+                <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Research</a>
+                <a href="index.html#suite" class="block text-sm text-muted hover:text-ink transition font-sans">Build</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            Resources
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-2">
+            <div class="rounded-xl border border-border bg-white p-6 shadow-xl">
+              <span class="block text-sm font-semibold text-ink mb-3 font-display">Resources</span>
+              <div class="space-y-[4px]">
+                <a href="marketplace.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Marketplace</a>
+                <a href="company.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Company</a>
+                <a href="blog.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Blog</a>
+                <a href="support.html" class="block text-sm text-muted hover:text-ink transition font-sans font-sans">Support</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <a href="enterprise.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Enterprise</a>
+        <a href="pricing.html" class="px-3 py-2 text-sm font-medium text-ink/85 hover:text-ink font-semibold">Pricing</a>
+      </nav>
+      <div class="hidden lg:flex items-center gap-2">
+        <a href="/?login=true" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Login</a>
+        <a href="#"
+          class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+      <button id="mobile-toggle" class="lg:hidden" aria-label="Menu">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-border bg-white px-[70px] py-4">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">AI Intelligence Suite</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="#">Create</a>
+        <a href="index.html#suite">Manage</a>
+        <a href="index.html#suite">Research</a>
+        <a href="index.html#suite">Build</a>
+      </div>
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Resources</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="marketplace.html">Marketplace</a><a href="company.html">Company</a><a href="blog.html">Blog</a><a href="support.html">Support</a>
+      </div>
+      <div class="grid gap-2 border-t border-border pt-4 text-sm">
+        <a href="enterprise.html" class="font-medium">Enterprise</a>
+        <a href="pricing.html" class="font-medium">Pricing</a>
+        <a href="/?login=true" class="font-medium">Login</a>
+        <a href="#"
+          class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-center font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="relative bg-white py-16 text-center">
+    <div class="mx-auto max-w-3xl px-[70px]">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">SIMPLE PRICING</p>
+      <h1 class="mt-3 text-3xl font-medium leading-[1.05] tracking-tight md:text-5xl font-display text-ink">
+        Choose the plan that's<br><span class="text-brand">right for your workflow.</span>
+      </h1>
+      <p class="mt-6 max-w-xl mx-auto text-sm leading-relaxed text-muted font-sans">
+        Start creating immediately. Lock in custom branding, compliance checks, and priority support as you expand.
+      </p>
+    </div>
+  </section>
+
+  <!-- PRICING CARDS -->
+  <section class="bg-white py-16 pt-0">
+    <div class="mx-auto max-w-7xl px-[70px]">
+      <div class="grid gap-8 lg:grid-cols-3 lg:items-stretch">
+        
+        <!-- Starter Plan -->
+        <div class="bg-white border border-border p-8 rounded-none flex flex-col justify-between hover:shadow-md transition">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted mb-4">STARTER</p>
+            <span class="text-4xl font-bold font-display text-ink">$0</span>
+            <span class="text-xs text-muted font-sans ml-1">Free 14-day trial</span>
+            <p class="text-sm text-muted font-sans mt-4">
+              Explore the core generative apps and test high-quality content output.
+            </p>
+            <hr class="border-border my-6" />
+            <ul class="space-y-3 text-sm text-ink/80">
+              <li class="flex items-center gap-2">✓ Access to standard Suite tools</li>
+              <li class="flex items-center gap-2">✓ Standard generation credits</li>
+              <li class="flex items-center gap-2">✓ Standard resolution downloads</li>
+              <li class="flex items-center gap-2">✓ Personal project license</li>
+            </ul>
+          </div>
+          <div class="mt-8">
+            <a href="trial.html" class="block w-full border-[0.5px] border-black bg-white text-ink text-center py-2.5 font-semibold text-sm transition rounded-none hover:scale-[1.02] active:scale-[0.98] hover:bg-[#dddddd]">
+              Start Free Trial
+            </a>
+          </div>
+        </div>
+
+        <!-- Pro Plan (Most Popular) -->
+        <div class="bg-white border border-black p-8 rounded-none flex flex-col justify-between hover:shadow-md transition">
+          <div>
+            <div class="flex justify-between items-center mb-4">
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">PRO CREATOR</p>
+              <span class="bg-[#000000] text-white text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-none uppercase">Popular</span>
+            </div>
+            <span class="text-4xl font-bold font-display text-ink">$29</span>
+            <span class="text-xs text-muted font-sans ml-1">/ seat / month</span>
+            <p class="text-sm text-muted font-sans mt-4">
+              Unlimited assets, faster creation times, and commercial production usage permissions.
+            </p>
+            <hr class="border-border my-6" />
+            <ul class="space-y-3 text-sm text-ink/80">
+              <li class="flex items-center gap-2">✓ <strong>Unlimited</strong> high-res creations</li>
+              <li class="flex items-center gap-2">✓ <strong>3x Faster</strong> generation speeds</li>
+              <li class="flex items-center gap-2">✓ Custom brand kits (logos, hex colors)</li>
+              <li class="flex items-center gap-2">✓ Commercial license for clients</li>
+              <li class="flex items-center gap-2">✓ Standard API endpoints</li>
+            </ul>
+          </div>
+          <div class="mt-8">
+            <a href="#" class="block w-full bg-brand text-white text-center py-2.5 rounded-none font-semibold text-sm hover:brightness-110 transition shadow-sm">
+              Upgrade to Pro
+            </a>
+          </div>
+        </div>
+
+        <!-- Enterprise Plan -->
+        <div class="bg-white border border-border p-8 rounded-none flex flex-col justify-between hover:shadow-md transition">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand mb-4">ENTERPRISE</p>
+            <span class="text-4xl font-bold font-display text-ink">Custom</span>
+            <span class="text-xs text-muted font-sans ml-1">Volume scale billing</span>
+            <p class="text-sm text-muted font-sans mt-4">
+              Closed-loop security workspace with fine-tuned private models and compliance checks.
+            </p>
+            <hr class="border-border my-6" />
+            <ul class="space-y-3 text-sm text-ink/80">
+              <li class="flex items-center gap-2">✓ <strong>Closed-Loop IP protection</strong></li>
+              <li class="flex items-center gap-2">✓ Single Sign-On (SSO / SAML)</li>
+              <li class="flex items-center gap-2">✓ Fine-tuned custom brand models</li>
+              <li class="flex items-center gap-2">✓ 24/7 dedicated support architect</li>
+              <li class="flex items-center gap-2">✓ Strict SLA response guarantees</li>
+            </ul>
+          </div>
+          <div class="mt-8">
+            <a href="enterprise.html#contact" class="block w-full border-[0.5px] border-black bg-white text-ink text-center py-2.5 font-semibold text-sm transition rounded-none hover:scale-[1.02] active:scale-[0.98] hover:bg-[#dddddd]">
+              Contact Sales
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURE TABLE -->
+  <section class="bg-[#dddddd] py-16">
+    <div class="mx-auto max-w-7xl px-[70px]">
+      <div class="text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">FEATURE COMPARISON</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">Compare our plans</h2>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse bg-white rounded-none shadow-sm overflow-hidden">
+          <thead>
+            <tr class="border-b border-border bg-slate-50 text-xs font-semibold uppercase tracking-wider text-ink/70">
+              <th class="p-5 font-sans">Feature</th>
+              <th class="p-5 font-sans">Starter</th>
+              <th class="p-5 font-sans">Pro</th>
+              <th class="p-5 font-sans">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody class="text-sm divide-y divide-border/60">
+            <tr>
+              <td class="p-5 font-medium text-ink">Core Creation Suite</td>
+              <td class="p-5 text-muted">Standard</td>
+              <td class="p-5 text-brand font-semibold">Standard + Pro Perks</td>
+              <td class="p-5 text-brand font-semibold">Fine-tuned Brand Models</td>
+            </tr>
+            <tr>
+              <td class="p-5 font-medium text-ink">Generation Speed</td>
+              <td class="p-5 text-muted">Standard Queue</td>
+              <td class="p-5 text-ink">Priority (3x faster)</td>
+              <td class="p-5 text-ink">Instant (Dedicated cluster)</td>
+            </tr>
+            <tr>
+              <td class="p-5 font-medium text-ink">Workspace Seats</td>
+              <td class="p-5 text-muted">1 Seat</td>
+              <td class="p-5 text-ink">Up to 25 Seats</td>
+              <td class="p-5 text-ink">Unlimited Seats</td>
+              </tr>
+            <tr>
+              <td class="p-5 font-medium text-ink">Custom Brand Kits</td>
+              <td class="p-5 text-muted">✗ Not Included</td>
+              <td class="p-5 text-brand font-semibold">Up to 3 Kits</td>
+              <td class="p-5 text-brand font-semibold">Unlimited Kits</td>
+            </tr>
+            <tr>
+              <td class="p-5 font-medium text-ink">SLA Guarantee</td>
+              <td class="p-5 text-muted">✗ Not Included</td>
+              <td class="p-5 text-muted">✗ Not Included</td>
+              <td class="p-5 text-ink">✓ 99.9% Uptime SLA</td>
+            </tr>
+            <tr>
+              <td class="p-5 font-medium text-ink">IP Protection</td>
+              <td class="p-5 text-muted">Standard Privacy</td>
+              <td class="p-5 text-muted">Standard Privacy</td>
+              <td class="p-5 text-brand font-semibold">Closed-loop (No training on IP)</td>
+            </tr>
+            <tr>
+              <td class="p-5 font-medium text-ink">Single Sign-On (SSO)</td>
+              <td class="p-5 text-muted">✗ Not Included</td>
+              <td class="p-5 text-muted">✗ Not Included</td>
+              <td class="p-5 text-brand font-semibold">✓ Okta, SAML, Azure AD</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING FAQ -->
+  <section class="bg-white py-16">
+    <div class="mx-auto max-w-6xl px-[70px]">
+      <div class="text-center mb-12">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand">BILLING FAQ</p>
+        <h2 class="mt-3 text-3xl font-medium tracking-tight md:text-5xl font-display text-ink">Pricing Questions?</h2>
+      </div>
+      
+      <div id="faq" class="space-y-1">
+        <details open>
+          <summary class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">Can I upgrade or downgrade anytime?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">
+            Yes. You can cancel, downgrade, or upgrade your plan directly inside your account billing settings. Changes are pro-rated immediately.
+          </p>
+        </details>
+
+        <details>
+          <summary class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">What happens at the end of the free trial?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">
+            At the end of your 14-day trial, you will be shifted to a view-only tier. You won't be charged unless you explicitly opt to upgrade to the Pro plan.
+          </p>
+        </details>
+
+        <details>
+          <summary class="flex w-full items-center justify-between gap-4 py-5 border-t border-border cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">Do you offer discounts for annual plans?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">
+            Yes. Annual billing plans offer a 20% discount compared to monthly billing cycles. Please toggle annual billing inside checkout.
+          </p>
+        </details>
+
+        <details>
+          <summary class="flex w-full items-center justify-between gap-4 py-5 border-t border-border border-b cursor-pointer list-none">
+            <span class="text-lg font-semibold font-display text-ink">What is a closed-loop security model?</span>
+            <span class="faq-plus text-xl text-muted font-sans flex-shrink-0">+</span>
+          </summary>
+          <p class="pb-5 text-sm leading-relaxed text-muted font-sans">
+            For Enterprise clients, we isolate all models, databases, and generation checkpoints. Your input prompts, logos, and output materials are never uploaded to the public internet or used to retrain our central weights.
+          </p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-[#dddddd] pt-16">
+    <div class="mx-auto max-w-7xl px-[70px] pb-16">
+
+      <!-- Footer Grid -->
+      <div class="grid gap-12 sm:grid-cols-2 lg:grid-cols-4 items-start w-full">
+        
+        <!-- Column 1: AI Suite -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">AI Intelligence Suite</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Create</a></li>
+            <li><a href="index.html#suite" class="hover:underline">Manage</a></li>
+            <li><a href="index.html#suite" class="hover:underline">Research</a></li>
+            <li><a href="index.html#suite" class="hover:underline">Build</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 2: Support -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Support</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Help Centre</a></li>
+            <li><a href="#" class="hover:underline">Download and install</a></li>
+            <li><a href="#" class="hover:underline">Cog Community</a></li>
+            <li><a href="#" class="hover:underline">Cog Learn</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 3: Enterprise -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Enterprise</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Marketplace</a></li>
+            <li><a href="company.html" class="hover:underline">Company</a></li>
+            <li><a href="blog.html" class="hover:underline">Blog</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 4: Company -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Company</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Careers</a></li>
+            <li><a href="#" class="hover:underline">Contact</a></li>
+            <li><a href="#" class="hover:underline">Press</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Bottom Bar (Black Bar with white text) -->
+    <div class="bg-black py-8">
+      <div class="mx-auto max-w-7xl px-[70px] flex flex-col md:flex-row justify-between items-start md:items-center text-xs text-white/80">
+        <p class="uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white">COPYRIGHT COG CULTURE <span id="year"></span></p>
+        <div class="flex gap-5 mt-4 md:mt-0">
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Privacy</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Terms</a>
+          <a href="#" class="hover:underline uppercase tracking-[0.2em] font-medium text-[11px] font-sans text-white/80 hover:text-white">Cookies</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Mobile menu toggle
+    const mobileToggle = document.getElementById('mobile-toggle');
+    if (mobileToggle) {
+      mobileToggle.addEventListener('click', () => {
+        document.getElementById('mobile-menu').classList.toggle('hidden');
+      });
+    }
+
+    // Custom Cursor logic
+    const cursor = document.getElementById('custom-cursor');
+    if (cursor) {
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        if (cursor.style.opacity !== '1') {
+          cursor.style.opacity = '1';
+        }
+      });
+      document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+      });
+      document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+      });
+      // Handle page visibility/focus changes
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          cursor.style.opacity = '0';
+        }
+      });
+      // Add active state on hover over interactive elements (using delegation)
+      document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.add('active');
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.remove('active');
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>

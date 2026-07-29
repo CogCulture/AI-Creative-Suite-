@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Thinking Machine: And what it means for thinking humans — Cog Culture</title>
+  <meta name="description" content="The Thinking Machine: And what it means for thinking humans. Latest insights and stories from Cog Culture." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#000000',
+            'brand-fg': '#ffffff',
+            ink: '#16192b',
+            surface: '#f7f8fa',
+            'surface-alt': '#dddddd',
+            border: '#e6e8ee',
+            muted: '#6b7080',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body, html, input, textarea, select, button, p, span, a, li {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    }
+    h1, h2, h3, h4, .font-display {
+      font-family: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif !important;
+    }
+    /* Custom Cursor styling */
+    #custom-cursor {
+      transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  height 0.2s cubic-bezier(0.25, 1, 0.5, 1), 
+                  background-color 0.2s, border 0.2s, opacity 0.2s;
+    }
+    #custom-cursor.active {
+      width: 40px;
+      height: 40px;
+      background-color: transparent;
+      border: 1.5px solid #ffffff;
+    }
+    /* Hide default cursor on desktop */
+    @media (hover: hover) and (pointer: fine) {
+      html, body, a, button, select, input, textarea, summary, [role="button"], .suite-tab {
+        cursor: none !important;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="flex flex-col min-h-screen bg-white text-ink font-sans">
+
+  <!-- Custom Black Dot Cursor -->
+  <div id="custom-cursor" class="pointer-events-none fixed z-[9999] rounded-full bg-white mix-blend-difference opacity-0" style="width: 16px; height: 16px; top: 0; left: 0; transform: translate3d(-50%, -50%, 0);"></div>
+
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-50 w-full border-b border-border/70 bg-white/85 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-[70px]">
+      <a href="index.html" class="flex items-center">
+        <img src="images/Cog logo full (1).svg" alt="Cog Logo" class="h-40 w-40" />
+      </a>
+      <nav class="hidden lg:flex items-center gap-1">
+        <!-- AI Intelligence Suite -->
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            AI Intelligence Suite
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-[640px] -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl grid grid-cols-4 gap-8">
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Create</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Image</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Video</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Copy</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Presentation</a>
+                </div>
+              </div>
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Manage</span>
+                <div class="space-y-[4px]">
+                  <a href="dashboard/hr.html" class="block text-sm text-muted hover:text-ink transition font-sans">HR</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Manage</a>
+                </div>
+              </div>
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Research</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Marketplace</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Dam</a>
+                </div>
+              </div>
+              <div>
+                <span class="block text-sm font-semibold text-ink mb-3 font-display">Build</span>
+                <div class="space-y-[4px]">
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">Website</a>
+                  <a href="#" class="block text-sm text-muted hover:text-ink transition font-sans">App</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resources -->
+        <div class="dropdown relative">
+          <button class="flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">
+            Resources
+            <svg class="dropdown-caret h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="dropdown-panel absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-2">
+            <div class="rounded-none border border-border bg-white p-6 shadow-xl">
+              <span class="block text-sm font-semibold text-ink mb-3 font-display">Resources</span>
+              <div class="space-y-[4px]">
+                <a href="marketplace.html" class="block text-sm text-muted hover:text-ink transition font-sans">Marketplace</a>
+                <a href="company.html" class="block text-sm text-muted hover:text-ink transition font-sans">Company</a>
+                <a href="blog.html" class="block text-sm text-muted hover:text-ink transition font-sans font-semibold text-black">Blog</a>
+                <a href="support.html" class="block text-sm text-muted hover:text-ink transition font-sans">Support</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <a href="enterprise.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Enterprise</a>
+        <a href="pricing.html" class="px-3 py-2 text-sm font-medium text-ink/80 hover:text-ink">Pricing</a>
+      </nav>
+      <div class="hidden lg:flex items-center gap-3">
+        <a href="/?login=true" class="px-3 py-2 text-sm font-medium text-ink/85 hover:text-ink">Login</a>
+        <a href="#" class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+      <!-- Mobile Menu Button -->
+      <button id="mobile-toggle" class="lg:hidden" aria-label="Menu">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-border bg-white px-[70px] py-4">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">AI Intelligence Suite</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="#">Create</a>
+        <a href="#">Manage</a>
+        <a href="#">Research</a>
+        <a href="#">Build</a>
+      </div>
+      <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Resources</p>
+      <div class="mb-4 grid gap-1 text-sm text-ink/80">
+        <a href="marketplace.html">Marketplace</a>
+        <a href="company.html">Company</a>
+        <a href="blog.html">Blog</a>
+        <a href="support.html">Support</a>
+      </div>
+      <div class="grid gap-2 border-t border-border pt-4 text-sm">
+        <a href="enterprise.html" class="font-medium">Enterprise</a>
+        <a href="pricing.html" class="font-medium">Pricing</a>
+        <a href="/?login=true" class="font-medium">Login</a>
+        <a href="#" class="group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand px-4 py-2 text-center font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-md hover:brightness-110">
+          <span>Sign Up</span>
+          <span class="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="flex-grow bg-white">
+    <!-- Header Hero Section -->
+    <section class="bg-white pt-16 pb-12">
+      <div class="mx-auto max-w-7xl px-[70px]">
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+          <h1 class="text-4xl md:text-[56px] font-bold font-display tracking-tight text-black leading-[1.1] max-w-4xl">
+            <span class="text-neutral-300">The Thinking Machine:</span><br>
+            <span class="text-neutral-400">And what it means for thinking humans</span>
+          </h1>
+          <span class="text-sm font-semibold tracking-wider text-black uppercase font-sans whitespace-nowrap mb-2">
+            14 April 2026
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Full Bleed Image -->
+    <div class="w-full overflow-hidden aspect-[21/9] bg-neutral-100 mb-16 relative">
+      <img src="images/images/thinking machine image.jpg" alt="The Thinking Machine" class="w-full h-full object-cover">
+    </div>
+
+    <!-- Content Section -->
+    <section class="bg-white pb-24">
+      <div class="mx-auto max-w-7xl px-[70px]">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          
+          <!-- Share Links (Col Span 3) -->
+          <div class="lg:col-span-3">
+            <div class="sticky top-24 flex flex-col gap-6">
+              <span class="text-xs font-bold uppercase tracking-wider text-neutral-300 font-sans">Share</span>
+              <div class="flex flex-wrap lg:flex-col gap-4 font-sans text-sm font-medium">
+                <a href="https://twitter.com/intent/tweet?url=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-thinking-machine.html&text=The%20Thinking%20Machine%3A%20And%20what%20it%20means%20for%20thinking%20humans" target="_blank" class="text-black hover:underline">X</a>
+                <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-thinking-machine.html" target="_blank" class="text-black hover:underline">Facebook</a>
+                <a href="https://www.linkedin.com/shareArticle?url=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-thinking-machine.html" target="_blank" class="text-black hover:underline">LinkedIn</a>
+                <a href="mailto:?subject=The%20Thinking%20Machine%3A%20And%20what%20it%20means%20for%20thinking%20humans&body=https%3A%2F%2Fwebtestinglink.net%2Fcc%2Fblog-thinking-machine.html" class="text-black hover:underline">Email</a>
+                <button id="copy-link-btn" class="text-left text-black hover:underline">Copy Link</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Body Content (Col Span 9) -->
+          <div class="lg:col-span-9">
+            <div class="prose prose-neutral max-w-3xl font-sans text-lg text-neutral-600 leading-relaxed space-y-6">
+              <p>History remembers the moments that fundamentally changed the trajectory of civilization. The invention of the printing press democratized knowledge. Electricity transformed industry. The internet erased geographical boundaries. Today, Artificial Intelligence is ushering in another defining chapter, reshaping the way we work, think, create and solve problems.</p>
+              <p>Unlike previous technological shifts that automated physical effort, AI augments human intelligence itself. It can analyse, generate, reason and learn, making it one of the most transformative technologies ever developed. What was once reserved for specialists is becoming accessible to everyone, empowering individuals and organisations to accomplish more than ever before.</p>
+              
+              <h2 class="text-2xl font-semibold text-black font-display tracking-tight pt-6 pb-2">A New Kind of Revolution</h2>
+              <p>Across industries, the impact is already visible.</p>
+              
+              <ul class="list-disc pl-6 space-y-2 text-neutral-600 font-sans">
+                <li><strong>Healthcare</strong> is discovering new drugs faster.</li>
+                <li><strong>Education</strong> is personalising learning at scale.</li>
+                <li><strong>Businesses</strong> are making smarter decisions with real-time insights.</li>
+                <li><strong>Creative</strong> professionals are turning ideas into execution in a fraction of the time.</li>
+              </ul>
+              
+              <p>AI serves as a powerful catalyst for human imagination.</p>
+              <p>This transformation is also changing the very structure of business. Competitive advantage is no longer determined solely by size or resources, but by adaptability. The organisations that embrace intelligent systems today will define the markets of tomorrow. As Satya Nadella, Chairman and CEO of Microsoft, aptly observed, organisations whose rate of change fails to match what's now possible risk being overtaken by smaller, faster players.</p>
+              
+              <h2 class="text-2xl font-semibold text-black font-display tracking-tight pt-6 pb-2">Intelligence, Democratized</h2>
+              <p>Perhaps the most remarkable shift is that intelligence itself is becoming increasingly accessible. AI assistants are evolving into everyday collaborators, helping people write, code, research, design and make decisions. The future won't belong only to technical experts; it will belong to those who know how to ask better questions, think creatively and collaborate effectively with intelligent tools.</p>
+              <p>The possibilities ahead are even more exciting. Scientists are accelerating breakthroughs in medicine. Engineers are reimagining sustainable infrastructure. Entrepreneurs are building companies that would have required hundreds of people only a few years ago. Demis Hassabis, CEO of Google DeepMind, believes that if AI develops responsibly, we could enter an era of "radical abundance," where technology amplifies human potential on an unprecedented scale.</p>
+              
+              <h2 class="text-2xl font-semibold text-black font-display tracking-tight pt-6 pb-2">The Human Advantage</h2>
+              <p>Every revolution creates uncertainty, but it also creates opportunity. AI is not the end of human ingenuity; it is the beginning of a new partnership between human creativity and machine intelligence.</p>
+              <p>The future isn't being written by artificial intelligence alone.</p>
+              <p>It's being written by the people bold enough to imagine what becomes possible with it.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Related Insights Section -->
+    <section class="border-t border-border/70 bg-surface/50 py-16">
+      <div class="mx-auto max-w-7xl px-[70px]">
+        <h3 class="text-sm font-semibold tracking-wider text-black uppercase font-sans mb-8">Related Insights</h3>
+        <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          
+          <!-- Card 1: Creativity & AI -->
+          <div class="group border-[0.5px] border-[#dddddd] bg-white flex flex-col hover:bg-[#f4f5f7] transition-all">
+            <div class="overflow-hidden aspect-[1.5] bg-neutral-50 border-b-[0.5px] border-[#dddddd]">
+              <img src="images/images/ai age.png" alt="Who Wins Creativity?" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <div class="p-6 flex flex-col flex-grow min-h-[180px]">
+              <span class="text-xs text-muted mb-3 font-sans">14 April 2026</span>
+              <h2 class="text-base font-semibold text-ink font-display leading-snug mb-6">
+                Who Wins Creativity? Brands, Ideas and the Age of AI.
+              </h2>
+              <a href="blog-creativity-ai.html" class="text-xs font-semibold text-ink hover:underline mt-auto inline-flex items-center gap-1">
+                Read More
+              </a>
+            </div>
+          </div>
+
+          <!-- Card 2: Future of B2B -->
+          <div class="group border-[0.5px] border-[#dddddd] bg-white flex flex-col hover:bg-[#f4f5f7] transition-all">
+            <div class="overflow-hidden aspect-[1.5] bg-neutral-50 border-b-[0.5px] border-[#dddddd]">
+              <img src="images/images/b2b image.jpg" alt="The Future of B2B Isn't B2B" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <div class="p-6 flex flex-col flex-grow min-h-[180px]">
+              <span class="text-xs text-muted mb-3 font-sans">14 April 2026</span>
+              <h2 class="text-base font-semibold text-ink font-display leading-snug mb-6">
+                The Future of B2B Isn't B2B
+              </h2>
+              <a href="blog-future-of-b2b.html" class="text-xs font-semibold text-ink hover:underline mt-auto inline-flex items-center gap-1">
+                Read More
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-[#dddddd] pt-16">
+    <div class="mx-auto max-w-7xl px-[70px] pb-16">
+
+      <!-- Footer Grid -->
+      <div class="grid gap-12 sm:grid-cols-2 lg:grid-cols-4 items-start w-full">
+        
+        <!-- Column 1: AI Suite -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">AI Intelligence Suite</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Create</a></li>
+            <li><a href="dashboard/hr.html" class="hover:underline">Manage</a></li>
+            <li><a href="#" class="hover:underline">Research</a></li>
+            <li><a href="#" class="hover:underline">Build</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 2: Cog Learn -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Cog Learn</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Cog Learn</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 3: Enterprise -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Enterprise</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Marketplace</a></li>
+            <li><a href="company.html" class="hover:underline">Company</a></li>
+            <li><a href="blog.html" class="hover:underline">Blog</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 4: Company -->
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-[0.2em] text-black font-sans mb-6">Company</h4>
+          <ul class="space-y-2 text-sm text-black">
+            <li><a href="#" class="hover:underline">Careers</a></li>
+            <li><a href="#" class="hover:underline">Contact</a></li>
+            <li><a href="#" class="hover:underline">Press</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Divider line -->
+      <hr class="my-12 border-black/10" />
+
+      <!-- Footer Lower: Branding and Info -->
+      <div class="flex flex-col lg:flex-row justify-between items-start gap-8 w-full">
+        <div class="flex flex-col gap-6 max-w-md">
+          <img src="images/Cog logo full (1).svg" alt="Cog Logo" class="h-20 w-20" />
+          <p class="text-sm text-black/70 leading-relaxed font-sans">
+            We build high-impact digital experiences that drive growth and elevate brands.
+          </p>
+        </div>
+        <div class="flex flex-col md:flex-row gap-16">
+          <div class="flex flex-col gap-3 font-sans text-sm">
+            <span class="text-xs font-semibold uppercase tracking-wider text-black/40">Email Us</span>
+            <a href="mailto:hello@cogculture.agency" class="text-black hover:underline font-medium">hello@cogculture.agency</a>
+          </div>
+          <div class="flex flex-col gap-3 font-sans text-sm">
+            <span class="text-xs font-semibold uppercase tracking-wider text-black/40">Visit Us</span>
+            <p class="text-black/80 leading-relaxed font-medium">
+              18th Floor, Emaar Colonnade, Golf Course<br />
+              Extension Road, Sector - 66, Gurgaon - 122018.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Copyright row -->
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4 mt-16 pt-8 border-t border-black/10 text-xs text-black/60 font-sans w-full">
+        <div>
+          <span>© <span id="year"></span> Cog Culture. All rights reserved.</span>
+        </div>
+        <div class="flex gap-6">
+          <a href="#" class="hover:underline">Privacy Policy</a>
+          <a href="#" class="hover:underline">Terms & Conditions</a>
+          <a href="#" class="hover:underline">Cookie Settings</a>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- SCRIPTS -->
+  <script>
+    // Custom Cursor logic
+    const cursor = document.getElementById('custom-cursor');
+    if (cursor) {
+      document.addEventListener('mousemove', (e) => {
+        cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        if (cursor.style.opacity !== '1') {
+          cursor.style.opacity = '1';
+        }
+      });
+      document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+      });
+      document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          cursor.style.opacity = '0';
+        }
+      });
+      document.addEventListener('mouseover', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.add('active');
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        if (e.target.closest('a, button, select, input, textarea, summary, [role="button"], .suite-tab')) {
+          cursor.classList.remove('active');
+        }
+      });
+    }
+
+    // Set Copyright Year
+    const yearSpan = document.getElementById('year');
+    if (yearSpan) {
+      yearSpan.textContent = new Date().getFullYear();
+    }
+
+    // Mobile menu toggle
+    const mobileToggle = document.getElementById('mobile-toggle');
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (mobileToggle && mobileMenu) {
+      mobileToggle.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden');
+      });
+    }
+
+    // Copy Link functionality
+    document.getElementById('copy-link-btn')?.addEventListener('click', function(e) {
+      e.preventDefault();
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        const originalText = this.innerText;
+        this.innerText = 'Copied!';
+        setTimeout(() => {
+          this.innerText = originalText;
+        }, 2000);
+      });
+    });
+  </script>
+
+</body>
+
+</html>
