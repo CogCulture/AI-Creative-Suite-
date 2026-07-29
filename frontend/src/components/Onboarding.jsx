@@ -5,7 +5,7 @@ import { Btn } from "./primitives/index.jsx";
 
 export default function Onboarding({ t, onClose, showToast, nav }) {
   const [step, setStep] = useState(1);
-  const steps = ["Foundation", "Voice & Tone", "Upload Assets", "Ready"];
+  const steps = ["Brand Identity", "Voice & Tone", "Guidelines & Files", "Brand Brain"];
 
   // Form States
   const [brandName, setBrandName] = useState("");
@@ -23,6 +23,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
   const [files, setFiles] = useState([
     { name: "brand-guidelines-2025.pdf", size: "2.4 MB" }
   ]);
+  const [skipDocs, setSkipDocs] = useState(false);
 
   const [errors, setErrors] = useState({});
 
@@ -43,6 +44,25 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
     if (step < 4) {
       setStep(step + 1);
     } else {
+      const brandContext = {
+        brandName: brandName.trim(),
+        website: website.trim(),
+        industry: industry.trim(),
+        productDesc: productDesc.trim(),
+        audience: audience.trim(),
+        primaryTone,
+        archetype,
+        usp: usp.trim(),
+        wordsToUse: wordsToUse.trim(),
+        wordsToAvoid: wordsToAvoid.trim(),
+        files,
+        skipDocs,
+        synthesizedAt: new Date().toISOString(),
+      };
+      try {
+        localStorage.setItem("studio-brand-context", JSON.stringify(brandContext));
+        localStorage.setItem("studio-brand-brain-active", "true");
+      } catch (_) {}
       onClose();
       showToast(`${brandName || "New"} workspace created — Brand Brain live`);
       nav("home");
@@ -56,7 +76,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
   };
 
   const nextLabel =
-    step === 4 ? "Enter workspace →" : step === 3 ? "Generate Brand Brain" : "Continue";
+    step === 4 ? "Enter workspace →" : step === 3 ? "Synthesize Brand Brain" : "Continue";
 
   const archetypes = [
     "The Creator", "The Outlaw", "The Adventurer", "The Seducer", 
@@ -136,7 +156,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
                 letterSpacing: "-.02em",
               }}
             >
-              {step === 4 ? "Brand DNA Synthesized" : "Define Brand DNA"}
+              {step === 4 ? "Brand Brain Synthesized" : "Define Brand DNA"}
             </h2>
           </div>
           <button
@@ -200,7 +220,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: t.text, marginBottom: 6 }}>
-                  Brand/Company Name <span style={{ color: "red" }}>*</span>
+                  Brand Name <span style={{ color: "red" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -254,7 +274,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
 
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: t.text, marginBottom: 6 }}>
-                  Product/Service Description <span style={{ color: "red" }}>*</span>
+                  Product / Service Description <span style={{ color: "red" }}>*</span>
                 </label>
                 <textarea
                   placeholder="What products or services do you offer? Describe your brand promise..."
@@ -293,9 +313,9 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: t.text, marginBottom: 6 }}>
-                    Primary Tone
-                  </label>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: t.text, marginBottom: 6 }}>
+                  Voice / Tone
+                </label>
                   <select
                     value={primaryTone}
                     onChange={(e) => setPrimaryTone(e.target.value)}
@@ -385,7 +405,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
                 Upload Reference Materials
               </h3>
               <p style={{ fontFamily: FONT, fontSize: 13, color: t.text2, lineHeight: 1.5, margin: "0 0 16px" }}>
-                Drop in your PDF brand guidelines, logo files, and tone documents to initialize the vector memory context.
+                Drop in your PDF brand guidelines, logo files, and tone documents to initialize the Brand Brain.
               </p>
               <div
                 style={{
@@ -394,7 +414,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
                   padding: "26px 20px",
                   textAlign: "center",
                   background: t.surface2,
-                  cursor: "pointer",
+                  position: "relative",
                 }}
               >
                 <Upload size={22} style={{ color: t.text3, marginBottom: 8 }} />
@@ -404,7 +424,32 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
                 <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3, marginTop: 4 }}>
                   PDF · DOCX · PNG · FIGMA · URL
                 </div>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    const next = Array.from(e.target.files || []).map((f) => ({
+                      name: f.name,
+                      size: f.size > 1024 * 1024
+                        ? `${(f.size / (1024 * 1024)).toFixed(1)} MB`
+                        : `${Math.max(1, Math.round(f.size / 1024))} KB`,
+                    }));
+                    if (next.length) setFiles((prev) => [...prev, ...next]);
+                    e.target.value = "";
+                  }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    opacity: 0,
+                    cursor: "pointer",
+                  }}
+                  aria-label="Upload brand files"
+                />
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: t.text2, marginTop: 10 }}>
+                <input type="checkbox" checked={skipDocs} onChange={(e) => setSkipDocs(e.target.checked)} />
+                I don't have documents yet
+              </label>
               <div style={{ marginTop: 14 }}>
                 {files.map((f) => (
                   <div
@@ -472,6 +517,17 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
               >
                 The Brand Brain has been synthesized. Copy Agent and all active tools will automatically speak in {brandName || "your brand"}'s customized voice.
               </p>
+              <div style={{ marginTop: 16, padding: 14, borderRadius: R.md, background: t.surface2, border: `1px solid ${t.border}`, textAlign: "left" }}>
+                <div style={{ fontFamily: MONO, fontSize: 10, color: t.text3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8 }}>
+                  Brand Context Active
+                </div>
+                <div style={{ fontSize: 13, color: t.text2, lineHeight: 1.6 }}>
+                  <div><b style={{ color: t.text }}>Industry:</b> {industry || "Not set"}</div>
+                  <div><b style={{ color: t.text }}>Voice:</b> {primaryTone}</div>
+                  <div><b style={{ color: t.text }}>Archetype:</b> {archetype}</div>
+                  <div><b style={{ color: t.text }}>Assets:</b> {files.length} file{files.length === 1 ? "" : "s"} {skipDocs ? "(docs skipped for now)" : ""}</div>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -3,7 +3,24 @@ import { FONT, MONO, R } from "../tokens.js";
 import { BRAND } from "../data.js";
 import { Card } from "./primitives/index.jsx";
 
+function loadBrandContext() {
+  try {
+    return JSON.parse(localStorage.getItem("studio-brand-context") || "null");
+  } catch {
+    return null;
+  }
+}
+
 export default function BrandContextRail({ t, showToast }) {
+  const brandContext = loadBrandContext();
+  const brand = brandContext ? {
+    voice: [brandContext.primaryTone, brandContext.archetype].filter(Boolean),
+    audience: [brandContext.audience || brandContext.industry].filter(Boolean),
+    never: (brandContext.wordsToAvoid || "").split(",").map((v) => v.trim()).filter(Boolean),
+    palette: BRAND.palette,
+    match: brandContext.skipDocs ? 82 : 96,
+  } : BRAND;
+
   const Block = ({ label, children }) => (
     <div style={{ marginTop: 12 }}>
       <div
@@ -81,22 +98,22 @@ export default function BrandContextRail({ t, showToast }) {
 
           <Block label="Voice">
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-              {BRAND.voice.map((v) => <Tag key={v}>{v}</Tag>)}
+              {brand.voice.map((v) => <Tag key={v}>{v}</Tag>)}
             </div>
           </Block>
           <Block label="Audience">
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-              {BRAND.audience.map((v) => <Tag key={v}>{v}</Tag>)}
+              {brand.audience.map((v) => <Tag key={v}>{v}</Tag>)}
             </div>
           </Block>
           <Block label="Never say">
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-              {BRAND.never.map((v) => <Tag key={v} ban>{v}</Tag>)}
+              {brand.never.map((v) => <Tag key={v} ban>{v}</Tag>)}
             </div>
           </Block>
           <Block label="Palette">
             <div style={{ display: "flex", gap: 5 }}>
-              {BRAND.palette.map((c) => (
+              {brand.palette.map((c) => (
                 <span
                   key={c}
                   style={{
@@ -127,7 +144,7 @@ export default function BrandContextRail({ t, showToast }) {
           <span
             style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: t.success }}
           >
-            {BRAND.match}%
+            {brand.match}%
           </span>
         </div>
 
@@ -136,7 +153,7 @@ export default function BrandContextRail({ t, showToast }) {
         >
           <div
             style={{
-              width: `${BRAND.match}%`,
+              width: `${brand.match}%`,
               height: "100%",
               background: `linear-gradient(90deg, ${t.success}, #5cc78e)`,
             }}

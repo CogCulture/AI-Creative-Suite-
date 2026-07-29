@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Brand — Suite Onboarding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F6F6F8;
+    --surface:#FFFFFF;
+    --surface-muted:#FAFAFA;
+    --border:#E5E5EA;
+    --border-strong:#D4D4DC;
+    --text:#18181B;
+    --text-muted:#68686F;
+    --text-faint:#A2A2AA;
+    --accent:#3730A3;
+    --accent-soft:#EEEEFB;
+    --accent-border:#C7C6F0;
+    --success:#16A34A;
+    --danger:#DC2626;
+    --font:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius:10px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  a,button,input,select,textarea{font-family:inherit;}
+  button{cursor:pointer;}
+
+  :focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+    border-radius:4px;
+  }
+
+  .page{
+    max-width:1080px;
+    margin:0 auto;
+    padding:40px 24px 90px;
+  }
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:32px;
+  }
+  .topbar__brand{display:flex;align-items:center;gap:9px;}
+  .topbar__mark{
+    width:22px;height:22px;
+    border-radius:5px;
+    background:var(--text);
+    color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;
+    font-size:12px;
+  }
+  .topbar__name{
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-muted);
+  }
+  .topbar__step{
+    font-size:12.5px;
+    font-weight:500;
+    color:var(--text-faint);
+  }
+  .topbar__step b{color:var(--text);font-weight:600;}
+
+  .wizard{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 320px;
+    gap:20px;
+    align-items:start;
+  }
+
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:32px 36px 28px;
+  }
+
+  /* ---------- stepper ---------- */
+  .stepper{
+    display:flex;
+    align-items:center;
+    margin-bottom:32px;
+  }
+  .stepper__item{display:flex;align-items:center;gap:9px;flex:0 0 auto;}
+  .stepper__circle{
+    width:24px;height:24px;
+    border-radius:50%;
+    border:1px solid var(--border-strong);
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;
+    font-weight:600;
+    color:var(--text-faint);
+    transition:border-color .2s ease, background .2s ease, color .2s ease;
+    flex-shrink:0;
+  }
+  .stepper__label{
+    font-size:13px;
+    color:var(--text-faint);
+    font-weight:500;
+    transition:color .2s ease;
+    white-space:nowrap;
+  }
+  .stepper__line{
+    width:40px;height:1px;
+    background:var(--border);
+    margin:0 12px;
+    transition:background .2s ease;
+  }
+  .stepper__item.is-active .stepper__circle{
+    border-color:var(--accent);
+    background:var(--accent);
+    color:#fff;
+  }
+  .stepper__item.is-active .stepper__label{color:var(--text);}
+  .stepper__item.is-done .stepper__circle{
+    border-color:var(--success);
+    background:var(--success);
+    color:#fff;
+  }
+  .stepper__item.is-done .stepper__label{color:var(--text-muted);}
+  .stepper__line.is-done{background:var(--success);}
+
+  /* ---------- step content ---------- */
+  .step{display:none;}
+  .step.is-visible{display:block;animation:fadeIn .2s ease;}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+
+  .step__eyebrow{
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin:0 0 8px;
+  }
+  .step__title{
+    font-size:22px;
+    font-weight:700;
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+  }
+  .step__sub{
+    color:var(--text-muted);
+    font-size:14px;
+    margin:0 0 28px;
+    line-height:1.55;
+  }
+
+  .field{margin-bottom:20px;}
+  .field__label{
+    display:flex;align-items:center;gap:4px;
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:7px;
+    color:var(--text);
+  }
+  .field__req{color:var(--accent);}
+  .field__hint{
+    font-size:12.5px;
+    color:var(--text-faint);
+    margin-top:6px;
+    line-height:1.4;
+  }
+  .field-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+
+  input[type=text],input[type=url],textarea{
+    width:100%;
+    background:var(--surface-muted);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:14px;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  input::placeholder,textarea::placeholder{color:var(--text-faint);}
+  input:hover,textarea:hover{border-color:var(--border-strong);}
+  input:focus,textarea:focus{
+    outline:none;
+    border-color:var(--accent);
+    background:#fff;
+    box-shadow:0 0 0 3px var(--accent-soft);
+  }
+  textarea{resize:vertical;min-height:68px;line-height:1.5;}
+
+  /* voice chips — neutral, single accent on selection */
+  .voice-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .voice-chip{
+    padding:8px 13px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:var(--surface-muted);
+    color:var(--text-muted);
+    font-size:13px;
+    font-weight:500;
+    transition:all .15s ease;
+  }
+  .voice-chip:hover{border-color:var(--border-strong);color:var(--text);}
+  .voice-chip.is-selected{
+    background:var(--accent-soft);
+    border-color:var(--accent-border);
+    color:var(--accent);
+    font-weight:600;
+  }
+
+  /* competitors: name + URL add row, list below */
+  .competitor-add-row{
+    display:grid;
+    grid-template-columns:1fr 1fr auto;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .btn-add{
+    background:var(--surface-muted);
+    border:1px solid var(--border);
+    color:var(--text-muted);
+    border-radius:8px;
+    padding:0 16px;
+    font-size:13px;
+    font-weight:600;
+    white-space:nowrap;
+    transition:all .15s ease;
+  }
+  .btn-add:hover{border-color:var(--border-strong);color:var(--text);}
+  .competitor-list{display:flex;flex-direction:column;gap:6px;}
+  .competitor-row{
+    display:flex;align-items:center;gap:10px;
+    background:var(--surface-muted);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:9px 11px;
+  }
+  .competitor-row__text{flex:1;min-width:0;}
+  .competitor-row__name{font-size:13px;font-weight:600;color:var(--text);}
+  .competitor-row__url{font-size:12px;color:var(--text-faint);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .competitor-row button{background:none;border:none;color:var(--text-faint);font-size:15px;flex-shrink:0;}
+  .competitor-row button:hover{color:var(--danger);}
+
+  /* brand voice — custom input */
+  .voice-divider{
+    display:flex;align-items:center;gap:10px;
+    margin:12px 0 10px;
+  }
+  .voice-divider span{
+    font-size:11.5px;
+    color:var(--text-faint);
+    font-weight:500;
+    white-space:nowrap;
+  }
+  .voice-divider::before,.voice-divider::after{
+    content:'';flex:1;height:1px;background:var(--border);
+  }
+
+  /* upload / connectors */
+  .dropzone{
+    border:1px dashed var(--border-strong);
+    border-radius:10px;
+    padding:26px 20px;
+    text-align:center;
+    background:var(--surface-muted);
+    transition:border-color .15s ease, background .15s ease;
+    cursor:pointer;
+    margin-bottom:16px;
+  }
+  .dropzone.is-drag{border-color:var(--accent);background:var(--accent-soft);}
+  .dropzone__icon{font-size:18px;margin-bottom:8px;opacity:.6;}
+  .dropzone__title{font-weight:600;font-size:13.5px;margin-bottom:3px;}
+  .dropzone__sub{font-size:12px;color:var(--text-faint);}
+
+  .connector-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .connector{
+    display:flex;align-items:center;gap:10px;
+    border:1px solid var(--border);
+    background:var(--surface-muted);
+    border-radius:9px;
+    padding:11px 13px;
+    transition:border-color .15s ease, background .15s ease;
+    text-align:left;
+  }
+  .connector:hover{border-color:var(--border-strong);}
+  .connector__mark{
+    width:28px;height:28px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;flex-shrink:0;
+    background:#fff;
+    border:1px solid var(--border);
+    color:var(--text-muted);
+  }
+  .connector__text{flex:1;}
+  .connector__title{font-size:13px;font-weight:600;}
+  .connector__status{font-size:11.5px;color:var(--text-faint);margin-top:1px;}
+  .connector.is-connected{border-color:var(--success);background:#F0FBF4;}
+  .connector.is-connected .connector__status{color:var(--success);font-weight:600;}
+  .connector.is-connected .connector__mark{border-color:var(--success);color:var(--success);}
+
+  .file-list{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
+  .file-row{
+    display:flex;align-items:center;gap:9px;
+    background:var(--surface-muted);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:7px 11px;
+    font-size:12.5px;
+  }
+  .file-row__name{flex:1;color:var(--text-muted);}
+  .file-row button{background:none;border:none;color:var(--text-faint);font-size:14px;}
+  .file-row button:hover{color:var(--danger);}
+
+  #timelineField{
+    overflow:hidden;
+    max-height:0;
+    opacity:0;
+    margin-bottom:0;
+    pointer-events:none;
+    transition:max-height .25s ease, opacity .2s ease, margin-bottom .25s ease;
+  }
+  #timelineField.is-visible{
+    max-height:140px;
+    opacity:1;
+    margin-bottom:20px;
+    pointer-events:auto;
+  }
+
+  .skip-row{
+    display:flex;align-items:center;gap:8px;
+    margin-top:4px;
+    font-size:13px;
+    color:var(--text-muted);
+  }
+  .skip-row input{width:14px;height:14px;accent-color:var(--accent);}
+
+  /* review step */
+  .review-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-bottom:6px;
+  }
+  .review-card{
+    background:var(--surface-muted);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:12px 14px;
+  }
+  .review-card__label{
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    margin-bottom:4px;
+  }
+  .review-card__value{font-size:13.5px;font-weight:600;color:var(--text);}
+  .review-card__value.is-empty{color:var(--text-faint);font-weight:500;}
+
+  .provision-list{margin-top:22px;border-top:1px solid var(--border);padding-top:18px;}
+  .provision-item{
+    display:flex;align-items:center;gap:11px;
+    padding:8px 0;
+    font-size:13px;
+    color:var(--text-faint);
+  }
+  .provision-item__dot{
+    width:16px;height:16px;border-radius:50%;
+    border:1.5px solid var(--border-strong);
+    flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:9px;
+    transition:all .2s ease;
+  }
+  .provision-item.is-done{color:var(--text);}
+  .provision-item.is-done .provision-item__dot{
+    background:var(--success);border-color:var(--success);color:#fff;
+  }
+  .provision-item.is-active{color:var(--text);}
+  .provision-item.is-active .provision-item__dot{
+    border-color:var(--accent);
+    border-top-color:transparent;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .success-box{text-align:center;padding:18px 10px 4px;}
+  .success-box__mark{
+    width:36px;height:36px;border-radius:50%;
+    background:var(--success);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;margin:0 auto 16px;
+  }
+  .success-box__title{font-size:19px;font-weight:700;margin:0 0 8px;}
+  .success-box__sub{color:var(--text-muted);font-size:13.5px;line-height:1.6;max-width:360px;margin:0 auto;}
+
+  /* nav */
+  .wizard__nav{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:30px;
+    padding-top:22px;
+    border-top:1px solid var(--border);
+  }
+  .btn{
+    border-radius:8px;
+    padding:10px 18px;
+    font-size:13.5px;
+    font-weight:600;
+    border:1px solid transparent;
+    transition:all .15s ease;
+  }
+  .btn-ghost{
+    background:transparent;
+    color:var(--text-muted);
+    border-color:var(--border);
+  }
+  .btn-ghost:hover{color:var(--text);border-color:var(--border-strong);}
+  .btn-ghost:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:#2E2887;}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;background:var(--accent);}
+
+  /* ---------- preview panel ---------- */
+  .preview{position:sticky;top:32px;}
+  .preview__eyebrow{
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    margin-bottom:12px;
+    padding-left:2px;
+  }
+  .brand-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px 20px 18px;
+  }
+  .brand-card__industry{
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    margin-bottom:8px;
+  }
+  .brand-card__name{
+    font-size:19px;
+    font-weight:700;
+    line-height:1.2;
+    margin-bottom:5px;
+    word-break:break-word;
+    color:var(--text);
+  }
+  .brand-card__name.is-placeholder{color:var(--text-faint);font-weight:600;}
+  .brand-card__tagline{
+    font-size:13px;
+    color:var(--text-muted);
+    margin-bottom:14px;
+    line-height:1.5;
+  }
+  .brand-card__row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .brand-card__badge{
+    font-size:11px;
+    font-weight:600;
+    padding:4px 9px;
+    border-radius:999px;
+    background:var(--accent-soft);
+    border:1px solid var(--accent-border);
+    color:var(--accent);
+  }
+  .brand-card__section{border-top:1px solid var(--border);padding-top:12px;margin-top:12px;}
+  .brand-card__section-label{
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    margin-bottom:7px;
+  }
+  .brand-card__competitors{display:flex;flex-wrap:wrap;gap:6px;}
+  .brand-card__competitors span{
+    font-size:11.5px;
+    color:var(--text-muted);
+    background:var(--surface-muted);
+    border:1px solid var(--border);
+    padding:3px 8px;
+    border-radius:6px;
+  }
+  .brand-card__empty{font-size:12px;color:var(--text-faint);}
+
+  .brand-card__engagement{
+    font-size:11.5px;
+    color:var(--text-muted);
+  }
+  .brand-card__engagement b{color:var(--text);font-weight:600;}
+
+  .completeness{
+    margin-top:12px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:15px 17px;
+  }
+  .completeness__top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .completeness__label{font-size:12px;font-weight:600;color:var(--text-muted);}
+  .completeness__pct{font-size:12.5px;font-weight:700;color:var(--accent);}
+  .completeness__track{height:5px;border-radius:99px;background:var(--surface-muted);overflow:hidden;border:1px solid var(--border);}
+  .completeness__fill{height:100%;background:var(--accent);width:0%;transition:width .3s ease;}
+  .completeness__note{font-size:11.5px;color:var(--text-faint);margin-top:9px;line-height:1.5;}
+
+  @media (max-width:860px){
+    .wizard{grid-template-columns:1fr;}
+    .preview{position:static;}
+    .field-row,.connector-grid,.review-grid{grid-template-columns:1fr;}
+    .panel{padding:26px 20px;}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="topbar">
+    <div class="topbar__brand">
+      <div class="topbar__mark">S</div>
+      <div class="topbar__name">Creative Suite</div>
+    </div>
+    <div class="topbar__step">Add brand — Step <b id="topStepNum">1</b> of 3</div>
+  </div>
+
+  <div class="wizard">
+
+    <!-- ============ FORM PANEL ============ -->
+    <section class="panel">
+
+      <div class="stepper" id="stepper">
+        <div class="stepper__item is-active" data-step="1">
+          <div class="stepper__circle">1</div>
+          <div class="stepper__label">Identity</div>
+        </div>
+        <div class="stepper__line"></div>
+        <div class="stepper__item" data-step="2">
+          <div class="stepper__circle">2</div>
+          <div class="stepper__label">Documents</div>
+        </div>
+        <div class="stepper__line"></div>
+        <div class="stepper__item" data-step="3">
+          <div class="stepper__circle">3</div>
+          <div class="stepper__label">Review</div>
+        </div>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="step is-visible" data-step="1">
+        <p class="step__eyebrow">Core identity</p>
+        <h1 class="step__title">Establish your brand</h1>
+        <p class="step__sub">This becomes the foundation every tool in the suite draws on. You can add more detail later.</p>
+
+        <div class="field">
+          <label class="field__label" for="brandName">Brand name <span class="field__req">*</span></label>
+          <input type="text" id="brandName" placeholder="e.g. TVS Emerald">
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="website">Company website</label>
+          <input type="url" id="website" placeholder="https://acme.com">
+          <p class="field__hint">We'll use this to automatically research your brand and pre-fill its identity.</p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="industry">Industry</label>
+          <input type="text" id="industry" placeholder="e.g. Real Estate">
+        </div>
+
+        <div class="field">
+          <label class="field__label">Brand voice</label>
+          <div class="voice-grid" id="voiceGrid">
+            <button type="button" class="voice-chip" data-voice="Bold &amp; Playful">Bold &amp; Playful</button>
+            <button type="button" class="voice-chip" data-voice="Elegant &amp; Refined">Elegant &amp; Refined</button>
+            <button type="button" class="voice-chip" data-voice="Minimal &amp; Modern">Minimal &amp; Modern</button>
+            <button type="button" class="voice-chip" data-voice="Warm &amp; Approachable">Warm &amp; Approachable</button>
+            <button type="button" class="voice-chip" data-voice="Professional &amp; Trustworthy">Professional &amp; Trustworthy</button>
+          </div>
+          <div class="voice-divider"><span>or describe your own</span></div>
+          <input type="text" id="voiceCustom" placeholder="e.g. Quietly confident, data-driven, never salesy">
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="products">Products / services</label>
+          <textarea id="products" placeholder="What do you sell?"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="field__label">Engagement type</label>
+          <div class="voice-grid" id="engagementGrid">
+            <button type="button" class="voice-chip" data-engagement="Project">Project</button>
+            <button type="button" class="voice-chip" data-engagement="Retainer">Retainer</button>
+          </div>
+        </div>
+
+        <div class="field" id="timelineField">
+          <label class="field__label" for="timeline">Tentative timeline to close the project</label>
+          <input type="text" id="timeline" placeholder="e.g. 6 weeks, or a target date">
+          <p class="field__hint">Retainers don't need a close date — this only applies to project-based engagements.</p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="scopeOfWork">Scope of work</label>
+          <textarea id="scopeOfWork" placeholder="What's included? e.g. social copy, monthly campaign creative, brand refresh"></textarea>
+        </div>
+
+        <div class="field" style="margin-bottom:0;">
+          <label class="field__label">Top competitors</label>
+          <div class="competitor-add-row">
+            <input type="text" id="competitorName" placeholder="Competitor name">
+            <input type="url" id="competitorUrl" placeholder="https://competitor.com">
+            <button type="button" class="btn-add" id="addCompetitorBtn">Add</button>
+          </div>
+          <div class="competitor-list" id="competitorList"></div>
+          <p class="field__hint">Helps tools position your brand's voice against the market.</p>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step" data-step="2">
+        <p class="step__eyebrow">Brand documents</p>
+        <h1 class="step__title">Teach it what you already know</h1>
+        <p class="step__sub">Style guides, past campaigns, decks — anything here becomes searchable brand knowledge every tool can draw on.</p>
+
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload local files">
+          <div class="dropzone__icon">＋</div>
+          <div class="dropzone__title">Drop files, or click to browse</div>
+          <div class="dropzone__sub">PDFs, PPTs, images — up to 25 files</div>
+          <input type="file" id="fileInput" multiple hidden>
+        </div>
+
+        <div class="connector-grid">
+          <button type="button" class="connector" id="connectDrive">
+            <div class="connector__mark">GD</div>
+            <div class="connector__text">
+              <div class="connector__title">Google Drive</div>
+              <div class="connector__status">Import directly</div>
+            </div>
+          </button>
+          <button type="button" class="connector" id="connectS3">
+            <div class="connector__mark">S3</div>
+            <div class="connector__text">
+              <div class="connector__title">Amazon S3</div>
+              <div class="connector__status">Connect a bucket</div>
+            </div>
+          </button>
+        </div>
+
+        <div class="file-list" id="fileList"></div>
+
+        <label class="skip-row">
+          <input type="checkbox" id="skipDocs">
+          I don't have documents yet — I'll add them after creating the brand
+        </label>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step" data-step="3">
+        <div id="reviewStage">
+          <p class="step__eyebrow">Review</p>
+          <h1 class="step__title">Confirm before we build it</h1>
+          <p class="step__sub">We'll set this brand up across every connected tool in the suite.</p>
+
+          <div class="review-grid">
+            <div class="review-card">
+              <div class="review-card__label">Brand name</div>
+              <div class="review-card__value" id="revName">—</div>
+            </div>
+            <div class="review-card">
+              <div class="review-card__label">Industry</div>
+              <div class="review-card__value" id="revIndustry">—</div>
+            </div>
+            <div class="review-card">
+              <div class="review-card__label">Brand voice</div>
+              <div class="review-card__value" id="revVoice">—</div>
+            </div>
+            <div class="review-card">
+              <div class="review-card__label">Documents added</div>
+              <div class="review-card__value" id="revDocs">—</div>
+            </div>
+            <div class="review-card">
+              <div class="review-card__label">Engagement</div>
+              <div class="review-card__value" id="revEngagement">—</div>
+            </div>
+            <div class="review-card">
+              <div class="review-card__label">Tentative timeline</div>
+              <div class="review-card__value" id="revTimeline">—</div>
+            </div>
+          </div>
+
+          <div class="provision-list" id="provisionList">
+            <div class="provision-item" data-item="workspace"><div class="provision-item__dot"></div>Creating suite workspace</div>
+            <div class="provision-item" data-item="copy"><div class="provision-item__dot"></div>Provisioning in Copy Studio</div>
+            <div class="provision-item" data-item="image"><div class="provision-item__dot"></div>Provisioning in Image Studio</div>
+            <div class="provision-item" data-item="rag"><div class="provision-item__dot"></div>Reserving brand intelligence namespace</div>
+          </div>
+        </div>
+
+        <div id="successStage" style="display:none;">
+          <div class="success-box">
+            <div class="success-box__mark">✓</div>
+            <h1 class="success-box__title" id="successTitle">Brand is live</h1>
+            <p class="success-box__sub" id="successSub">We're indexing your documents now — your Brand Kit will be ready to review shortly.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard__nav">
+        <button class="btn btn-ghost" id="backBtn" disabled>Back</button>
+        <button class="btn btn-primary" id="nextBtn">Continue</button>
+      </div>
+
+    </section>
+
+    <!-- ============ PREVIEW PANEL ============ -->
+    <aside>
+      <div class="preview">
+        <p class="preview__eyebrow">Live preview</p>
+        <div class="brand-card" id="brandCard">
+          <div class="brand-card__industry" id="cardIndustry">Unspecified industry</div>
+          <div class="brand-card__name is-placeholder" id="cardName">Your brand name</div>
+          <div class="brand-card__tagline" id="cardTagline">Its story will appear here as you write it.</div>
+          <div class="brand-card__row">
+            <span class="brand-card__badge" id="cardVoiceBadge" style="display:none;"></span>
+          </div>
+          <div class="brand-card__section">
+            <div class="brand-card__section-label">Top competitors</div>
+            <div class="brand-card__competitors" id="cardCompetitors">
+              <span class="brand-card__empty">None added yet</span>
+            </div>
+          </div>
+          <div class="brand-card__section">
+            <div class="brand-card__section-label">Engagement</div>
+            <div class="brand-card__engagement" id="cardEngagement">Not selected yet</div>
+          </div>
+          <div class="brand-card__section">
+            <div class="brand-card__section-label">Knowledge base</div>
+            <div class="brand-card__empty" id="cardDocs">No documents added yet</div>
+          </div>
+        </div>
+
+        <div class="completeness">
+          <div class="completeness__top">
+            <span class="completeness__label">Profile completeness</span>
+            <span class="completeness__pct" id="pctLabel">0%</span>
+          </div>
+          <div class="completeness__track"><div class="completeness__fill" id="pctFill"></div></div>
+          <p class="completeness__note">A fuller profile means every tool in the suite starts with better brand context from day one.</p>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  const state = {
+    step: 1,
+    name:'', website:'', industry:'', voice:'', products:'',
+    engagement:'', timeline:'',
+    competitors: [],
+    files: [],
+    driveConnected:false, s3Connected:false, skipDocs:false
+  };
+
+  const stepEls = document.querySelectorAll('.step');
+  const stepperItems = document.querySelectorAll('.stepper__item');
+  const stepperLines = document.querySelectorAll('.stepper__line');
+  const backBtn = document.getElementById('backBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const topStepNum = document.getElementById('topStepNum');
+
+  function renderStepper(){
+    stepperItems.forEach(item=>{
+      const s = +item.dataset.step;
+      item.classList.toggle('is-active', s === state.step);
+      item.classList.toggle('is-done', s < state.step);
+    });
+    stepperLines.forEach((line,i)=>{
+      line.classList.toggle('is-done', (i+1) < state.step);
+    });
+    topStepNum.textContent = state.step;
+  }
+
+  function goToStep(n){
+    state.step = n;
+    stepEls.forEach(el=>{
+      el.classList.toggle('is-visible', +el.dataset.step === n);
+    });
+    renderStepper();
+    backBtn.disabled = n === 1;
+    if(n === 3){
+      nextBtn.textContent = 'Create brand';
+      populateReview();
+    } else {
+      nextBtn.textContent = 'Continue';
+    }
+    validateNext();
+  }
+
+  function validateNext(){
+    if(state.step === 1){
+      nextBtn.disabled = state.name.trim().length === 0;
+    } else {
+      nextBtn.disabled = false;
+    }
+  }
+
+  backBtn.addEventListener('click', ()=> goToStep(Math.max(1, state.step-1)) );
+  nextBtn.addEventListener('click', ()=>{
+    if(state.step < 3){
+      goToStep(state.step+1);
+    } else {
+      runProvisioning();
+    }
+  });
+
+  // ---------- Step 1 fields ----------
+  document.getElementById('brandName').addEventListener('input', e=>{
+    state.name = e.target.value; renderPreview(); validateNext();
+  });
+  document.getElementById('website').addEventListener('input', e=>{
+    state.website = e.target.value; renderPreview();
+  });
+  document.getElementById('industry').addEventListener('input', e=>{
+    state.industry = e.target.value; renderPreview();
+  });
+  document.getElementById('products').addEventListener('input', e=>{
+    state.products = e.target.value; renderPreview();
+  });
+
+  const voiceCustom = document.getElementById('voiceCustom');
+
+  // FIX: scope to #voiceGrid only, so engagement chips (which share the
+  // .voice-chip class for styling) are never caught by this handler.
+  document.querySelectorAll('#voiceGrid .voice-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const already = chip.classList.contains('is-selected');
+      document.querySelectorAll('#voiceGrid .voice-chip').forEach(c=>c.classList.remove('is-selected'));
+      voiceCustom.value = '';
+      state.voice = already ? '' : chip.dataset.voice.replace('&amp;','&');
+      if(!already) chip.classList.add('is-selected');
+      renderPreview();
+    });
+  });
+
+  voiceCustom.addEventListener('input', ()=>{
+    const val = voiceCustom.value.trim();
+    if(val){
+      document.querySelectorAll('#voiceGrid .voice-chip').forEach(c=>c.classList.remove('is-selected'));
+      state.voice = val;
+    } else {
+      state.voice = '';
+    }
+    renderPreview();
+  });
+
+  // ---------- Engagement type (Project / Retainer) ----------
+  const engagementChips = document.querySelectorAll('#engagementGrid .voice-chip');
+  const timelineField = document.getElementById('timelineField');
+  const timelineInput = document.getElementById('timeline');
+
+  engagementChips.forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const already = chip.classList.contains('is-selected');
+      engagementChips.forEach(c=>c.classList.remove('is-selected'));
+      state.engagement = already ? '' : chip.dataset.engagement;
+      if(!already) chip.classList.add('is-selected');
+
+      const showTimeline = state.engagement === 'Project';
+      timelineField.classList.toggle('is-visible', showTimeline);
+      if(!showTimeline){
+        timelineInput.value = '';
+        state.timeline = '';
+      }
+      renderPreview();
+    });
+  });
+
+  timelineInput.addEventListener('input', e=>{
+    state.timeline = e.target.value; renderPreview();
+  });
+
+  // competitors — name + URL
+  const competitorName = document.getElementById('competitorName');
+  const competitorUrl = document.getElementById('competitorUrl');
+  const competitorList = document.getElementById('competitorList');
+  const addCompetitorBtn = document.getElementById('addCompetitorBtn');
+
+  function domainFromUrl(url){
+    if(!url) return '';
+    try{
+      const withScheme = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+      return new URL(withScheme).hostname.replace(/^www\./,'');
+    } catch(e){
+      return url;
+    }
+  }
+
+  function addCompetitor(){
+    const name = competitorName.value.trim();
+    const url = competitorUrl.value.trim();
+    if(!name) { competitorName.focus(); return; }
+    state.competitors.push({ name, url });
+    competitorName.value = '';
+    competitorUrl.value = '';
+    competitorName.focus();
+    renderCompetitorList();
+    renderPreview();
+  }
+  addCompetitorBtn.addEventListener('click', addCompetitor);
+  [competitorName, competitorUrl].forEach(el=>{
+    el.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); addCompetitor(); }
+    });
+  });
+
+  function renderCompetitorList(){
+    competitorList.innerHTML = '';
+    state.competitors.forEach((c,i)=>{
+      const row = document.createElement('div');
+      row.className = 'competitor-row';
+      const domain = domainFromUrl(c.url);
+      row.innerHTML =
+        '<div class="competitor-row__text">' +
+          '<div class="competitor-row__name">'+c.name+'</div>' +
+          (domain ? '<div class="competitor-row__url">'+domain+'</div>' : '') +
+        '</div>' +
+        '<button type="button" aria-label="Remove '+c.name+'">&times;</button>';
+      row.querySelector('button').addEventListener('click', ()=>{
+        state.competitors.splice(i,1);
+        renderCompetitorList(); renderPreview();
+      });
+      competitorList.appendChild(row);
+    });
+  }
+
+  // ---------- Step 2: files ----------
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileList = document.getElementById('fileList');
+
+  dropzone.addEventListener('click', ()=> fileInput.click());
+  dropzone.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ fileInput.click(); }});
+  ['dragenter','dragover'].forEach(evt=>{
+    dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.classList.add('is-drag'); });
+  });
+  ['dragleave','drop'].forEach(evt=>{
+    dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.classList.remove('is-drag'); });
+  });
+  dropzone.addEventListener('drop', e=>{
+    addFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', e=>{
+    addFiles(e.target.files);
+  });
+  function addFiles(fileListObj){
+    Array.from(fileListObj).forEach(f=> state.files.push(f.name));
+    renderFiles(); renderPreview();
+  }
+  function renderFiles(){
+    fileList.innerHTML = '';
+    state.files.forEach((name,i)=>{
+      const row = document.createElement('div');
+      row.className = 'file-row';
+      row.innerHTML = '<span class="file-row__name">'+name+'</span><button type="button" aria-label="Remove file">&times;</button>';
+      row.querySelector('button').addEventListener('click', ()=>{
+        state.files.splice(i,1); renderFiles(); renderPreview();
+      });
+      fileList.appendChild(row);
+    });
+  }
+
+  document.getElementById('connectDrive').addEventListener('click', function(){
+    state.driveConnected = !state.driveConnected;
+    this.classList.toggle('is-connected', state.driveConnected);
+    this.querySelector('.connector__status').textContent = state.driveConnected ? 'Connected' : 'Import directly';
+    renderPreview();
+  });
+  document.getElementById('connectS3').addEventListener('click', function(){
+    state.s3Connected = !state.s3Connected;
+    this.classList.toggle('is-connected', state.s3Connected);
+    this.querySelector('.connector__status').textContent = state.s3Connected ? 'Connected' : 'Connect a bucket';
+    renderPreview();
+  });
+
+  // ---------- Live preview ----------
+  const cardName = document.getElementById('cardName');
+  const cardIndustry = document.getElementById('cardIndustry');
+  const cardTagline = document.getElementById('cardTagline');
+  const cardVoiceBadge = document.getElementById('cardVoiceBadge');
+  const cardCompetitors = document.getElementById('cardCompetitors');
+  const cardEngagement = document.getElementById('cardEngagement');
+  const cardDocs = document.getElementById('cardDocs');
+  const pctLabel = document.getElementById('pctLabel');
+  const pctFill = document.getElementById('pctFill');
+
+  function renderPreview(){
+    cardName.textContent = state.name || 'Your brand name';
+    cardName.classList.toggle('is-placeholder', !state.name);
+
+    cardIndustry.textContent = state.industry ? state.industry.toUpperCase() : 'Unspecified industry';
+
+    if(state.products){
+      cardTagline.textContent = state.products.length > 90 ? state.products.slice(0,90)+'…' : state.products;
+    } else {
+      cardTagline.textContent = 'Its story will appear here as you write it.';
+    }
+
+    if(state.voice){
+      cardVoiceBadge.style.display = 'inline-block';
+      cardVoiceBadge.textContent = state.voice;
+    } else {
+      cardVoiceBadge.style.display = 'none';
+    }
+
+    if(state.competitors.length){
+      cardCompetitors.innerHTML = state.competitors.map(c=>{
+        const d = domainFromUrl(c.url);
+        return '<span>'+c.name+(d ? ' · '+d : '')+'</span>';
+      }).join('');
+    } else {
+      cardCompetitors.innerHTML = '<span class="brand-card__empty">None added yet</span>';
+    }
+
+    if(state.engagement === 'Project'){
+      cardEngagement.innerHTML = '<b>Project</b>' + (state.timeline ? ' · target: '+state.timeline : ' · no timeline set yet');
+    } else if(state.engagement === 'Retainer'){
+      cardEngagement.innerHTML = '<b>Retainer</b> · ongoing';
+    } else {
+      cardEngagement.textContent = 'Not selected yet';
+    }
+
+    const docCount = state.files.length + (state.driveConnected?1:0) + (state.s3Connected?1:0);
+    cardDocs.textContent = docCount > 0
+      ? docCount + ' source' + (docCount>1?'s':'') + ' ready to teach your brand'
+      : 'No documents added yet';
+
+    let filled = 0, total = 7;
+    if(state.name) filled++;
+    if(state.website) filled++;
+    if(state.industry) filled++;
+    if(state.voice) filled++;
+    if(state.products) filled++;
+    if(state.engagement) filled++;
+    if(docCount>0 || state.skipDocs) filled++;
+    const pct = Math.round((filled/total)*100);
+    pctLabel.textContent = pct + '%';
+    pctFill.style.width = pct + '%';
+  }
+
+  document.getElementById('skipDocs').addEventListener('change', e=>{
+    state.skipDocs = e.target.checked;
+    dropzoneToggle(!e.target.checked);
+    renderPreview();
+  });
+  function dropzoneToggle(enabled){
+    dropzone.style.opacity = enabled ? '1' : '.4';
+    dropzone.style.pointerEvents = enabled ? 'auto' : 'none';
+  }
+
+  // ---------- Step 3: review + provisioning ----------
+  function populateReview(){
+    document.getElementById('revName').textContent = state.name || '—';
+    document.getElementById('revName').classList.toggle('is-empty', !state.name);
+
+    document.getElementById('revIndustry').textContent = state.industry || 'Not specified';
+    document.getElementById('revIndustry').classList.toggle('is-empty', !state.industry);
+
+    document.getElementById('revVoice').textContent = state.voice || 'Not selected';
+    document.getElementById('revVoice').classList.toggle('is-empty', !state.voice);
+
+    const docCount = state.files.length + (state.driveConnected?1:0) + (state.s3Connected?1:0);
+    document.getElementById('revDocs').textContent = docCount > 0 ? docCount + ' source(s)' : (state.skipDocs ? 'Skipped — add later' : 'None');
+    document.getElementById('revDocs').classList.toggle('is-empty', docCount === 0 && !state.skipDocs);
+
+    document.getElementById('revEngagement').textContent = state.engagement || 'Not selected';
+    document.getElementById('revEngagement').classList.toggle('is-empty', !state.engagement);
+
+    const timelineText = state.engagement === 'Project' ? (state.timeline || 'Not set') : (state.engagement === 'Retainer' ? 'N/A — retainer' : '—');
+    document.getElementById('revTimeline').textContent = timelineText;
+    document.getElementById('revTimeline').classList.toggle('is-empty', state.engagement === 'Project' && !state.timeline);
+  }
+
+  function runProvisioning(){
+    nextBtn.disabled = true;
+    backBtn.disabled = true;
+    const items = document.querySelectorAll('.provision-item');
+    let i = 0;
+    function step(){
+      if(i > 0) items[i-1].classList.remove('is-active');
+      if(i > 0) items[i-1].classList.add('is-done');
+      if(i < items.length){
+        items[i].classList.add('is-active');
+        i++;
+        setTimeout(step, 500);
+      } else {
+        setTimeout(showSuccess, 350);
+      }
+    }
+    step();
+  }
+
+  function showSuccess(){
+    document.getElementById('reviewStage').style.display = 'none';
+    document.getElementById('successStage').style.display = 'block';
+    document.getElementById('successTitle').textContent = (state.name || 'Your brand') + ' is live';
+    const docCount = state.files.length + (state.driveConnected?1:0) + (state.s3Connected?1:0);
+    document.getElementById('successSub').textContent = docCount > 0
+      ? "We're indexing " + docCount + " source" + (docCount>1?'s':'') + " now — your Brand Kit will be ready to review shortly."
+      : "No documents were added yet — you can connect sources any time and we'll build the Brand Kit from there.";
+    nextBtn.textContent = 'Go to workspace';
+    nextBtn.disabled = false;
+    backBtn.disabled = true;
+    nextBtn.onclick = null;
+  }
+
+  // init
+  dropzoneToggle(true);
+  renderPreview();
+  goToStep(1);
+})();
+</script>
+
+</body>
+</html>
