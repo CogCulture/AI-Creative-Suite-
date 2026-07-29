@@ -54,6 +54,10 @@ load_dotenv()
 
 SUITE_API_KEY: str    = os.getenv("SUITE_API_KEY", "")
 STATIC_USER_ID: str   = os.getenv("USER_ID", "")          # fallback for unauthenticated use
+STATIC_USER_EMAIL: str = os.getenv(
+    "USER_EMAIL",
+    f"suite-fallback-{STATIC_USER_ID[:8]}@creative.suite" if STATIC_USER_ID else "suite-fallback@creative.suite",
+)
 COPYAGENT_URL: str    = os.getenv(
     "COPYAGENT_URL",
     "https://www.copyagennt.in/api/integration/v1/chat/completions",
@@ -148,6 +152,33 @@ def _seed_admin_user():
         print(f"[Auth Seed] Note on admin user seed: {exc}")
 
 _seed_admin_user()
+
+
+def _seed_static_user():
+    if not STATIC_USER_ID:
+        return
+    try:
+        db = SuiteSessionLocal()
+        existing = db.query(SuiteUser).filter(SuiteUser.id == STATIC_USER_ID).first()
+        if not existing:
+            pw_hash = pwd_ctx.hash("SuiteFallback123!")
+            fallback_user = SuiteUser(
+                id=STATIC_USER_ID,
+                email=STATIC_USER_EMAIL,
+                password_hash=pw_hash,
+                name="Suite Fallback",
+                auth_provider="email",
+                created_at=datetime.utcnow(),
+            )
+            db.add(fallback_user)
+            db.commit()
+            print(f"[Auth Seed] Created fallback user: {STATIC_USER_EMAIL}")
+        db.close()
+    except Exception as exc:
+        print(f"[Auth Seed] Note on fallback user seed: {exc}")
+
+
+_seed_static_user()
 
 
 def get_suite_db():
@@ -417,6 +448,16 @@ async def startup_sync_admin_to_copyagent():
                 auth_provider="email",
             )
             print(f"[Startup] Admin CopyAgent sync: {'ok' if synced else 'failed/already-exists'}")
+        fallback_user = db.query(SuiteUser).filter(SuiteUser.id == STATIC_USER_ID).first()
+        if fallback_user:
+            synced = await _sync_to_copyagent(
+                user_id=fallback_user.id,
+                email=fallback_user.email,
+                name=fallback_user.name or "Suite Fallback",
+                password_hash=fallback_user.password_hash,
+                auth_provider="email",
+            )
+            print(f"[Startup] Fallback CopyAgent sync: {'ok' if synced else 'failed/already-exists'}")
         db.close()
     except Exception as exc:
         print(f"[Startup] Admin sync error (non-fatal): {exc}")
@@ -691,7 +732,7 @@ async def _stream_from_upstream(payload: dict, user_id: Optional[str]) -> AsyncG
             headers=_upstream_headers(user_id),
             json=payload,
         ) as upstream:
-            if upstream.status_code == 404 and user_id and user_id != STATIC_USER_ID:
+            if upstream.status_code == 404 and user_id:
                 # Read error body to check if it's the missing user detail
                 error_body = await upstream.aread()
                 error_text = error_body.decode("utf-8", errors="replace")
@@ -776,7 +817,7 @@ async def chat_completions(
         user_id = STATIC_USER_ID
 
     # If it is a real Suite user, ensure they are synced in CopyAgent's DB
-    if user_id and user_id != STATIC_USER_ID:
+    if user_id:
         await _ensure_copyagent_user(user_id, db)
 
     upstream_payload = {
@@ -802,11 +843,11 @@ async def chat_completions(
                 COPYAGENT_URL,
                 headers=_upstream_headers(user_id),
                 json=upstream_payload,
-            )
+        )
 
         # Self-healing retry on 404
         if upstream.status_code == 404 and "User specified in X-User-Id does not exist" in upstream.text:
-            if user_id and user_id != STATIC_USER_ID:
+            if user_id:
                 print(f"[Self-Healing Chat] User {user_id} missing from CopyAgent. Force syncing and retrying...")
                 await _sync_user_forced(user_id, db)
                 async with httpx.AsyncClient(timeout=120.0) as client:
