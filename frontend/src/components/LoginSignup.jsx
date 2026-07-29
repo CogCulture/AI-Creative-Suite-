@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowRight, Mail, Lock, User, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Loader2 } from "lucide-react";
 
 function decodeJwt(token) {
   try {
@@ -23,7 +23,9 @@ export default function LoginSignup({ onLogin, onNavigate }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [error, setError] = useState("");
   const [isOtpPending, setIsOtpPending] = useState(false);
   const [otp, setOtp] = useState("");
@@ -124,18 +126,34 @@ export default function LoginSignup({ onLogin, onNavigate }) {
     e.preventDefault();
     setError("");
 
-    if (!email || !password || (isSignUp && !name)) {
-      setError("Please fill in all fields.");
-      return;
+    if (isSignUp) {
+      if (!firstName.trim() || !lastName.trim() || !email || !password || !confirmPassword) {
+        setError("Please fill in all fields.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters.");
+        return;
+      }
+    } else {
+      if (!email || !password) {
+        setError("Please enter your email and password.");
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
       if (isSignUp) {
+        const fullName = `${firstName.trim()} ${lastName.trim()}`;
         const res = await fetch("/bff/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ email, password, name: fullName }),
         });
         const data = await parseJsonResponse(res);
         if (!res.ok) {
@@ -230,14 +248,31 @@ export default function LoginSignup({ onLogin, onNavigate }) {
             </div>
           ) : (
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-medium font-display tracking-tight text-ink">
-                {isSignUp ? "Create your account" : "Welcome back"}
-              </h1>
-              <p className="text-sm text-muted mt-2 font-sans">
-                {isSignUp
-                  ? "Join Cog Culture to start creating."
-                  : "Enter your credentials to access the suite."}
-              </p>
+              {isSignUp ? (
+                <>
+                  <div className="inline-flex items-center gap-2 bg-brand/10 text-brand text-xs font-semibold tracking-widest uppercase px-3 py-1 rounded-full mb-3">
+                    ✦ New Account
+                  </div>
+                  <h1 className="text-2xl font-medium font-display tracking-tight text-ink">
+                    Create your account
+                  </h1>
+                  <p className="text-sm text-muted mt-2 font-sans">
+                    Join Cog Culture's Creative Suite and start building.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="inline-flex items-center gap-2 bg-ink/5 text-ink text-xs font-semibold tracking-widest uppercase px-3 py-1 rounded-full mb-3">
+                    👋 Welcome back
+                  </div>
+                  <h1 className="text-2xl font-medium font-display tracking-tight text-ink">
+                    Sign in to your suite
+                  </h1>
+                  <p className="text-sm text-muted mt-2 font-sans">
+                    Good to see you again — enter your credentials below.
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -306,27 +341,49 @@ export default function LoginSignup({ onLogin, onNavigate }) {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+              {/* Sign Up: First + Last Name row */}
               {isSignUp && (
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted font-sans">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted/60">
-                      <User size={16} />
-                    </span>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Akhil Kushwaha"
-                      className="w-full bg-surface border border-border py-2.5 pl-10 pr-4 text-sm text-ink placeholder-muted/50 rounded-none focus:outline-none focus:border-ink font-sans transition-colors"
-                    />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted font-sans">
+                      First Name
+                    </label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted/60">
+                        <User size={14} />
+                      </span>
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="John"
+                        className="w-full bg-surface border border-border py-2.5 pl-9 pr-3 text-sm text-ink placeholder-muted/50 rounded-none focus:outline-none focus:border-ink font-sans transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted font-sans">
+                      Last Name
+                    </label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted/60">
+                        <User size={14} />
+                      </span>
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Doe"
+                        className="w-full bg-surface border border-border py-2.5 pl-9 pr-3 text-sm text-ink placeholder-muted/50 rounded-none focus:outline-none focus:border-ink font-sans transition-colors"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
+              {/* Email */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-muted font-sans">
                   Email Address
@@ -345,6 +402,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
                 </div>
               </div>
 
+              {/* Password */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-muted font-sans">
                   Password
@@ -363,19 +421,45 @@ export default function LoginSignup({ onLogin, onNavigate }) {
                 </div>
               </div>
 
+              {/* Sign Up: Confirm Password */}
+              {isSignUp && (
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted font-sans">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted/60">
+                      <Lock size={16} />
+                    </span>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className={`w-full bg-surface border py-2.5 pl-10 pr-4 text-sm text-ink placeholder-muted/50 rounded-none focus:outline-none font-sans transition-colors ${
+                        confirmPassword && confirmPassword !== password
+                          ? "border-red-400 focus:border-red-500"
+                          : "border-border focus:border-ink"
+                      }`}
+                    />
+                  </div>
+                  {confirmPassword && confirmPassword !== password && (
+                    <p className="text-xs text-red-500 font-sans mt-1">Passwords do not match</p>
+                  )}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98] hover:shadow-md hover:brightness-110 disabled:opacity-50"
+                className="w-full group/btn inline-flex items-center justify-center gap-1.5 rounded-none bg-brand py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98] hover:shadow-md hover:brightness-110 disabled:opacity-50 mt-2"
               >
                 {isLoading ? (
                   <Loader2 className="animate-spin text-white" size={16} />
                 ) : (
                   <>
-                    <span>{isSignUp ? "Sign Up" : "Sign In"}</span>
-                    <span className="transition-transform duration-300 group-hover/btn:translate-x-1">
-                      →
-                    </span>
+                    <span>{isSignUp ? "Create Account" : "Sign In"}</span>
+                    <span className="transition-transform duration-300 group-hover/btn:translate-x-1">→</span>
                   </>
                 )}
               </button>
@@ -411,6 +495,9 @@ export default function LoginSignup({ onLogin, onNavigate }) {
                       onClick={() => {
                         setIsSignUp(false);
                         setError("");
+                        setFirstName("");
+                        setLastName("");
+                        setConfirmPassword("");
                       }}
                       className="text-ink font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer"
                     >
@@ -425,10 +512,11 @@ export default function LoginSignup({ onLogin, onNavigate }) {
                       onClick={() => {
                         setIsSignUp(true);
                         setError("");
+                        setPassword("");
                       }}
                       className="text-ink font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer"
                     >
-                      Sign Up
+                      Create one
                     </button>
                   </span>
                 )}
