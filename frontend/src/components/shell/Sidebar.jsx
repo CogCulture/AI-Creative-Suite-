@@ -1,8 +1,8 @@
-import { ChevronsUpDown, Brain } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { FONT, MONO, R } from "../../tokens.js";
 import { BRAND, NAV } from "../../data.js";
 
-export default function Sidebar({ t, view, nav, compact, onboard }) {
+export default function Sidebar({ t, view, nav, compact, activeWorkspace, onOpenWorkspace }) {
   return (
     <aside
       style={{
@@ -51,7 +51,7 @@ export default function Sidebar({ t, view, nav, compact, onboard }) {
       >
         {/* Workspace switcher */}
         <button
-          onClick={onboard}
+          onClick={onOpenWorkspace}
           style={{
             display: "flex",
             alignItems: "center",
@@ -79,14 +79,14 @@ export default function Sidebar({ t, view, nav, compact, onboard }) {
               flexShrink: 0,
             }}
           >
-            {BRAND.av}
+            {(activeWorkspace?.name || BRAND.name).slice(0, 1).toUpperCase()}
           </div>
           {!compact && (
             <>
               <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{BRAND.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{activeWorkspace?.name || BRAND.name}</div>
                 <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3 }}>
-                  client workspace
+                  {activeWorkspace?.members?.length ? `${activeWorkspace.members.length} members` : "client workspace"}
                 </div>
               </div>
               <ChevronsUpDown size={14} color={t.text3} />
