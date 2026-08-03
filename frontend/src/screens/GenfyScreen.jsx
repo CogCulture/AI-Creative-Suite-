@@ -75,7 +75,7 @@ export default function GenfyScreen({ t, nav, showToast }) {
         setCatalog(data);
         setLoadingCatalog(false);
       })
-      .catch(err => {
+      .catch(() => {
         showToast("Failed to fetch style catalog from BFF");
         setLoadingCatalog(false);
       });
@@ -88,16 +88,19 @@ export default function GenfyScreen({ t, nav, showToast }) {
         showToast("Pre-filled prompt from Copy Agent!");
       }
     } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Poll current session ─────────────────────────────────
   const pollTimerRef = useRef(null);
+  const pollTimeoutRef = useRef(null);
 
   const startPolling = (sessionId) => {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    
+    if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+
     // Safety: stop polling after 90 seconds no matter what
-    const timeoutId = setTimeout(() => {
+    pollTimeoutRef.current = setTimeout(() => {
       clearInterval(pollTimerRef.current);
       setIsGenerating(false);
       setIsEditing(false);
@@ -123,7 +126,7 @@ export default function GenfyScreen({ t, nav, showToast }) {
             // Check if all images finished (none still pending)
             const pending = allImages.some(img => img.status === "pending");
             if (!pending) {
-              clearTimeout(timeoutId);
+              clearTimeout(pollTimeoutRef.current);
               clearInterval(pollTimerRef.current);
               setIsGenerating(false);
               setIsEditing(false);
@@ -144,7 +147,10 @@ export default function GenfyScreen({ t, nav, showToast }) {
   };
 
   useEffect(() => {
-    return () => clearInterval(pollTimerRef.current);
+    return () => {
+      clearInterval(pollTimerRef.current);
+      clearTimeout(pollTimeoutRef.current);
+    };
   }, []);
 
   // ── Trigger standard generation ─────────────────────────

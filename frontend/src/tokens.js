@@ -71,4 +71,4 @@ export const TOKENS = {
 
 export const FONT = `"Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif`;
 export const MONO = `"JetBrains Mono", ui-monospace, Menlo, monospace`;
-export const R = { sm: 8, md: 12, lg: 16, xl: 20, pill: 999 };
+export const R = { sm: 0, md: 0, lg: 0, xl: 0, pill: 999 };

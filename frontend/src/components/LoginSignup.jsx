@@ -1,24 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Mail, Lock, User, Loader2 } from "lucide-react";
 
-function decodeJwt(token) {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map(function (c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join("")
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    return null;
-  }
-}
-
 export default function LoginSignup({ onLogin, onNavigate }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
@@ -99,7 +81,9 @@ export default function LoginSignup({ onLogin, onNavigate }) {
       if (!res.ok) {
         throw new Error(data.detail || "Google authentication failed.");
       }
-      localStorage.setItem("studio-user-info", JSON.stringify(data.user));
+      // Store only display fields — no sensitive data in localStorage
+      const { id, name, email, auth_provider } = data.user || {};
+      localStorage.setItem("studio-user-info", JSON.stringify({ id, name, email, auth_provider }));
       triggerLoginTransition();
     } catch (err) {
       setError(err.message);
@@ -126,9 +110,15 @@ export default function LoginSignup({ onLogin, onNavigate }) {
     e.preventDefault();
     setError("");
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (isSignUp) {
       if (!firstName.trim() || !lastName.trim() || !email || !password || !confirmPassword) {
         setError("Please fill in all fields.");
+        return;
+      }
+      if (!emailRegex.test(email)) {
+        setError("Please enter a valid email address.");
         return;
       }
       if (password !== confirmPassword) {
@@ -142,6 +132,10 @@ export default function LoginSignup({ onLogin, onNavigate }) {
     } else {
       if (!email || !password) {
         setError("Please enter your email and password.");
+        return;
+      }
+      if (!emailRegex.test(email)) {
+        setError("Please enter a valid email address.");
         return;
       }
     }
@@ -170,7 +164,8 @@ export default function LoginSignup({ onLogin, onNavigate }) {
         if (!res.ok) {
           throw new Error(data.detail || "Invalid email or password.");
         }
-        localStorage.setItem("studio-user-info", JSON.stringify(data.user));
+        const { id, name, email, auth_provider } = data.user || {};
+        localStorage.setItem("studio-user-info", JSON.stringify({ id, name, email, auth_provider }));
         triggerLoginTransition();
       }
     } catch (err) {
@@ -199,7 +194,8 @@ export default function LoginSignup({ onLogin, onNavigate }) {
       if (!res.ok) {
         throw new Error(data.detail || "OTP verification failed.");
       }
-      localStorage.setItem("studio-user-info", JSON.stringify(data.user));
+      const { id, name, email, auth_provider } = data.user || {};
+      localStorage.setItem("studio-user-info", JSON.stringify({ id, name, email, auth_provider }));
       triggerLoginTransition();
     } catch (err) {
       setError(err.message);

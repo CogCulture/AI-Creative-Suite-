@@ -469,12 +469,16 @@ function Tag({ t, label, value }) {
 
 // ── Main WorkflowScreen ───────────────────────────────────────────────────────
 export default function WorkflowScreen({ t, nav, showToast, activeProject, setActiveProject }) {
-  // Build initial configs — merge AI workflow config on top of defaults if available
   const aiCfg = activeProject?.workflowConfig?.node_configs || {};
   const defaultStrategyPrompt = PIPELINE.find(n => n.id === "agent_strategy").defaultPrompt;
   const defaultArtDirPrompt = PIPELINE.find(n => n.id === "agent_artdir").defaultPrompt;
 
-  const [configs, setConfigs] = useState({
+  // Persist configs to localStorage keyed by project id so they survive refresh
+  const configStorageKey = activeProject?.id
+    ? `studio-wf-config-${activeProject.id}`
+    : "studio-wf-config-default";
+
+  const buildDefaultConfigs = () => ({
     brief: {
       brief: activeProject?.brief || "Create an Instagram Ad image for FrostBrew Organic Cold Brew Coffee — bold, energizing, modern aesthetic with rich golden hour lighting.",
       assetType: activeProject?.assetType || "Instagram Ad Image",
@@ -501,6 +505,19 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       ratio: "1:1",
       ...(aiCfg.genfy || {}),
     },
+  });
+
+  const [configs, setConfigs] = useState(() => {
+    try {
+      const saved = localStorage.getItem(configStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // If project brief changed (e.g. edited externally), keep server brief
+        if (activeProject?.brief) parsed.brief = { ...parsed.brief, brief: activeProject.brief };
+        return parsed;
+      }
+    } catch (_) {}
+    return buildDefaultConfigs();
   });
 
   // Was this workflow designed by AI?
@@ -550,7 +567,11 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const setOutput = (id, d) => setNodeOutputs(prev => ({ ...prev, [id]: d }));
 
   const updateConfig = (nodeId, field, value) => {
-    setConfigs(prev => ({ ...prev, [nodeId]: { ...prev[nodeId], [field]: value } }));
+    setConfigs(prev => {
+      const next = { ...prev, [nodeId]: { ...prev[nodeId], [field]: value } };
+      try { localStorage.setItem(configStorageKey, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
   };
 
   // ── Run Workflow ─────────────────────────────────────────────────────────────
@@ -558,6 +579,17 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     if (isRunning) return;
     const brief = configs.brief.brief?.trim();
     if (!brief) { showToast("Please enter a campaign brief first."); setSelectedNodeId("brief"); return; }
+
+    // Read brand context from localStorage if available
+    let brandContext = null;
+    try {
+      const raw = localStorage.getItem("studio-brand-context");
+      if (raw) brandContext = JSON.parse(raw);
+    } catch (_) {}
+
+    const brandPrefix = brandContext
+      ? `BRAND CONTEXT:\nBrand: ${brandContext.brandName || ""}\nIndustry: ${brandContext.industry || ""}\nAudience: ${brandContext.audience || ""}\nVoice/Tone: ${brandContext.primaryTone || ""}\nArchetype: ${brandContext.archetype || ""}\nUSP: ${brandContext.usp || ""}\nWords to use: ${brandContext.wordsToUse || ""}\nWords to avoid: ${brandContext.wordsToAvoid || ""}\n\nCAMPAIGN BRIEF:\n`
+      : "";
 
     setIsRunning(true);
     setNodeStatus({});
@@ -570,6 +602,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
     log("👑 Master Supervisor Agent activated", "agent");
     log(`Campaign goal: ${brief.slice(0, 80)}...`, "info");
+    if (brandContext) {
+      log(`🧠 Brand Brain active: ${brandContext.brandName || "Brand"} · ${brandContext.primaryTone || ""} tone`, "agent");
+    }
 
     try {
       // ── STEP 1: Brief node ─────────────────────────────────────────────────
@@ -596,7 +631,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         const r = await fetch("/bff/workflow/step-bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bridge_type: "brief_to_copy", brief, asset_type: configs.brief.assetType }),
+          body: JSON.stringify({ bridge_type: "brief_to_copy", brief: brandPrefix + brief, asset_type: configs.brief.assetType }),
         });
         strategyData = await r.json();
         log(`Strategy Agent: audience = "${strategyData.target_audience}"`, "success");
@@ -607,8 +642,10 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setOutput("agent_strategy", strategyData);
       setStatus("agent_strategy", "done");
 
-      // Master audit step 1
-      fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "2. Strategy Analysis", step_data: strategyData }) }).catch(() => {});
+      // Master audit step 1 — non-blocking, log failures instead of swallowing
+      fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "2. Strategy Analysis", step_data: strategyData }) })
+        .then(r => { if (!r.ok) console.warn("[Orchestrator] audit step 1 returned", r.status); })
+        .catch(err => console.warn("[Orchestrator] audit step 1 error:", err));
 
       // ── STEP 3: Copy Agent ─────────────────────────────────────────────────
       setStatus("copy", "active");
@@ -616,7 +653,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       log("Node 3: Copy Agent — generating campaign copy via CopyAgent API...", "info");
       setMasterFeedback("Supervising Copy Agent output quality...");
 
-      const copyPrompt = strategyData.recommended_copy_prompt || `Write high-converting ${configs.brief.assetType} copy for: ${brief}`;
+      const copyPrompt = strategyData.recommended_copy_prompt
+        ? (brandPrefix ? brandPrefix + strategyData.recommended_copy_prompt : strategyData.recommended_copy_prompt)
+        : `Write high-converting ${configs.brief.assetType} copy for: ${brandPrefix}${brief}`;
       let copyData = null;
       setInput("copy", {
         user_message: copyPrompt,
@@ -640,8 +679,10 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setOutput("copy", copyData);
       setStatus("copy", "done");
 
-      // Master audit step 2
-      fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "3. Copy Generation", step_data: copyData }) }).catch(() => {});
+      // Master audit step 2 — non-blocking, log failures instead of swallowing
+      fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "3. Copy Generation", step_data: copyData }) })
+        .then(r => { if (!r.ok) console.warn("[Orchestrator] audit step 2 returned", r.status); })
+        .catch(err => console.warn("[Orchestrator] audit step 2 error:", err));
 
       // ── STEP 4: Art Director Agent ─────────────────────────────────────────
       setStatus("agent_artdir", "active");
@@ -659,7 +700,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         const r = await fetch("/bff/workflow/step-bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bridge_type: "copy_to_genfy", brief, copy_output: copyData.bodyText, asset_type: configs.brief.assetType }),
+          body: JSON.stringify({ bridge_type: "copy_to_genfy", brief: brandPrefix + brief, copy_output: copyData.bodyText, asset_type: configs.brief.assetType }),
         });
         artDirData = await r.json();
         log(`Art Director: image prompt ready — "${artDirData.image_prompt?.slice(0, 50)}..."`, "success");
@@ -720,6 +761,23 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setOutput("genfy", genfyResult);
       setStatus("genfy", "done");
       log("✓ Image generation complete", "success");
+
+      // Save generated image to assets store so Assets screen can display it
+      if (genfyResult?.url || genfyResult?.base64) {
+        try {
+          const existing = JSON.parse(localStorage.getItem("studio-generated-assets") || "[]");
+          const newAsset = {
+            name: `${configs.brief.assetType} — ${new Date().toLocaleDateString()}`,
+            type: "IMAGE",
+            url: genfyResult.url || (genfyResult.base64 ? `data:image/png;base64,${genfyResult.base64}` : null),
+            by: "Workflow",
+            byHue: "#E8552A",
+            date: new Date().toLocaleDateString(),
+            gradient: "232 85 42, 232 133 12",
+          };
+          localStorage.setItem("studio-generated-assets", JSON.stringify([newAsset, ...existing].slice(0, 50)));
+        } catch (_) {}
+      }
 
       // ── Master Final Audit ─────────────────────────────────────────────────
       log("👑 Master Supervisor: running final campaign audit...", "agent");

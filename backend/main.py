@@ -42,9 +42,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # SQLAlchemy for local SQLite suite users DB
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text, event
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text, Integer, event
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from passlib.context import CryptContext
 from jose import JWTError, jwt as jose_jwt
@@ -69,7 +72,14 @@ if not SUITE_API_KEY:
     raise RuntimeError("SUITE_API_KEY is not set in environment.")
 
 # ── Suite auth config ─────────────────────────────────────────────────────────
-SUITE_SECRET_KEY: str  = os.getenv("SUITE_SECRET_KEY", "fallback-insecure-key")
+SUITE_SECRET_KEY: str  = os.getenv("SUITE_SECRET_KEY", "")
+if not SUITE_SECRET_KEY or SUITE_SECRET_KEY == "fallback-insecure-key":
+    raise RuntimeError(
+        "SUITE_SECRET_KEY is not set or is using the insecure default. "
+        "Generate a strong key with: python -c 'import secrets; print(secrets.token_urlsafe(64))' "
+        "and set it in your .env file."
+    )
+
 SUITE_DB_URL: str      = os.getenv("SUITE_DB_URL", "sqlite:///./suite.db")
 JWT_ALGORITHM          = "HS256"
 JWT_EXPIRE_DAYS        = 7
@@ -122,6 +132,21 @@ class SuitePendingUser(SuiteBase):
     otp_hash       = Column(String(64), nullable=False)
     otp_expires_at = Column(DateTime, nullable=False)
     created_at     = Column(DateTime, default=datetime.utcnow)
+    otp_attempts   = Column(Integer, default=0, nullable=False)
+
+
+class SuiteProject(SuiteBase):
+    """Projects created by Suite users — persisted server-side."""
+    __tablename__ = "suite_projects"
+    id             = Column(String(36), primary_key=True)
+    user_id        = Column(String(36), nullable=False, index=True)
+    name           = Column(String(255), nullable=False)
+    brief          = Column(Text, nullable=True)
+    asset_type     = Column(String(255), nullable=True)
+    status         = Column(String(50), default="draft")
+    workflow_config = Column(Text, nullable=True)  # JSON string
+    created_at     = Column(DateTime, default=datetime.utcnow)
+    updated_at     = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 # Create tables on first startup
@@ -216,6 +241,13 @@ def _generate_otp():
 
 COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 
+if not COOKIE_SECURE:
+    print(
+        "[Auth] WARNING: COOKIE_SECURE is false. Session cookies will be sent over HTTP. "
+        "Set COOKIE_SECURE=true in production when running behind HTTPS.",
+        flush=True,
+    )
+
 def _set_auth_cookie(response: Response, user_id: str):
     token = _create_jwt(user_id)
     response.set_cookie(
@@ -236,6 +268,13 @@ MAIL_USERNAME  = os.getenv("MAIL_USERNAME", "")
 MAIL_PASSWORD  = os.getenv("MAIL_PASSWORD", "")
 MAIL_FROM      = os.getenv("MAIL_FROM", "")
 MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Creative Suite")
+
+if not MAIL_USERNAME or not MAIL_PASSWORD or not MAIL_FROM:
+    print(
+        "[Mail] WARNING: MAIL_USERNAME / MAIL_PASSWORD / MAIL_FROM are not set. "
+        "OTP emails will silently fail. Set these in your .env — never commit real credentials.",
+        flush=True,
+    )
 
 
 def _send_otp_email_sync(to_email: str, otp: str, name: str = ""):
@@ -296,6 +335,7 @@ def _build_copyagent_user_payload(
         "profile_picture": profile_picture,
         "plan_type":       "agency",
         "plan_name":       "agency",
+        "is_suite_user":   True,
     }
 
 
@@ -419,6 +459,11 @@ app = FastAPI(
     version="2.0.0",
 )
 
+# ── Rate limiter ──────────────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -466,8 +511,10 @@ async def startup_sync_admin_to_copyagent():
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 @app.post("/bff/auth/signup")
+@limiter.limit("5/minute")
 async def auth_signup(
     body: SignupRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_suite_db),
 ):
@@ -477,6 +524,10 @@ async def auth_signup(
 
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+
+    import re as _re
+    if not _re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
 
     if db.query(SuiteUser).filter(SuiteUser.email == email).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
@@ -509,8 +560,10 @@ async def auth_signup(
 
 
 @app.post("/bff/auth/verify-otp")
+@limiter.limit("10/minute")
 async def auth_verify_otp(
     body: VerifyOTPRequest,
+    request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_suite_db),
@@ -528,8 +581,20 @@ async def auth_verify_otp(
         db.commit()
         raise HTTPException(status_code=400, detail="OTP has expired. Please sign up again.")
 
+    # Lock out after 5 wrong attempts
+    if pending.otp_attempts >= 5:
+        db.delete(pending)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Too many incorrect attempts. Please sign up again.")
+
     if pending.otp_hash != otp_hash:
-        raise HTTPException(status_code=400, detail="Incorrect verification code.")
+        pending.otp_attempts += 1
+        db.commit()
+        remaining = max(0, 5 - pending.otp_attempts)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Incorrect verification code. {remaining} attempt{'s' if remaining != 1 else ''} remaining.",
+        )
 
     user_id  = pending.id
     pw_hash  = pending.password_hash
@@ -549,13 +614,16 @@ async def auth_verify_otp(
     db.refresh(new_user)
 
     # Sync to CopyAgent immediately (await inline for instant provisioning)
-    await _sync_to_copyagent(
+    synced = await _sync_to_copyagent(
         user_id=user_id,
         email=email,
         name=name or email.split("@")[0],
         password_hash=pw_hash,
         auth_provider="email",
     )
+    if synced:
+        new_user.copyagent_synced = True
+        db.commit()
 
     _set_auth_cookie(response, user_id)
     return {
@@ -565,8 +633,10 @@ async def auth_verify_otp(
 
 
 @app.post("/bff/auth/resend-otp")
+@limiter.limit("3/minute")
 async def auth_resend_otp(
     body: ResendOTPRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_suite_db),
 ):
@@ -586,8 +656,10 @@ async def auth_resend_otp(
 
 
 @app.post("/bff/auth/login")
+@limiter.limit("10/minute")
 async def auth_login(
     body: LoginRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(get_suite_db),
 ):
@@ -712,6 +784,119 @@ async def auth_logout(response: Response):
     return {"status": "logged_out"}
 
 
+# ── Projects API ─────────────────────────────────────────────────────────────
+
+class ProjectCreateRequest(BaseModel):
+    name: str
+    brief: Optional[str] = ""
+    asset_type: Optional[str] = "Instagram Ad Image"
+    workflow_config: Optional[dict] = None
+
+class ProjectUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    brief: Optional[str] = None
+    asset_type: Optional[str] = None
+    status: Optional[str] = None
+    workflow_config: Optional[dict] = None
+
+def _get_current_user_id(suite_session: Optional[str]) -> Optional[str]:
+    if not suite_session:
+        return None
+    return _decode_jwt(suite_session)
+
+@app.get("/bff/projects")
+async def list_projects(
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    projects = db.query(SuiteProject).filter(SuiteProject.user_id == user_id).order_by(SuiteProject.created_at.desc()).all()
+    return [
+        {
+            "id": p.id, "name": p.name, "brief": p.brief,
+            "asset_type": p.asset_type, "status": p.status,
+            "workflow_config": json.loads(p.workflow_config) if p.workflow_config else None,
+            "createdAt": p.created_at.isoformat(), "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
+        }
+        for p in projects
+    ]
+
+@app.post("/bff/projects")
+async def create_project(
+    body: ProjectCreateRequest,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    project = SuiteProject(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name=body.name.strip(),
+        brief=body.brief,
+        asset_type=body.asset_type,
+        status="draft",
+        workflow_config=json.dumps(body.workflow_config) if body.workflow_config else None,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    return {
+        "id": project.id, "name": project.name, "brief": project.brief,
+        "asset_type": project.asset_type, "status": project.status,
+        "workflow_config": body.workflow_config,
+        "createdAt": project.created_at.isoformat(),
+    }
+
+@app.patch("/bff/projects/{project_id}")
+async def update_project(
+    project_id: str,
+    body: ProjectUpdateRequest,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    project = db.query(SuiteProject).filter(SuiteProject.id == project_id, SuiteProject.user_id == user_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    if body.name is not None:
+        project.name = body.name.strip()
+    if body.brief is not None:
+        project.brief = body.brief
+    if body.asset_type is not None:
+        project.asset_type = body.asset_type
+    if body.status is not None:
+        project.status = body.status
+    if body.workflow_config is not None:
+        project.workflow_config = json.dumps(body.workflow_config)
+    project.updated_at = datetime.utcnow()
+    db.commit()
+    return {"status": "updated"}
+
+@app.delete("/bff/projects/{project_id}")
+async def delete_project(
+    project_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    project = db.query(SuiteProject).filter(SuiteProject.id == project_id, SuiteProject.user_id == user_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    db.delete(project)
+    db.commit()
+    return {"status": "deleted"}
+
+
 # ── Upstream headers (API key injected server-side) ───────────────────────────
 def _upstream_headers(user_id: Optional[str] = None) -> dict:
     effective_user_id = user_id or STATIC_USER_ID
@@ -779,7 +964,7 @@ async def _ensure_user_in_copyagent(user_id: str, db_session) -> None:
     """If Copy Agent doesn't know this user yet, register them."""
     try:
         user = db_session.query(SuiteUser).filter(SuiteUser.id == user_id).first()
-        if user:
+        if user and not getattr(user, 'copyagent_synced', False):
             await _sync_to_copyagent(
                 user_id=user.id,
                 email=user.email,

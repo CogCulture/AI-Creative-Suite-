@@ -4,6 +4,7 @@ import { NAV } from "./data.js";
 import Sidebar from "./components/shell/Sidebar.jsx";
 import TopBar from "./components/shell/TopBar.jsx";
 import Onboarding from "./components/Onboarding.jsx";
+import WorkspaceModal from "./components/WorkspaceModal.jsx";
 import { Toast } from "./components/primitives/index.jsx";
 import PublicShell from "./components/PublicShell.jsx";
 
@@ -14,6 +15,7 @@ import ToolDetail from "./screens/ToolDetail.jsx";
 import WorkflowScreen from "./screens/WorkflowScreen.jsx";
 import ProjectsScreen from "./screens/ProjectsScreen.jsx";
 import BrainScreen from "./screens/BrainScreen.jsx";
+import WorkspaceScreen from "./screens/WorkspaceScreen.jsx";
 import AssetsScreen from "./screens/AssetsScreen.jsx";
 import GenfyScreen from "./screens/GenfyScreen.jsx";
 
@@ -39,18 +41,52 @@ function useTheme() {
 
 /* ── App root ──────────────────────────────────────────── */
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    try {
-      return localStorage.getItem("studio-logged-in") === "true";
-    } catch (_) {
-      return false;
-    }
-  });
+  // null = still checking with server, false = not logged in, true = confirmed by server
+  const [isLoggedIn, setIsLoggedIn] = useState(null);
+
+  useEffect(() => {
+    // Validate session with the server on every load.
+    // localStorage flag is intentionally removed — server cookie is the only source of truth.
+    fetch("/bff/auth/me", { credentials: "include" })
+      .then((res) => {
+        if (res.ok) {
+          return res.json().then((user) => {
+            try { localStorage.setItem("studio-user-info", JSON.stringify(user)); } catch (_) {}
+            setIsLoggedIn(true);
+          });
+        }
+        // Cookie missing or expired — force login screen
+        try { localStorage.removeItem("studio-logged-in"); } catch (_) {}
+        setIsLoggedIn(false);
+      })
+      .catch(() => {
+        // Network error — fail closed (show login, not app)
+        setIsLoggedIn(false);
+      });
+  }, []);
   const { t, mode, toggle } = useTheme();
   const [view, setView] = useState("home");
   const [activeProject, setActiveProject] = useState(null);
+  const [activeWorkspace, setActiveWorkspace] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("studio-active-workspace") || "null");
+    } catch (_) {
+      return null;
+    }
+  });
+  const [workspaceList, setWorkspaceList] = useState(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem("studio-workspaces") || "[]");
+      return Array.isArray(list) ? list : [];
+    } catch (_) {
+      return [];
+    }
+  });
   const [toast, setToast] = useState(null);
-  const [onb, setOnb] = useState(false);
+  const [showBrandDNA, setShowBrandDNA] = useState(false);
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+  const [workspaceModalMode, setWorkspaceModalMode] = useState("create");
+  const [workspaceModalWorkspace, setWorkspaceModalWorkspace] = useState(null);
   const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1300);
   const timerRef = useRef(null);
 
@@ -88,8 +124,30 @@ export default function App() {
         background: ${t.borderStrong};
         border-color: ${t.bg};
       }
-    `;
+    `; 
   }, [t]);
+
+  useEffect(() => {
+    try {
+      if (activeWorkspace) {
+        localStorage.setItem("studio-active-workspace", JSON.stringify(activeWorkspace));
+      } else {
+        localStorage.removeItem("studio-active-workspace");
+      }
+    } catch (_) {}
+  }, [activeWorkspace]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("studio-workspaces", JSON.stringify(workspaceList));
+    } catch (_) {}
+  }, [workspaceList]);
+
+  useEffect(() => {
+    if (!activeWorkspace && workspaceList.length > 0) {
+      setActiveWorkspace(workspaceList[0]);
+    }
+  }, [activeWorkspace, workspaceList]);
 
   const showToast = (msg) => {
     clearTimeout(timerRef.current);
@@ -116,8 +174,37 @@ export default function App() {
     if (s) s.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const openCreateWorkspace = () => {
+    setWorkspaceModalMode("create");
+    setWorkspaceModalWorkspace(null);
+    setShowWorkspaceModal(true);
+  };
+
+  const openInviteWorkspace = (workspace = activeWorkspace) => {
+    setWorkspaceModalMode("invite");
+    setWorkspaceModalWorkspace(workspace || null);
+    setShowWorkspaceModal(true);
+  };
+
+  const handleWorkspaceSaved = (workspace) => {
+    setActiveWorkspace(workspace);
+    setWorkspaceList((prev) => {
+      const next = prev.filter((w) => w.id !== workspace.id).concat(workspace);
+      return next;
+    });
+  };
+
   const compact = w < 1080;
-  const shared = { t, nav, showToast };
+  const shared = { t, nav, showToast, activeWorkspace, workspaceList };
+
+  if (isLoggedIn === null) {
+    // Still verifying session with server — show blank screen to avoid flash
+    return (
+      <div style={{ height: "100vh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 24, height: 24, border: "2px solid #e5e7eb", borderTopColor: "#111", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      </div>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -147,13 +234,24 @@ export default function App() {
           view={view}
           nav={nav}
           compact={compact}
-          onboard={() => setOnb(true)}
+          activeWorkspace={activeWorkspace}
+          onOpenWorkspace={() => nav("workspace")}
         />
       )}
 
       {/* Main area */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <TopBar t={t} mode={mode} toggle={toggle} view={view} nav={nav} onboard={() => setOnb(true)} />
+        <TopBar
+          t={t}
+          mode={mode}
+          toggle={toggle}
+          view={view}
+          nav={nav}
+          activeWorkspace={activeWorkspace}
+          workspaces={workspaceList}
+          onSelectWorkspace={(workspace) => handleWorkspaceSaved(workspace)}
+          onAddWorkspace={openCreateWorkspace}
+        />
 
         <div
           id="studio-scroll"
@@ -165,7 +263,8 @@ export default function App() {
           {view === "tool-detail" && <ToolDetail {...shared} />}
           {view === "workflow"    && <WorkflowScreen {...shared} activeProject={activeProject} setActiveProject={setActiveProject} />}
           {view === "projects"    && <ProjectsScreen {...shared} setActiveProject={setActiveProject} />}
-          {view === "brain"       && <BrainScreen {...shared} />}
+          {view === "workspace"   && <WorkspaceScreen {...shared} onSelectWorkspace={handleWorkspaceSaved} onInviteFriend={openInviteWorkspace} onAddWorkspace={openCreateWorkspace} />}
+          {view === "brain"       && <BrainScreen {...shared} onAddBrandDNA={() => setShowBrandDNA(true)} />}
           {view === "assets"      && <AssetsScreen {...shared} />}
           {view === "genfy-detail" && <GenfyScreen {...shared} />}
         </div>
@@ -208,12 +307,22 @@ export default function App() {
       </div>
 
       {/* Overlays */}
-      {onb && (
+      {showBrandDNA && (
         <Onboarding
           t={t}
-          onClose={() => setOnb(false)}
+          onClose={() => setShowBrandDNA(false)}
           showToast={showToast}
           nav={nav}
+        />
+      )}
+      {showWorkspaceModal && (
+        <WorkspaceModal
+          t={t}
+          mode={workspaceModalMode}
+          workspace={workspaceModalWorkspace}
+          onClose={() => setShowWorkspaceModal(false)}
+          showToast={showToast}
+          onWorkspaceCreated={handleWorkspaceSaved}
         />
       )}
       <Toast t={t} toast={toast} />

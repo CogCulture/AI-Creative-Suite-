@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, X, Zap, Clock, Trash2, ChevronRight, FolderOpen, Sparkles, Brain, CheckCircle, Loader2 } from "lucide-react";
 import { FONT, MONO, R } from "../tokens.js";
 import { Card, Btn, Eyebrow, H1 } from "../components/primitives/index.jsx";
@@ -12,15 +12,6 @@ const ASSET_TYPES = [
   "YouTube Thumbnail",
   "Email Header",
 ];
-
-function loadProjects() {
-  try { return JSON.parse(localStorage.getItem("studio-projects") || "[]"); }
-  catch { return []; }
-}
-
-function saveProjects(list) {
-  try { localStorage.setItem("studio-projects", JSON.stringify(list)); } catch (_) {}
-}
 
 function timeSince(iso) {
   const ms = Date.now() - new Date(iso).getTime();
@@ -39,30 +30,38 @@ const STATUS_COLORS = {
 };
 
 export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) {
-  const [projects, setProjects] = useState(loadProjects);
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: "", brief: "", assetType: "Instagram Ad Image" });
   const [nameError, setNameError] = useState(false);
   const [briefError, setBriefError] = useState(false);
-  // AI analysis states
-  const [aiPhase, setAiPhase] = useState(null); // null | 'analyzing' | 'designing' | 'done'
+  const [aiPhase, setAiPhase] = useState(null);
   const [aiResult, setAiResult] = useState(null);
+
+  // Load projects from server on mount
+  useEffect(() => {
+    fetch("/bff/projects", { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setProjects(Array.isArray(data) ? data : []); })
+      .catch(() => setProjects([]))
+      .finally(() => setLoadingProjects(false));
+  }, []);
 
   const handleCreate = async () => {
     setNameError(!form.name.trim());
     setBriefError(!form.brief.trim());
     if (!form.name.trim() || !form.brief.trim()) return;
 
-    // ── Phase 1: Show AI analyzing state ─────────────────────────────────
     setAiPhase("analyzing");
     setAiResult(null);
 
     let workflowConfig = null;
     try {
-      // ── Phase 2: Call the AI Workflow Designer ────────────────────────
       setAiPhase("designing");
       const res = await fetch("/bff/workflow/analyze-brief", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brief: form.brief.trim(),
@@ -74,43 +73,56 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
         workflowConfig = await res.json();
         setAiResult(workflowConfig);
         setAiPhase("done");
-        // Show result briefly before navigating
-        await delay(1600);
+        // 800ms so user sees the "✅ Workflow configured!" confirmation before navigating
+        await delay(800);
       }
     } catch (err) {
       console.warn("[AI Workflow Designer] Error:", err);
     }
 
-    // ── Save project with AI config and navigate ──────────────────────
-    const newProject = {
-      id: `proj_${Date.now()}`,
-      name: form.name.trim(),
-      brief: form.brief.trim(),
-      assetType: form.assetType,
-      createdAt: new Date().toISOString(),
-      status: "draft",
-      workflowConfig,
-    };
-    const updated = [newProject, ...projects];
-    setProjects(updated);
-    saveProjects(updated);
-    setShowModal(false);
-    setAiPhase(null);
-    setAiResult(null);
-    setForm({ name: "", brief: "", assetType: "Instagram Ad Image" });
-    setNameError(false);
-    setBriefError(false);
-    showToast(`✨ "${newProject.name}" configured by AI — opening canvas...`);
-    setActiveProject(newProject);
-    nav("workflow", newProject);
+    // Save to server
+    try {
+      const res = await fetch("/bff/projects", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          brief: form.brief.trim(),
+          asset_type: form.assetType,
+          workflow_config: workflowConfig,
+        }),
+      });
+      if (res.ok) {
+        const newProject = await res.json();
+        setProjects(prev => [newProject, ...prev]);
+        setShowModal(false);
+        setAiPhase(null);
+        setAiResult(null);
+        setForm({ name: "", brief: "", assetType: "Instagram Ad Image" });
+        setNameError(false);
+        setBriefError(false);
+        showToast(`✨ "${newProject.name}" configured by AI — opening canvas...`);
+        setActiveProject(newProject);
+        nav("workflow", newProject);
+      } else {
+        throw new Error("Failed to save project");
+      }
+    } catch (err) {
+      showToast("Failed to save project. Please try again.");
+      setAiPhase(null);
+    }
   };
 
-  const handleDelete = (e, id) => {
+  const handleDelete = async (e, id) => {
     e.stopPropagation();
-    const updated = projects.filter((p) => p.id !== id);
-    setProjects(updated);
-    saveProjects(updated);
-    showToast("Project removed.");
+    try {
+      await fetch(`/bff/projects/${id}`, { method: "DELETE", credentials: "include" });
+      setProjects(prev => prev.filter(p => p.id !== id));
+      showToast("Project removed.");
+    } catch {
+      showToast("Failed to delete project.");
+    }
   };
 
   const openProject = (project) => {
@@ -137,7 +149,12 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
       {/* Project list */}
       <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 10 }}>
-        {projects.length === 0 ? (
+        {loadingProjects ? (
+          <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
+            <Loader2 size={24} style={{ color: t.text3, margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
+            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3 }}>Loading projects...</div>
+          </Card>
+        ) : projects.length === 0 ? (
           <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
             <div style={{
               width: 64, height: 64, borderRadius: 20, margin: "0 auto 16px",

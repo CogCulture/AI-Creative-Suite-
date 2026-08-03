@@ -144,24 +144,28 @@ export function Btn({
       background: disabled ? t.surface3 : h ? (hue ? hue : t.accentHover) : acc,
       color: disabled ? t.text3 : hue ? "#fff" : t.onAccent,
       filter: h && hue ? "brightness(.93)" : "none",
+      boxShadow: h && !disabled ? `0 0 0 1px ${t.borderStrong}, 0 10px 18px rgba(0,0,0,.06)` : "none",
     },
     secondary: {
       background: h && !disabled ? t.surface3 : t.surface2,
       color: t.text,
       border: `1px solid ${h ? t.borderStrong : t.border}`,
+      boxShadow: h && !disabled ? `0 0 0 1px ${t.borderStrong}` : "none",
     },
     ghost: {
       background: h && !disabled ? t.surface2 : "transparent",
       color: t.text2,
     },
     dark: {
-      background: h && !disabled ? "#000" : t.text,
+      background: h && !disabled ? t.accent : t.text,
       color: t.bg,
+      boxShadow: h && !disabled ? `0 0 0 1px ${t.borderStrong}, 0 10px 18px rgba(0,0,0,.08)` : "none",
     },
     success: {
       background: t.success,
       color: "#fff",
       filter: h ? "brightness(1.08)" : "none",
+      boxShadow: h && !disabled ? `0 0 0 1px ${t.borderStrong}, 0 10px 18px rgba(0,0,0,.06)` : "none",
     },
   };
 
@@ -201,7 +205,7 @@ export function Btn({
 }
 
 /* ── Chip ────────────────────────────────────────────────── */
-export function Chip({ t, children, dot, hue, banned }) {
+export function Chip({ t, children, dot, hue, banned, removable, onRemove }) {
   return (
     <span
       style={{
@@ -211,7 +215,7 @@ export function Chip({ t, children, dot, hue, banned }) {
         fontFamily: MONO,
         fontSize: 11,
         fontWeight: 500,
-        padding: "4px 10px",
+        padding: removable ? "4px 6px 4px 10px" : "4px 10px",
         borderRadius: R.pill,
         background: banned ? t.dangerSoft : t.surface2,
         color: banned ? t.danger : t.text2,
@@ -225,6 +229,30 @@ export function Chip({ t, children, dot, hue, banned }) {
         />
       )}
       {children}
+      {removable && (
+        <button
+          onClick={onRemove}
+          aria-label="Remove"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 14,
+            height: 14,
+            borderRadius: "50%",
+            border: "none",
+            background: "transparent",
+            color: "inherit",
+            cursor: "pointer",
+            padding: 0,
+            opacity: 0.6,
+            lineHeight: 1,
+            fontSize: 12,
+          }}
+        >
+          ×
+        </button>
+      )}
     </span>
   );
 }

@@ -55,7 +55,8 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
         usp: usp.trim(),
         wordsToUse: wordsToUse.trim(),
         wordsToAvoid: wordsToAvoid.trim(),
-        files,
+        // File metadata only — never store file contents in localStorage
+        fileCount: files.length,
         skipDocs,
         synthesizedAt: new Date().toISOString(),
       };
@@ -113,7 +114,7 @@ export default function Onboarding({ t, onClose, showToast, nav }) {
           width: 580,
           maxWidth: "100%",
           background: t.surface,
-          borderRadius: R.xl,
+          borderRadius: 0,
           boxShadow: t.shadowLg,
           overflow: "hidden",
           fontFamily: FONT,

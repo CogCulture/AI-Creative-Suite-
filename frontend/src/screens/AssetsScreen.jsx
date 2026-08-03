@@ -1,18 +1,48 @@
-import { useState } from "react";
-import { Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, Download } from "lucide-react";
 import { FONT, MONO, R } from "../tokens.js";
 import { ASSETS } from "../data.js";
 import { Card, Eyebrow, H1, Sub } from "../components/primitives/index.jsx";
 
+function loadGeneratedAssets() {
+  // Pull any real generated images saved by the workflow screen
+  try {
+    const raw = localStorage.getItem("studio-generated-assets");
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
 export default function AssetsScreen({ t, nav, showToast }) {
   const [filter, setFilter] = useState("All");
+  const [generatedAssets, setGeneratedAssets] = useState([]);
+
+  useEffect(() => {
+    setGeneratedAssets(loadGeneratedAssets());
+  }, []);
+
+  // Merge real generated images (type IMAGE) with static demo assets
+  const allAssets = [
+    ...generatedAssets.map((a) => ({
+      name: a.name || "Generated Image",
+      type: "IMAGE",
+      g: a.gradient || "232 85 42, 232 133 12",
+      url: a.url || null,
+      by: a.by || "Workflow",
+      byHue: "#E8552A",
+      date: a.date || "just now",
+      real: true,
+    })),
+    ...ASSETS,
+  ];
 
   const list =
     filter === "All"
-      ? ASSETS
+      ? allAssets
       : filter === "Copy"
-      ? ASSETS.filter((a) => ["COPY", "STRATEGY"].includes(a.type))
-      : ASSETS.filter((a) => a.g);
+      ? allAssets.filter((a) => ["COPY", "STRATEGY"].includes(a.type))
+      : allAssets.filter((a) => a.type === "IMAGE" || a.g);
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "32px 40px 80px", fontFamily: FONT }}>
@@ -63,7 +93,21 @@ export default function AssetsScreen({ t, nav, showToast }) {
             onClick={() => showToast(`Opened "${a.name}"`)}
             style={{ overflow: "hidden" }}
           >
-            {a.g ? (
+            {/* Real generated image — show actual image */}
+            {a.real && a.url ? (
+              <div style={{ aspectRatio: "4/3", position: "relative", overflow: "hidden", background: t.surface2 }}>
+                <img src={a.url} alt={a.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <span style={{ position: "absolute", top: 8, left: 8, fontFamily: MONO, fontSize: 9, color: "#fff", background: "rgba(0,0,0,.5)", padding: "2px 7px", borderRadius: 5 }}>
+                  {a.type}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); const link = document.createElement("a"); link.href = a.url; link.download = `${a.name}.png`; document.body.appendChild(link); link.click(); document.body.removeChild(link); }}
+                  style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,.5)", border: "none", borderRadius: 5, padding: "4px 7px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "#fff" }}
+                >
+                  <Download size={10} />
+                </button>
+              </div>
+            ) : a.g ? (
               <div
                 style={{
                   aspectRatio: "4/3",
