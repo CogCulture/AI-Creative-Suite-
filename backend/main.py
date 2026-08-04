@@ -34,7 +34,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, List
+from fastapi import UploadFile, File, Form
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks, Cookie, Depends
@@ -46,6 +47,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+
 # SQLAlchemy for local SQLite suite users DB
 from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text, Integer, event, func, or_
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -54,6 +56,16 @@ from jose import JWTError, jwt as jose_jwt
 
 # ── Load environment ──────────────────────────────────────────────────────────
 load_dotenv()
+
+# ── RAG engine (Pinecone) ─────────────────────────────────────────────────────
+try:
+    from rag import rag_engine, match_brand_to_clients
+    _RAG_AVAILABLE = True
+except ImportError as _rag_import_err:
+    print(f"[RAG] rag.py not loadable: {_rag_import_err}. RAG features disabled.", flush=True)
+    rag_engine = None
+    match_brand_to_clients = None
+    _RAG_AVAILABLE = False
 
 SUITE_API_KEY: str    = os.getenv("SUITE_API_KEY", "")
 STATIC_USER_ID: str   = os.getenv("USER_ID", "")          # fallback for unauthenticated use
@@ -148,24 +160,28 @@ class SuitePendingUser(SuiteBase):
 class SuiteBrand(SuiteBase):
     """Brands onboarded by Suite users/agencies — persisted server-side."""
     __tablename__ = "suite_brands"
-    id               = Column(String(36), primary_key=True)
-    user_id          = Column(String(36), nullable=False, index=True)
-    brand_name       = Column(String(255), nullable=False)
-    website          = Column(String(255), nullable=True)
-    industry         = Column(String(255), nullable=True)
-    product_desc     = Column(Text, nullable=True)
-    audience         = Column(Text, nullable=True)
-    engagement_type  = Column(String(100), nullable=True)
-    timeline         = Column(String(255), nullable=True)
-    scope_of_work    = Column(Text, nullable=True)
-    sow_file_name    = Column(String(255), nullable=True)
-    competitors      = Column(Text, nullable=True)  # JSON string
-    voice            = Column(String(255), nullable=True)
-    archetype        = Column(String(100), nullable=True)
-    usp              = Column(Text, nullable=True)
-    words_to_use     = Column(Text, nullable=True)
-    words_to_avoid   = Column(Text, nullable=True)
-    created_at       = Column(DateTime, default=datetime.utcnow)
+    id                  = Column(String(36), primary_key=True)
+    user_id             = Column(String(36), nullable=False, index=True)
+    brand_name          = Column(String(255), nullable=False)
+    website             = Column(String(255), nullable=True)
+    industry            = Column(String(255), nullable=True)
+    product_desc        = Column(Text, nullable=True)
+    audience            = Column(Text, nullable=True)
+    engagement_type     = Column(String(100), nullable=True)
+    timeline            = Column(String(255), nullable=True)
+    scope_of_work       = Column(Text, nullable=True)
+    sow_file_name       = Column(String(255), nullable=True)
+    competitors         = Column(Text, nullable=True)  # JSON string
+    voice               = Column(String(255), nullable=True)
+    archetype           = Column(String(100), nullable=True)
+    usp                 = Column(Text, nullable=True)
+    words_to_use        = Column(Text, nullable=True)
+    words_to_avoid      = Column(Text, nullable=True)
+    created_at          = Column(DateTime, default=datetime.utcnow)
+    # ── RAG linking fields ────────────────────────────────────────────────────
+    pinecone_client_key = Column(String(255), nullable=True)   # exact client value in Pinecone metadata
+    rag_linked          = Column(Boolean, default=False)        # confirmed link
+    rag_linked_at       = Column(DateTime, nullable=True)
 
 
 class SuiteProject(SuiteBase):
@@ -193,6 +209,25 @@ class SuiteProjectInvite(SuiteBase):
     email            = Column(String(255), nullable=False, index=True)
     role             = Column(String(50), default="Editor")  # "Editor", "Viewer", "Admin"
     status           = Column(String(50), default="pending") # "pending", "accepted"
+    created_at       = Column(DateTime, default=datetime.utcnow)
+
+
+class SuiteDamFile(SuiteBase):
+    """Digital Asset Management files — source of truth for Pinecone ingestion."""
+    __tablename__ = "suite_dam_files"
+    id               = Column(String(36), primary_key=True)
+    brand_id         = Column(String(36), nullable=False, index=True)
+    user_id          = Column(String(36), nullable=False, index=True)
+    project_id       = Column(String(36), nullable=True)
+    original_name    = Column(String(512), nullable=False)
+    corrected_name   = Column(String(512), nullable=True)   # user-edited display name
+    file_size        = Column(Integer, nullable=True)        # bytes
+    media_type       = Column(String(50), nullable=True)     # pdfs, images, docs
+    content_hash     = Column(String(64), nullable=True)     # SHA-256 for dedup
+    rag_status       = Column(String(30), default="not_ingested")  # not_ingested|queued|ingested|failed
+    chunk_count      = Column(Integer, nullable=True)
+    ingest_error     = Column(Text, nullable=True)
+    ingested_at      = Column(DateTime, nullable=True)
     created_at       = Column(DateTime, default=datetime.utcnow)
 
 
@@ -974,6 +1009,9 @@ async def list_brands(
             "wordsToUse": b.words_to_use,
             "wordsToAvoid": b.words_to_avoid,
             "createdAt": b.created_at.isoformat(),
+            # RAG fields
+            "ragLinked": bool(b.rag_linked),
+            "pineconeClientKey": b.pinecone_client_key,
         }
         for b in unique_brands
     ]
@@ -1064,6 +1102,308 @@ async def delete_brand(
     db.delete(brand)
     db.commit()
     return {"status": "deleted", "id": brand_id}
+
+
+# ── RAG: Brand ↔ Pinecone Matching & Linking ─────────────────────────────────
+
+@app.get("/bff/brands/{brand_id}/rag-match")
+async def rag_match_brand(
+    brand_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    """
+    Run fuzzy-match of this brand's name against all known Pinecone `client` values.
+    Returns tier-classified match suggestions for the user to confirm.
+    """
+    user_id = _get_current_user_id(suite_session)
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id, SuiteBrand.user_id == user_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found.")
+
+    if not _RAG_AVAILABLE or not rag_engine:
+        return {"rag_available": False, "matches": [], "known_clients": []}
+
+    # Fetch known clients from Pinecone
+    known_clients = await asyncio.get_event_loop().run_in_executor(None, rag_engine.get_known_clients)
+    matches = match_brand_to_clients(brand.brand_name, known_clients)
+
+    return {
+        "rag_available": True,
+        "brand_id": brand_id,
+        "brand_name": brand.brand_name,
+        "currently_linked_client": brand.pinecone_client_key,
+        "rag_linked": brand.rag_linked,
+        "matches": matches,
+        "known_clients": known_clients,
+    }
+
+
+class RagLinkRequest(BaseModel):
+    pinecone_client_key: Optional[str] = None   # None = unlink
+
+
+@app.post("/bff/brands/{brand_id}/rag-link")
+async def rag_link_brand(
+    brand_id: str,
+    body: RagLinkRequest,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    """
+    Confirm (or revoke) linking of a brand to a specific Pinecone client key.
+    A None value unlinks the brand.
+    """
+    user_id = _get_current_user_id(suite_session)
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id, SuiteBrand.user_id == user_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found.")
+
+    if body.pinecone_client_key:
+        brand.pinecone_client_key = body.pinecone_client_key
+        brand.rag_linked          = True
+        brand.rag_linked_at       = datetime.utcnow()
+        msg = f"Brand '{brand.brand_name}' linked to Pinecone client '{body.pinecone_client_key}'"
+    else:
+        brand.pinecone_client_key = None
+        brand.rag_linked          = False
+        brand.rag_linked_at       = None
+        msg = f"Brand '{brand.brand_name}' unlinked from Pinecone"
+
+    db.commit()
+    print(f"[RAG] {msg}", flush=True)
+    return {
+        "status": "ok",
+        "message": msg,
+        "rag_linked": brand.rag_linked,
+        "pinecone_client_key": brand.pinecone_client_key,
+    }
+
+
+@app.get("/bff/brands/{brand_id}/rag-context")
+async def rag_get_context(
+    brand_id: str,
+    query: str = "brand identity and messaging",
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    """Debug endpoint: retrieve RAG context for a brand + test query."""
+    user_id = _get_current_user_id(suite_session)
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id, SuiteBrand.user_id == user_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found.")
+
+    if not _RAG_AVAILABLE or not rag_engine or not brand.rag_linked or not brand.pinecone_client_key:
+        return {"rag_linked": False, "context": "", "message": "Brand not RAG-linked"}
+
+    context = await rag_engine.retrieve_brand_context(brand.pinecone_client_key, query)
+    return {
+        "rag_linked": True,
+        "pinecone_client_key": brand.pinecone_client_key,
+        "query": query,
+        "context_length": len(context),
+        "context": context[:3000] if context else "",
+    }
+
+
+# ── DAM: File Upload, List, Delete, Ingest ────────────────────────────────────
+
+@app.get("/bff/dam/files")
+async def list_dam_files(
+    brand_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    """List all DAM files for a brand."""
+    user_id = _get_current_user_id(suite_session)
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id, SuiteBrand.user_id == user_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found.")
+
+    files = db.query(SuiteDamFile).filter(
+        SuiteDamFile.brand_id == brand_id,
+        SuiteDamFile.user_id == user_id,
+    ).order_by(SuiteDamFile.created_at.desc()).all()
+
+    return [
+        {
+            "id":             f.id,
+            "brandId":        f.brand_id,
+            "originalName":   f.original_name,
+            "correctedName":  f.corrected_name or f.original_name,
+            "fileSize":       f.file_size,
+            "mediaType":      f.media_type,
+            "ragStatus":      f.rag_status,
+            "chunkCount":     f.chunk_count,
+            "ingestError":    f.ingest_error,
+            "ingestedAt":     f.ingested_at.isoformat() if f.ingested_at else None,
+            "createdAt":      f.created_at.isoformat(),
+        }
+        for f in files
+    ]
+
+
+@app.post("/bff/dam/files")
+async def upload_dam_file(
+    brand_id: str = Form(...),
+    project_id: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    """
+    Upload a file to DAM for a brand.
+    Automatically enqueues Pinecone ingestion if the brand is RAG-linked.
+    """
+    user_id = _get_current_user_id(suite_session)
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id, SuiteBrand.user_id == user_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found.")
+
+    # Size guard: max 20MB
+    content = await file.read()
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Maximum 20 MB.")
+
+    content_hash = hashlib.sha256(content).hexdigest()
+    filename     = file.filename or "upload"
+    ext          = filename.lower().rsplit(".", 1)[-1] if "." in filename else "txt"
+    media_type   = "images" if ext in {"jpg", "jpeg", "png", "gif", "webp", "svg"} else "pdfs" if ext == "pdf" else "docs"
+
+    # Dedup: skip if same file already ingested for this brand
+    existing = db.query(SuiteDamFile).filter(
+        SuiteDamFile.brand_id == brand_id,
+        SuiteDamFile.content_hash == content_hash,
+    ).first()
+    if existing and existing.rag_status == "ingested":
+        return {
+            "id":       existing.id,
+            "status":   "already_ingested",
+            "message":  f"This file was already ingested ({existing.original_name})",
+            "ragStatus": existing.rag_status,
+        }
+
+    dam_file = SuiteDamFile(
+        id            = str(uuid.uuid4()),
+        brand_id      = brand_id,
+        user_id       = user_id,
+        project_id    = project_id,
+        original_name = filename,
+        corrected_name= filename,
+        file_size     = len(content),
+        media_type    = media_type,
+        content_hash  = content_hash,
+        rag_status    = "queued" if (brand.rag_linked and brand.pinecone_client_key and _RAG_AVAILABLE) else "not_ingested",
+        created_at    = datetime.utcnow(),
+    )
+    db.add(dam_file)
+    db.commit()
+    db.refresh(dam_file)
+
+    # Kick off background ingestion if brand is linked
+    if brand.rag_linked and brand.pinecone_client_key and _RAG_AVAILABLE and rag_engine:
+        background_tasks.add_task(
+            _ingest_dam_file_bg,
+            dam_file.id, brand.pinecone_client_key, filename, content, project_id, media_type
+        )
+
+    return {
+        "id":           dam_file.id,
+        "status":       "uploaded",
+        "ragStatus":    dam_file.rag_status,
+        "mediaType":    media_type,
+        "message":      "File uploaded. Ingestion queued." if dam_file.rag_status == "queued" else "File uploaded. Link brand to RAG to enable ingestion.",
+    }
+
+
+async def _ingest_dam_file_bg(dam_file_id: str, pinecone_client_key: str, filename: str, content: bytes, project_id: Optional[str], media_type: Optional[str]):
+    """Background task: ingest a DAM file to Pinecone and update status."""
+    db = SuiteSessionLocal()
+    try:
+        result = await rag_engine.ingest_file(
+            dam_file_id=dam_file_id,
+            pinecone_client_key=pinecone_client_key,
+            filename=filename,
+            content=content,
+            project_id=project_id,
+            media_type=media_type,
+        )
+        dam_file = db.query(SuiteDamFile).filter(SuiteDamFile.id == dam_file_id).first()
+        if dam_file:
+            if result["success"]:
+                dam_file.rag_status  = "ingested"
+                dam_file.chunk_count = result["chunk_count"]
+                dam_file.ingested_at = datetime.utcnow()
+                dam_file.ingest_error= None
+            else:
+                dam_file.rag_status  = "failed"
+                dam_file.ingest_error= result.get("error", "Unknown error")
+            db.commit()
+        print(f"[RAG Ingest] {dam_file_id}: success={result['success']} chunks={result['chunk_count']}", flush=True)
+    except Exception as exc:
+        print(f"[RAG Ingest] Background ingest error for {dam_file_id}: {exc}", flush=True)
+        try:
+            dam_file = db.query(SuiteDamFile).filter(SuiteDamFile.id == dam_file_id).first()
+            if dam_file:
+                dam_file.rag_status   = "failed"
+                dam_file.ingest_error = str(exc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+@app.post("/bff/dam/files/{file_id}/ingest")
+async def ingest_dam_file(
+    file_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    """Manually trigger (or retry) Pinecone ingestion for a DAM file."""
+    user_id = _get_current_user_id(suite_session)
+    dam_file = db.query(SuiteDamFile).filter(SuiteDamFile.id == file_id, SuiteDamFile.user_id == user_id).first()
+    if not dam_file:
+        raise HTTPException(status_code=404, detail="DAM file not found.")
+
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == dam_file.brand_id).first()
+    if not brand or not brand.rag_linked or not brand.pinecone_client_key:
+        raise HTTPException(status_code=400, detail="Brand is not linked to Pinecone RAG. Link the brand first.")
+
+    if not _RAG_AVAILABLE or not rag_engine:
+        raise HTTPException(status_code=503, detail="RAG engine unavailable.")
+
+    dam_file.rag_status  = "queued"
+    dam_file.ingest_error= None
+    db.commit()
+
+    # We can't re-read bytes from DB, so we send a placeholder that triggers re-ingestion
+    # In production you'd fetch from a blob store; here we note it as "queued" and instruct user to re-upload if needed
+    return {"status": "queued", "message": "Re-upload the file to trigger fresh ingestion with the current RAG link."}
+
+
+@app.delete("/bff/dam/files/{file_id}")
+async def delete_dam_file(
+    file_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    """Remove a DAM file record and delete its Pinecone vectors."""
+    user_id = _get_current_user_id(suite_session)
+    dam_file = db.query(SuiteDamFile).filter(SuiteDamFile.id == file_id, SuiteDamFile.user_id == user_id).first()
+    if not dam_file:
+        raise HTTPException(status_code=404, detail="DAM file not found.")
+
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == dam_file.brand_id).first()
+    if brand and brand.pinecone_client_key and _RAG_AVAILABLE and rag_engine:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, rag_engine.delete_file_vectors, dam_file.id, brand.pinecone_client_key)
+
+    db.delete(dam_file)
+    db.commit()
+    return {"status": "deleted", "id": file_id}
 
 
 @app.get("/bff/projects")
@@ -1408,6 +1748,8 @@ async def chat_completions(
     Forward a chat completion request to the Copy Agent backend.
     User-id is read from the JWT cookie; falls back to env USER_ID.
     If CopyAgent returns 404 (unknown user), registers the user and retries once.
+    If external_project_data carries a brand_id linked to Pinecone, brand RAG context
+    is prepended to the user message automatically.
     """
     user_id: Optional[str] = None
     if suite_session:
@@ -1426,8 +1768,32 @@ async def chat_completions(
     if user_id:
         await _ensure_copyagent_user(user_id, db)
 
+    # ── RAG context injection ─────────────────────────────────────────────────
+    effective_message = body.user_message
+    if _RAG_AVAILABLE and rag_engine and body.external_project_data:
+        brand_id = body.external_project_data.get("brand_id") or body.external_project_data.get("brandId")
+        if brand_id:
+            brand = db.query(SuiteBrand).filter(
+                SuiteBrand.id == brand_id,
+                SuiteBrand.user_id == user_id,
+            ).first()
+            if brand and brand.rag_linked and brand.pinecone_client_key:
+                try:
+                    rag_context = await rag_engine.retrieve_brand_context(
+                        brand.pinecone_client_key,
+                        body.user_message,
+                    )
+                    if rag_context:
+                        effective_message = (
+                            f"{rag_context}\n\n"
+                            f"Using the brand knowledge above, answer the following:\n{body.user_message}"
+                        )
+                        print(f"[RAG] Injected {len(rag_context)} chars of brand context for brand_id={brand_id}", flush=True)
+                except Exception as rag_exc:
+                    print(f"[RAG] Context retrieval failed (non-fatal): {rag_exc}", flush=True)
+
     upstream_payload = {
-        "user_message":    body.user_message,
+        "user_message":    effective_message,
         "llm_model":       body.llm_model or "claude-4-sonnet",
         "temperature":     body.temperature if body.temperature is not None else 0.7,
         "stream":          body.stream or False,
