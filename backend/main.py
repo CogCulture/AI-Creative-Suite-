@@ -47,7 +47,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 # SQLAlchemy for local SQLite suite users DB
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text, Integer, event
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text, Integer, event, func, or_
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from passlib.context import CryptContext
 from jose import JWTError, jwt as jose_jwt
@@ -80,7 +80,17 @@ if not SUITE_SECRET_KEY or SUITE_SECRET_KEY == "fallback-insecure-key":
         "and set it in your .env file."
     )
 
-SUITE_DB_URL: str      = os.getenv("SUITE_DB_URL", "sqlite:///./suite.db")
+SUITE_DB_URL: str      = os.getenv("SUITE_DB_URL", "sqlite:////app/data/suite.db")
+
+# Ensure directory exists for persistent SQLite DB
+if "sqlite:////" in SUITE_DB_URL:
+    db_path = SUITE_DB_URL.replace("sqlite:////", "")
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+elif "sqlite:///" in SUITE_DB_URL:
+    db_path = SUITE_DB_URL.replace("sqlite:///", "")
+    if "/" in db_path or "\\" in db_path:
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
 JWT_ALGORITHM          = "HS256"
 JWT_EXPIRE_DAYS        = 7
 OTP_EXPIRE_MINUTES     = 10
@@ -135,18 +145,55 @@ class SuitePendingUser(SuiteBase):
     otp_attempts   = Column(Integer, default=0, nullable=False)
 
 
+class SuiteBrand(SuiteBase):
+    """Brands onboarded by Suite users/agencies — persisted server-side."""
+    __tablename__ = "suite_brands"
+    id               = Column(String(36), primary_key=True)
+    user_id          = Column(String(36), nullable=False, index=True)
+    brand_name       = Column(String(255), nullable=False)
+    website          = Column(String(255), nullable=True)
+    industry         = Column(String(255), nullable=True)
+    product_desc     = Column(Text, nullable=True)
+    audience         = Column(Text, nullable=True)
+    engagement_type  = Column(String(100), nullable=True)
+    timeline         = Column(String(255), nullable=True)
+    scope_of_work    = Column(Text, nullable=True)
+    sow_file_name    = Column(String(255), nullable=True)
+    competitors      = Column(Text, nullable=True)  # JSON string
+    voice            = Column(String(255), nullable=True)
+    archetype        = Column(String(100), nullable=True)
+    usp              = Column(Text, nullable=True)
+    words_to_use     = Column(Text, nullable=True)
+    words_to_avoid   = Column(Text, nullable=True)
+    created_at       = Column(DateTime, default=datetime.utcnow)
+
+
 class SuiteProject(SuiteBase):
-    """Projects created by Suite users — persisted server-side."""
+    """Projects/Campaigns created by Suite users — persisted server-side."""
     __tablename__ = "suite_projects"
-    id             = Column(String(36), primary_key=True)
-    user_id        = Column(String(36), nullable=False, index=True)
-    name           = Column(String(255), nullable=False)
-    brief          = Column(Text, nullable=True)
-    asset_type     = Column(String(255), nullable=True)
-    status         = Column(String(50), default="draft")
+    id              = Column(String(36), primary_key=True)
+    user_id         = Column(String(36), nullable=False, index=True)
+    brand_id        = Column(String(36), nullable=True, index=True)
+    brand_name      = Column(String(255), nullable=True)
+    name            = Column(String(255), nullable=False)
+    brief           = Column(Text, nullable=True)
+    asset_type      = Column(String(255), nullable=True)
+    status          = Column(String(50), default="draft")
     workflow_config = Column(Text, nullable=True)  # JSON string
-    created_at     = Column(DateTime, default=datetime.utcnow)
-    updated_at     = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SuiteProjectInvite(SuiteBase):
+    """Team member invitations/memberships for a campaign project."""
+    __tablename__ = "suite_project_invites"
+    id               = Column(String(36), primary_key=True)
+    project_id       = Column(String(36), nullable=False, index=True)
+    inviter_user_id  = Column(String(36), nullable=False)
+    email            = Column(String(255), nullable=False, index=True)
+    role             = Column(String(50), default="Editor")  # "Editor", "Viewer", "Admin"
+    status           = Column(String(50), default="pending") # "pending", "accepted"
+    created_at       = Column(DateTime, default=datetime.utcnow)
 
 
 # Create tables on first startup
@@ -307,11 +354,63 @@ def _send_otp_email_sync(to_email: str, otp: str, name: str = ""):
         print(f"[Auth] OTP sent to {to_email}")
     except Exception as exc:
         print(f"[Auth] Failed to send OTP to {to_email}: {exc}")
+        print(f"\n==========================================")
+        print(f"  [DEV MODE OTP CODE FOR {to_email}]: {otp}")
+        print(f"==========================================\n")
 
 
 async def _send_otp_email(to_email: str, otp: str, name: str = ""):
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _send_otp_email_sync, to_email, otp, name)
+
+
+def _send_campaign_invite_email_sync(to_email: str, campaign_name: str, brand_name: str, inviter_name: str, role: str):
+    try:
+        app_url = os.getenv("APP_URL", "http://localhost:3000")
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Invitation: Join '{campaign_name}' ({brand_name}) on Creative Suite"
+        msg["From"]    = f"{MAIL_FROM_NAME} <{MAIL_FROM}>"
+        msg["To"]      = to_email
+        html = f"""
+        <div style="font-family:Inter,system-ui,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;background:#ffffff;border:1px solid #eaebf0;border-radius:12px;">
+          <div style="margin-bottom:24px;">
+            <span style="font-family:monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#6d4ae8;background:rgba(109,74,232,0.1);padding:4px 10px;border-radius:20px;font-weight:700;">Creative Suite Collaboration</span>
+          </div>
+          <h2 style="font-size:22px;font-weight:800;color:#16192b;margin:0 0 12px;letter-spacing:-0.02em;">You've been invited to a Campaign</h2>
+          <p style="color:#475467;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Hi there, <b>{inviter_name}</b> has invited you to join the <b>"{campaign_name}"</b> campaign workspace for <b>{brand_name}</b> as an <b>{role}</b>.
+          </p>
+          <div style="background:#f8f9fc;border-radius:8px;padding:20px;margin-bottom:24px;border:1px solid #eaebf0;">
+            <div style="font-size:12px;color:#667085;margin-bottom:4px;">Brand</div>
+            <div style="font-size:15px;font-weight:700;color:#6d4ae8;margin-bottom:12px;">{brand_name}</div>
+            <div style="font-size:12px;color:#667085;margin-bottom:4px;">Campaign Project</div>
+            <div style="font-size:16px;font-weight:700;color:#101828;">{campaign_name}</div>
+            <div style="font-size:12px;color:#6d4ae8;margin-top:6px;font-weight:600;">Role: {role}</div>
+          </div>
+          <div style="text-align:center;margin:32px 0 24px;">
+            <a href="{app_url}/#projects" style="display:inline-block;background:#6d4ae8;color:#ffffff;font-weight:600;padding:12px 28px;border-radius:8px;text-decoration:none;font-size:14px;box-shadow:0 4px 12px rgba(109,74,232,0.25);">Accept & Open Campaign →</a>
+          </div>
+          <p style="color:#888888;font-size:12px;text-align:center;margin:0;">
+            Log in to your Creative Suite account to access and work on this campaign.
+          </p>
+        </div>
+        """
+        msg.attach(MIMEText(html, "html"))
+        if MAIL_USERNAME and MAIL_PASSWORD and MAIL_FROM:
+            with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as server:
+                server.starttls()
+                server.login(MAIL_USERNAME, MAIL_PASSWORD)
+                server.sendmail(MAIL_FROM, to_email, msg.as_string())
+            print(f"[Invite Mail] Successfully sent invite email to {to_email} for campaign '{campaign_name}' ({brand_name})")
+        else:
+            print(f"[Invite Mail DEV MODE] Would send email to {to_email} for campaign '{campaign_name}' ({brand_name})")
+    except Exception as exc:
+        print(f"[Invite Mail Error] Failed to send invite email to {to_email}: {exc}")
+
+
+async def _send_campaign_invite_email(to_email: str, campaign_name: str, brand_name: str, inviter_name: str, role: str):
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _send_campaign_invite_email_sync, to_email, campaign_name, brand_name, inviter_name, role)
 
 
 # ── CopyAgent sync ────────────────────────────────────────────────────────────
@@ -347,6 +446,7 @@ async def _sync_to_copyagent(
     auth_provider: str = "email",
     google_id: Optional[str] = None,
     profile_picture: Optional[str] = None,
+    db: Optional[Session] = None,
 ) -> bool:
     payload = _build_copyagent_user_payload(
         user_id=user_id,
@@ -365,7 +465,16 @@ async def _sync_to_copyagent(
                 headers={"X-Suite-API-Key": SUITE_API_KEY},
             )
         if resp.status_code in {200, 201, 202}:
-            print(f"[Auth] CopyAgent sync OK for {email}: {resp.json().get('status')}", flush=True)
+            resp_json = resp.json()
+            ca_user_id = (resp_json.get("user") or {}).get("id") or resp_json.get("user_id")
+            print(f"[Auth] CopyAgent sync OK for {email} (ca_user_id={ca_user_id})", flush=True)
+            
+            if ca_user_id and db:
+                user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+                if user:
+                    user.copyagent_user_id = ca_user_id
+                    user.copyagent_synced = True
+                    db.commit()
             return True
         print(f"[Auth] CopyAgent sync FAILED ({resp.status_code}) for {email}: {resp.text[:300]}", flush=True)
         return False
@@ -379,7 +488,7 @@ async def _ensure_copyagent_user(user_id: str, db: Session) -> bool:
     user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
     if not user:
         return False
-    if getattr(user, 'copyagent_synced', False):
+    if getattr(user, 'copyagent_synced', False) and getattr(user, 'copyagent_user_id', None):
         return True
     
     print(f"[Auth] Proactively syncing user {user.email} (id={user.id}) to CopyAgent...")
@@ -391,6 +500,7 @@ async def _ensure_copyagent_user(user_id: str, db: Session) -> bool:
         auth_provider=user.auth_provider,
         google_id=user.google_id,
         profile_picture=user.profile_picture,
+        db=db,
     )
     if success:
         user.copyagent_synced = True
@@ -413,6 +523,7 @@ async def _sync_user_forced(user_id: str, db: Session) -> bool:
         auth_provider=user.auth_provider,
         google_id=user.google_id,
         profile_picture=user.profile_picture,
+        db=db,
     )
     if success:
         user.copyagent_synced = True
@@ -784,13 +895,34 @@ async def auth_logout(response: Response):
     return {"status": "logged_out"}
 
 
-# ── Projects API ─────────────────────────────────────────────────────────────
+# ── Brands & Projects API ───────────────────────────────────────────────────
+
+class BrandCreateRequest(BaseModel):
+    brandName: str
+    website: Optional[str] = ""
+    industry: Optional[str] = ""
+    productDesc: Optional[str] = ""
+    audience: Optional[str] = ""
+    engagementType: Optional[str] = ""
+    timeline: Optional[str] = ""
+    scopeOfWork: Optional[str] = ""
+    sowFileName: Optional[str] = None
+    competitors: Optional[list] = []
+    voice: Optional[str] = ""
+    archetype: Optional[str] = ""
+    usp: Optional[str] = ""
+    wordsToUse: Optional[str] = ""
+    wordsToAvoid: Optional[str] = ""
+
 
 class ProjectCreateRequest(BaseModel):
     name: str
     brief: Optional[str] = ""
     asset_type: Optional[str] = "Instagram Ad Image"
+    brand_id: Optional[str] = None
+    brand_name: Optional[str] = None
     workflow_config: Optional[dict] = None
+
 
 class ProjectUpdateRequest(BaseModel):
     name: Optional[str] = None
@@ -799,29 +931,182 @@ class ProjectUpdateRequest(BaseModel):
     status: Optional[str] = None
     workflow_config: Optional[dict] = None
 
+
 def _get_current_user_id(suite_session: Optional[str]) -> Optional[str]:
     if not suite_session:
         return None
     return _decode_jwt(suite_session)
 
-@app.get("/bff/projects")
-async def list_projects(
+
+@app.get("/bff/brands")
+async def list_brands(
     suite_session: Optional[str] = Cookie(None),
     db: Session = Depends(get_suite_db),
 ):
     user_id = _get_current_user_id(suite_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-    projects = db.query(SuiteProject).filter(SuiteProject.user_id == user_id).order_by(SuiteProject.created_at.desc()).all()
+    brands = db.query(SuiteBrand).filter(SuiteBrand.user_id == user_id).order_by(SuiteBrand.created_at.desc()).all()
+    
+    # Deduplicate by brand_name (case-insensitive) keeping the most recent
+    seen_names = set()
+    unique_brands = []
+    for b in brands:
+        name_key = b.brand_name.strip().lower()
+        if name_key not in seen_names:
+            seen_names.add(name_key)
+            unique_brands.append(b)
+            
+    return [
+        {
+            "id": b.id,
+            "brandName": b.brand_name,
+            "website": b.website,
+            "industry": b.industry,
+            "productDesc": b.product_desc,
+            "audience": b.audience,
+            "engagementType": b.engagement_type,
+            "timeline": b.timeline,
+            "scopeOfWork": b.scope_of_work,
+            "sowFileName": b.sow_file_name,
+            "competitors": json.loads(b.competitors) if b.competitors else [],
+            "voice": b.voice,
+            "archetype": b.archetype,
+            "usp": b.usp,
+            "wordsToUse": b.words_to_use,
+            "wordsToAvoid": b.words_to_avoid,
+            "createdAt": b.created_at.isoformat(),
+        }
+        for b in unique_brands
+    ]
+
+
+@app.post("/bff/brands")
+async def create_brand(
+    body: BrandCreateRequest,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    bname = body.brandName.strip()
+
+    # Check if brand with same name already exists for this user
+    existing = db.query(SuiteBrand).filter(
+        SuiteBrand.user_id == user_id,
+        func.lower(SuiteBrand.brand_name) == bname.lower()
+    ).first()
+
+    if existing:
+        existing.website = body.website
+        existing.industry = body.industry
+        existing.product_desc = body.productDesc
+        existing.audience = body.audience
+        existing.engagement_type = body.engagementType
+        existing.timeline = body.timeline
+        existing.scope_of_work = body.scopeOfWork
+        existing.sow_file_name = body.sowFileName
+        existing.competitors = json.dumps(body.competitors) if body.competitors else None
+        existing.voice = body.voice
+        existing.archetype = body.archetype
+        existing.usp = body.usp
+        existing.words_to_use = body.wordsToUse
+        existing.words_to_avoid = body.wordsToAvoid
+        db.commit()
+        db.refresh(existing)
+        return {
+            "id": existing.id,
+            "brandName": existing.brand_name,
+            "industry": existing.industry,
+            "voice": existing.voice,
+            "createdAt": existing.created_at.isoformat(),
+        }
+
+    brand = SuiteBrand(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        brand_name=bname,
+        website=body.website,
+        industry=body.industry,
+        product_desc=body.productDesc,
+        audience=body.audience,
+        engagement_type=body.engagementType,
+        timeline=body.timeline,
+        scope_of_work=body.scopeOfWork,
+        sow_file_name=body.sowFileName,
+        competitors=json.dumps(body.competitors) if body.competitors else None,
+        voice=body.voice,
+        archetype=body.archetype,
+        usp=body.usp,
+        words_to_use=body.wordsToUse,
+        words_to_avoid=body.wordsToAvoid,
+        created_at=datetime.utcnow(),
+    )
+    db.add(brand)
+    db.commit()
+    db.refresh(brand)
+    return {
+        "id": brand.id,
+        "brandName": brand.brand_name,
+        "industry": brand.industry,
+        "voice": brand.voice,
+        "createdAt": brand.created_at.isoformat(),
+    }
+
+
+@app.delete("/bff/brands/{brand_id}")
+async def delete_brand(
+    brand_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    brand = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id, SuiteBrand.user_id == user_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found.")
+    db.delete(brand)
+    db.commit()
+    return {"status": "deleted", "id": brand_id}
+
+
+@app.get("/bff/projects")
+async def list_projects(
+    brand_id: Optional[str] = None,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    user_obj = db.query(SuiteUser).filter(SuiteUser.id == user_id).first() if user_id else None
+    user_email = user_obj.email.lower().strip() if user_obj and user_obj.email else ""
+
+    # Find projects owned BY user OR invited TO user's email
+    invited_p_ids = []
+    if user_email:
+        invites = db.query(SuiteProjectInvite.project_id).filter(
+            func.lower(SuiteProjectInvite.email) == user_email
+        ).all()
+        invited_p_ids = [inv[0] for inv in invites]
+
+    query = db.query(SuiteProject).filter(
+        or_(
+            SuiteProject.user_id == user_id,
+            SuiteProject.id.in_(invited_p_ids)
+        )
+    )
+
+    if brand_id and brand_id != "all":
+        query = query.filter(SuiteProject.brand_id == brand_id)
+
+    projects = query.order_by(SuiteProject.created_at.desc()).all()
     return [
         {
             "id": p.id, "name": p.name, "brief": p.brief,
             "asset_type": p.asset_type, "status": p.status,
+            "brand_id": p.brand_id, "brand_name": p.brand_name,
+            "isOwner": p.user_id == user_id,
             "workflow_config": json.loads(p.workflow_config) if p.workflow_config else None,
             "createdAt": p.created_at.isoformat(), "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
         }
         for p in projects
     ]
+
 
 @app.post("/bff/projects")
 async def create_project(
@@ -830,11 +1115,11 @@ async def create_project(
     db: Session = Depends(get_suite_db),
 ):
     user_id = _get_current_user_id(suite_session)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
     project = SuiteProject(
         id=str(uuid.uuid4()),
         user_id=user_id,
+        brand_id=body.brand_id,
+        brand_name=body.brand_name,
         name=body.name.strip(),
         brief=body.brief,
         asset_type=body.asset_type,
@@ -849,6 +1134,7 @@ async def create_project(
     return {
         "id": project.id, "name": project.name, "brief": project.brief,
         "asset_type": project.asset_type, "status": project.status,
+        "brand_id": project.brand_id, "brand_name": project.brand_name,
         "workflow_config": body.workflow_config,
         "createdAt": project.created_at.isoformat(),
     }
@@ -897,9 +1183,144 @@ async def delete_project(
     return {"status": "deleted"}
 
 
+# ── Team Invites API ─────────────────────────────────────────────────────────
+
+class ProjectInviteRequest(BaseModel):
+    email: str
+    role: Optional[str] = "Editor"  # "Editor", "Viewer", "Admin"
+
+
+@app.get("/bff/projects/{project_id}/members")
+async def list_project_members(
+    project_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    curr_user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first() if user_id else None
+
+    project = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
+    
+    creator_user = None
+    if project:
+        creator_user = db.query(SuiteUser).filter(SuiteUser.id == project.user_id).first()
+    
+    if not creator_user and curr_user:
+        creator_user = curr_user
+
+    creator_name = creator_user.name if (creator_user and creator_user.name) else (creator_user.email if (creator_user and creator_user.email) else "Owner")
+    creator_email = creator_user.email if (creator_user and creator_user.email) else (curr_user.email if (curr_user and curr_user.email) else "user@agency.com")
+
+    invites = db.query(SuiteProjectInvite).filter(SuiteProjectInvite.project_id == project_id).all()
+    
+    members = [
+        {
+            "id": "owner",
+            "email": creator_email,
+            "name": creator_name,
+            "role": "Owner",
+            "status": "active",
+            "isOwner": True,
+        }
+    ] + [
+        {
+            "id": inv.id,
+            "email": inv.email,
+            "name": inv.email.split("@")[0].capitalize(),
+            "role": inv.role,
+            "status": inv.status,
+            "isOwner": False,
+            "createdAt": inv.created_at.isoformat(),
+        }
+        for inv in invites
+    ]
+    return members
+
+
+@app.post("/bff/projects/{project_id}/invites")
+async def invite_project_member(
+    project_id: str,
+    body: ProjectInviteRequest,
+    background_tasks: BackgroundTasks,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    email = body.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+    
+    # Check if already invited
+    existing = db.query(SuiteProjectInvite).filter(
+        SuiteProjectInvite.project_id == project_id,
+        SuiteProjectInvite.email == email,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User is already invited to this campaign.")
+
+    invite = SuiteProjectInvite(
+        id=str(uuid.uuid4()),
+        project_id=project_id,
+        inviter_user_id=user_id,
+        email=email,
+        role=body.role or "Editor",
+        status="pending",
+        created_at=datetime.utcnow(),
+    )
+    db.add(invite)
+    db.commit()
+    db.refresh(invite)
+
+    # Fetch project, brand, and inviter info for email
+    project = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
+    campaign_name = project.name if project else "Campaign Project"
+    brand_name = project.brand_name if (project and project.brand_name) else "Marketing Suite"
+    inviter_user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+    inviter_name = inviter_user.name if (inviter_user and inviter_user.name) else (inviter_user.email if inviter_user else "A team member")
+
+    # Queue invite email sending task
+    background_tasks.add_task(_send_campaign_invite_email, email, campaign_name, brand_name, inviter_name, body.role or "Editor")
+
+    return {
+        "id": invite.id,
+        "email": invite.email,
+        "role": invite.role,
+        "status": invite.status,
+        "createdAt": invite.created_at.isoformat(),
+    }
+
+
+@app.delete("/bff/projects/{project_id}/invites/{invite_id}")
+async def remove_project_invite(
+    project_id: str,
+    invite_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    invite = db.query(SuiteProjectInvite).filter(
+        SuiteProjectInvite.id == invite_id,
+        SuiteProjectInvite.project_id == project_id,
+    ).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invitation not found.")
+    db.delete(invite)
+    db.commit()
+    return {"status": "removed", "id": invite_id}
+
+
 # ── Upstream headers (API key injected server-side) ───────────────────────────
-def _upstream_headers(user_id: Optional[str] = None) -> dict:
+def _upstream_headers(user_id: Optional[str] = None, db: Optional[Session] = None) -> dict:
     effective_user_id = user_id or STATIC_USER_ID
+    if user_id:
+        local_db = db or SuiteSessionLocal()
+        try:
+            user = local_db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+            if user and user.copyagent_user_id:
+                effective_user_id = user.copyagent_user_id
+        finally:
+            if not db:
+                local_db.close()
+
     return {
         "Content-Type":    "application/json",
         "X-Suite-API-Key": SUITE_API_KEY,
@@ -922,14 +1343,14 @@ async def _stream_from_upstream(payload: dict, user_id: Optional[str]) -> AsyncG
                 error_body = await upstream.aread()
                 error_text = error_body.decode("utf-8", errors="replace")
                 if "User specified in X-User-Id does not exist" in error_text:
-                    print(f"[Self-Healing Stream] User {user_id} missing from CopyAgent. Force syncing and retrying...")
+                    print(f"[Self-Healing Stream] User {user_id} missing from CopyAgent. Force syncing and retrying...", flush=True)
                     db_local = SuiteSessionLocal()
                     try:
                         await _sync_user_forced(user_id, db_local)
                     finally:
                         db_local.close()
                     
-                    # Retry the connection once
+                    # Retry the connection once with fresh headers
                     async with client.stream(
                         "POST",
                         COPYAGENT_URL,
@@ -954,7 +1375,7 @@ async def _stream_from_upstream(payload: dict, user_id: Optional[str]) -> AsyncG
                 err_payload = json.dumps({"error": f"Upstream error {upstream.status_code}: {snippet}"})
                 yield f"data: {err_payload}\n\n"
                 return
-            async for line in upstream.aiter_lines():
+            async for line in retry_upstream.aiter_lines() if 'retry_upstream' in locals() else upstream.aiter_lines():
                 if line:
                     yield f"{line}\n\n"
 

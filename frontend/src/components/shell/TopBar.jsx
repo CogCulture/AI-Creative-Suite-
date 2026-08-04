@@ -44,6 +44,10 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
     try {
       localStorage.removeItem("studio-logged-in");
       localStorage.removeItem("studio-user-info");
+      localStorage.removeItem("studio-brands");
+      localStorage.removeItem("studio-brand-context");
+      localStorage.removeItem("studio-brand-brain-active");
+      localStorage.removeItem("studio-projects");
     } catch (_) {}
     fetch("/bff/auth/logout", { method: "POST" }).finally(() => {
       window.location.hash = "home";

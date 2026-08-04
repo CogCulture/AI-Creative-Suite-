@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, X, Zap, Clock, Trash2, ChevronRight, FolderOpen, Sparkles, Brain, CheckCircle, Loader2 } from "lucide-react";
+import { Plus, X, Zap, Clock, Trash2, ChevronRight, FolderOpen, Sparkles, Brain, CheckCircle, Loader2, Building2, Users, UserPlus, Mail, Shield, Trash } from "lucide-react";
 import { FONT, MONO, R } from "../tokens.js";
 import { Card, Btn, Eyebrow, H1 } from "../components/primitives/index.jsx";
 
@@ -14,6 +14,7 @@ const ASSET_TYPES = [
 ];
 
 function timeSince(iso) {
+  if (!iso) return "";
   const ms = Date.now() - new Date(iso).getTime();
   const m = Math.floor(ms / 60000);
   if (m < 1) return "just now";
@@ -29,29 +30,216 @@ const STATUS_COLORS = {
   complete: { bg: "rgba(34, 197, 94, 0.12)",  text: "#22C55E" },
 };
 
+function delay(ms) {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
 export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) {
   const [projects, setProjects] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState("all");
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: "", brief: "", assetType: "Instagram Ad Image" });
+
+  // Team Invite Modal States
+  const [teamModalProject, setTeamModalProject] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("Editor");
+  const [inviteError, setInviteError] = useState("");
+  const [sendingInvite, setSendingInvite] = useState(false);
+
+  const [form, setForm] = useState({
+    name: "",
+    brief: "",
+    brandId: "",
+    assetType: "Instagram Ad Image",
+  });
   const [nameError, setNameError] = useState(false);
   const [briefError, setBriefError] = useState(false);
+  const [brandError, setBrandError] = useState(false);
   const [aiPhase, setAiPhase] = useState(null);
   const [aiResult, setAiResult] = useState(null);
 
-  // Load projects from server on mount
+  // Helper to deduplicate brand list by brandName
+  const deduplicateBrands = (list) => {
+    const seen = new Set();
+    const result = [];
+    for (const b of list) {
+      if (!b || !b.brandName) continue;
+      const key = b.brandName.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(b);
+      }
+    }
+    return result;
+  };
+
+  const fetchBrands = () => {
+    fetch("/bff/brands", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const brandList = Array.isArray(data) ? deduplicateBrands(data) : [];
+        setBrands(brandList);
+        if (brandList.length > 0 && !form.brandId) {
+          setForm((f) => ({ ...f, brandId: brandList[0].id || brandList[0].brandName }));
+        }
+      })
+      .catch(() => {
+        const local = JSON.parse(localStorage.getItem("studio-brands") || "[]");
+        setBrands(deduplicateBrands(local));
+      });
+  };
+
+  // Load brands and projects on mount and listen to brand creation events
   useEffect(() => {
+    fetchBrands();
+
+    const handleBrandCreated = () => fetchBrands();
+    window.addEventListener("studio-brand-created", handleBrandCreated);
+
+    // 2. Fetch Projects for active authenticated user
     fetch("/bff/projects", { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { setProjects(Array.isArray(data) ? data : []); })
-      .catch(() => setProjects([]))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        setProjects(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        const localProjects = JSON.parse(localStorage.getItem("studio-projects") || "[]");
+        setProjects(localProjects);
+      })
       .finally(() => setLoadingProjects(false));
+
+    return () => {
+      window.removeEventListener("studio-brand-created", handleBrandCreated);
+    };
   }, []);
 
+  // Filter projects by selected brand (matches brand_id, brand_name, or legacy unassigned projects)
+  const selectedBrandObj = brands.find((b) => (b.id || b.brandName) === selectedBrandFilter || b.brandName === selectedBrandFilter);
+  const targetFilterName = selectedBrandObj ? selectedBrandObj.brandName.toLowerCase() : selectedBrandFilter.toLowerCase();
+  const targetFilterId = selectedBrandObj ? (selectedBrandObj.id || "").toLowerCase() : selectedBrandFilter.toLowerCase();
+
+  const filteredProjects = selectedBrandFilter === "all"
+    ? projects
+    : projects.filter((p) => {
+        if (!p) return false;
+        const pBrandId = (p.brand_id || p.brandId || "").toLowerCase();
+        const pBrandName = (p.brand_name || p.brandName || "").toLowerCase();
+        
+        // Show legacy unassigned campaigns alongside brand campaigns so no user data is lost
+        if (!pBrandId && !pBrandName) return true;
+
+        return (
+          (targetFilterId && pBrandId === targetFilterId) ||
+          (targetFilterName && pBrandName === targetFilterName) ||
+          pBrandId === selectedBrandFilter.toLowerCase() ||
+          pBrandName === selectedBrandFilter.toLowerCase()
+        );
+      });
+
+  // Open Team Invite Modal & Load Members
+  const openTeamModal = async (e, project) => {
+    e.stopPropagation();
+    setTeamModalProject(project);
+    setInviteEmail("");
+    setInviteError("");
+    setLoadingMembers(true);
+
+    const userInfo = JSON.parse(localStorage.getItem("studio-user-info") || "{}");
+    const activeEmail = userInfo.email || "you@agency.com";
+    const activeName = userInfo.name || activeEmail.split("@")[0];
+
+    try {
+      const res = await fetch(`/bff/projects/${project.id}/members`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        // Replace default fallback emails if returned
+        const resolved = (data || []).map(m => {
+          if (m.isOwner && (m.email === "owner@agency.com" || m.email === "user@agency.com" || m.email === "you@agency.com")) {
+            return { ...m, email: activeEmail, name: activeName };
+          }
+          return m;
+        });
+        setMembers(resolved);
+      } else {
+        setMembers([{ id: "owner", email: activeEmail, name: activeName, role: "Owner", isOwner: true }]);
+      }
+    } catch (_) {
+      setMembers([{ id: "owner", email: activeEmail, name: activeName, role: "Owner", isOwner: true }]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  // Send Team Invite
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim() || !inviteEmail.includes("@")) {
+      setInviteError("Please enter a valid email address.");
+      return;
+    }
+    setSendingInvite(true);
+    setInviteError("");
+
+    try {
+      const res = await fetch(`/bff/projects/${teamModalProject.id}/invites`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      });
+      if (res.ok) {
+        const newInvite = await res.json();
+        setMembers((prev) => [
+          ...prev,
+          {
+            id: newInvite.id,
+            email: newInvite.email,
+            name: newInvite.email.split("@")[0],
+            role: newInvite.role,
+            status: "pending",
+            isOwner: false,
+          },
+        ]);
+        setInviteEmail("");
+        showToast(`Invitation sent to ${newInvite.email} (${newInvite.role})`);
+      } else {
+        const err = await res.json();
+        setInviteError(err.detail || "Failed to send invitation.");
+      }
+    } catch (_) {
+      setInviteError("Network error. Could not send invite.");
+    } finally {
+      setSendingInvite(false);
+    }
+  };
+
+  // Remove / Revoke Team Invite
+  const handleRemoveMember = async (inviteId) => {
+    try {
+      await fetch(`/bff/projects/${teamModalProject.id}/invites/${inviteId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      setMembers((prev) => prev.filter((m) => m.id !== inviteId));
+      showToast("Team invitation revoked");
+    } catch (_) {
+      showToast("Failed to remove member");
+    }
+  };
+
   const handleCreate = async () => {
+    const brandObj = brands.find(b => (b.id || b.brandName) === form.brandId) || brands[0];
+    const targetBrandId = brandObj ? (brandObj.id || brandObj.brandName) : "";
+    const targetBrandName = brandObj ? brandObj.brandName : "";
+
     setNameError(!form.name.trim());
     setBriefError(!form.brief.trim());
-    if (!form.name.trim() || !form.brief.trim()) return;
+    setBrandError(!targetBrandId);
+
+    if (!form.name.trim() || !form.brief.trim() || !targetBrandId) return;
 
     setAiPhase("analyzing");
     setAiResult(null);
@@ -67,13 +255,13 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
           brief: form.brief.trim(),
           asset_type: form.assetType,
           project_name: form.name.trim(),
+          brand_name: targetBrandName,
         }),
       });
       if (res.ok) {
         workflowConfig = await res.json();
         setAiResult(workflowConfig);
         setAiPhase("done");
-        // 800ms so user sees the "✅ Workflow configured!" confirmation before navigating
         await delay(800);
       }
     } catch (err) {
@@ -90,26 +278,36 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
           name: form.name.trim(),
           brief: form.brief.trim(),
           asset_type: form.assetType,
+          brand_id: targetBrandId,
+          brand_name: targetBrandName,
           workflow_config: workflowConfig,
         }),
       });
       if (res.ok) {
         const newProject = await res.json();
-        setProjects(prev => [newProject, ...prev]);
+        setProjects((prev) => [newProject, ...prev]);
+
+        // Save to localStorage as fallback
+        try {
+          const localProjects = JSON.parse(localStorage.getItem("studio-projects") || "[]");
+          localStorage.setItem("studio-projects", JSON.stringify([newProject, ...localProjects]));
+        } catch (_) {}
+
         setShowModal(false);
         setAiPhase(null);
         setAiResult(null);
-        setForm({ name: "", brief: "", assetType: "Instagram Ad Image" });
+        setForm({ name: "", brief: "", brandId: brands[0]?.id || "", assetType: "Instagram Ad Image" });
         setNameError(false);
         setBriefError(false);
-        showToast(`✨ "${newProject.name}" configured by AI — opening canvas...`);
+        setBrandError(false);
+        showToast(`✨ Campaign "${newProject.name}" linked to ${targetBrandName} — opening canvas...`);
         setActiveProject(newProject);
         nav("workflow", newProject);
       } else {
-        throw new Error("Failed to save project");
+        throw new Error("Failed to save campaign project");
       }
     } catch (err) {
-      showToast("Failed to save project. Please try again.");
+      showToast("Failed to save campaign project. Please try again.");
       setAiPhase(null);
     }
   };
@@ -118,10 +316,10 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
     e.stopPropagation();
     try {
       await fetch(`/bff/projects/${id}`, { method: "DELETE", credentials: "include" });
-      setProjects(prev => prev.filter(p => p.id !== id));
-      showToast("Project removed.");
-    } catch {
-      showToast("Failed to delete project.");
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      showToast("Campaign project deleted");
+    } catch (err) {
+      showToast("Failed to delete project");
     }
   };
 
@@ -132,29 +330,64 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "32px 40px 80px", fontFamily: FONT }}>
-
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
         <div>
           <Eyebrow t={t}>Mode 02 · Orchestrated</Eyebrow>
-          <H1 t={t}>Projects</H1>
+          <H1 t={t}>Campaign Projects</H1>
           <p style={{ fontFamily: FONT, fontSize: 13.5, color: t.text2, marginTop: 6, lineHeight: 1.5 }}>
-            Each project holds your campaign brief and runs it through the full multi-agent workflow pipeline.
+            Manage brand campaigns. Select a brand to view linked campaigns, invite team members, or launch multi-agent workflows.
           </p>
         </div>
         <Btn t={t} kind="dark" icon={Plus} onClick={() => setShowModal(true)}>
-          New Project
+          New Campaign
         </Btn>
       </div>
 
-      {/* Project list */}
-      <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Brand Selection Filter Bar */}
+      <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", background: t.surface, border: `1px solid ${t.border}`, padding: "12px 18px", borderRadius: R.md }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Building2 size={16} style={{ color: t.accent }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: t.text, fontFamily: FONT }}>Filter by Brand:</span>
+          <select
+            value={selectedBrandFilter}
+            onChange={(e) => setSelectedBrandFilter(e.target.value)}
+            style={{
+              padding: "7px 12px",
+              borderRadius: R.md,
+              border: `1px solid ${t.borderStrong}`,
+              background: t.surface2,
+              color: t.text,
+              fontFamily: FONT,
+              fontSize: 13,
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value="all">All Brands ({brands.length})</option>
+            {brands.map((b) => (
+              <option key={b.id || b.brandName} value={b.id || b.brandName}>
+                {b.brandName} {b.industry ? `(${b.industry})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {brands.length === 0 && (
+          <span style={{ fontSize: 12, color: t.text3, fontFamily: FONT }}>
+            No brands onboarded yet. Create a brand to link campaigns.
+          </span>
+        )}
+      </div>
+
+      {/* Campaign list */}
+      <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
         {loadingProjects ? (
           <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
             <Loader2 size={24} style={{ color: t.text3, margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
-            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3 }}>Loading projects...</div>
+            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3 }}>Loading campaign projects...</div>
           </Card>
-        ) : projects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
             <div style={{
               width: 64, height: 64, borderRadius: 20, margin: "0 auto 16px",
@@ -164,17 +397,19 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
             }}>
               <FolderOpen size={28} style={{ color: t.text3 }} />
             </div>
-            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: t.text }}>No projects yet</div>
-            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3, marginTop: 6, maxWidth: 340, margin: "6px auto 0" }}>
-              Create your first project to launch a multi-agent campaign workflow — Brief → Copy Agent → Image Engine.
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: t.text }}>No campaigns found</div>
+            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3, marginTop: 6, maxWidth: 360, margin: "6px auto 0" }}>
+              {selectedBrandFilter === "all"
+                ? "Create your first campaign project to launch a multi-agent workflow — Strategy → Copy Agent → Image Engine."
+                : "No campaigns created for this brand yet."}
             </div>
             <Btn t={t} kind="accent" icon={Sparkles} onClick={() => setShowModal(true)}
               style={{ marginTop: 20, display: "inline-flex" }}>
-              Create First Project
+              Create New Campaign
             </Btn>
           </Card>
         ) : (
-          projects.map((p) => {
+          filteredProjects.map((p) => {
             const sc = STATUS_COLORS[p.status] || STATUS_COLORS.draft;
             return (
               <Card key={p.id} t={t} hoverable onClick={() => openProject(p)}
@@ -192,9 +427,19 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: t.text }}>{p.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: t.text }}>{p.name}</span>
+                    {p.brand_name && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, fontFamily: MONO, color: t.accentText,
+                        background: t.accentSoft, border: `1px solid ${t.border}`, padding: "2px 8px", borderRadius: 999
+                      }}>
+                        {p.brand_name}
+                      </span>
+                    )}
+                  </div>
                   <div style={{
-                    fontSize: 12.5, color: t.text2, marginTop: 2,
+                    fontSize: 12.5, color: t.text2, marginTop: 4,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {p.brief}
@@ -203,12 +448,27 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                     <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3, display: "flex", alignItems: "center", gap: 4 }}>
                       <Clock size={10} /> {timeSince(p.createdAt)}
                     </span>
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3 }}>{p.assetType}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3 }}>{p.assetType || p.asset_type}</span>
                   </div>
                 </div>
 
-                {/* Status + Actions */}
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                {/* Team Members Button & Status */}
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+                  <button
+                    onClick={(e) => openTeamModal(e, p)}
+                    title="Invite & manage campaign team members"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "6px 12px", borderRadius: R.md,
+                      border: `1px solid ${t.borderStrong}`, background: t.surface2,
+                      color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                      cursor: "pointer", transition: "all .15s"
+                    }}
+                  >
+                    <UserPlus size={13} style={{ color: t.accent }} />
+                    <span>Invite Team</span>
+                  </button>
+
                   <span style={{
                     fontFamily: MONO, fontSize: 10, padding: "3px 10px", borderRadius: 20, fontWeight: 700,
                     background: sc.bg, color: sc.text,
@@ -218,13 +478,15 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                   <button onClick={(e) => handleDelete(e, p.id)}
                     title="Delete project"
                     style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      color: t.text3, padding: "5px", borderRadius: 6, display: "flex",
-                      transition: "color .15s",
+                      background: "none", border: "none", color: t.text3,
+                      cursor: "pointer", padding: 6, borderRadius: R.md,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "color .15s, background .15s",
                     }}
-                    onMouseEnter={e => e.currentTarget.style.color = "#EF4444"}
-                    onMouseLeave={e => e.currentTarget.style.color = t.text3}>
-                    <Trash2 size={14} />
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = t.text3; e.currentTarget.style.background = "none"; }}
+                  >
+                    <Trash2 size={15} />
                   </button>
                   <ChevronRight size={16} style={{ color: t.text3 }} />
                 </div>
@@ -234,7 +496,158 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
         )}
       </div>
 
-      {/* ── Create Project Modal ─────────────────────────────────── */}
+      {/* ── Team Invites Modal ── */}
+      {teamModalProject && (
+        <div
+          onClick={() => setTeamModalProject(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1100,
+            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 480, background: t.surface, borderRadius: R.xl,
+              border: `1px solid ${t.border}`, boxShadow: t.shadowLg, padding: 28, fontFamily: FONT,
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <Users size={18} style={{ color: t.accent }} />
+                  <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>Campaign Collaborators</span>
+                </div>
+                <div style={{ fontSize: 12, color: t.text3 }}>
+                  Invite team members to work on <b style={{ color: t.text }}>{teamModalProject.name}</b>
+                </div>
+              </div>
+              <button
+                onClick={() => setTeamModalProject(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: t.text3, padding: 4 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Invite Row */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                Invite by Email
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="email"
+                  placeholder="colleague@agency.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendInvite()}
+                  style={{
+                    flex: 1, padding: "9px 12px", borderRadius: R.md,
+                    border: `1px solid ${inviteError ? "#EF4444" : t.borderStrong}`,
+                    background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13, outline: "none",
+                  }}
+                />
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  style={{
+                    padding: "9px 10px", borderRadius: R.md,
+                    border: `1px solid ${t.borderStrong}`, background: t.surface2,
+                    color: t.text, fontFamily: FONT, fontSize: 12, outline: "none", cursor: "pointer",
+                  }}
+                >
+                  <option value="Editor">Editor</option>
+                  <option value="Viewer">Viewer</option>
+                  <option value="Admin">Admin</option>
+                </select>
+                <button
+                  onClick={handleSendInvite}
+                  disabled={sendingInvite}
+                  style={{
+                    padding: "9px 16px", borderRadius: R.md, background: t.accent,
+                    color: "#fff", border: "none", fontFamily: FONT, fontSize: 13, fontWeight: 600,
+                    cursor: sendingInvite ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  {sendingInvite ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Send"}
+                </button>
+              </div>
+              {inviteError && <p style={{ fontSize: 11, color: "#EF4444", margin: "6px 0 0" }}>{inviteError}</p>}
+            </div>
+
+            {/* Members & Invites List */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>
+                Active Members ({members.length})
+              </div>
+
+              {loadingMembers ? (
+                <div style={{ padding: 20, textAlign: "center", fontSize: 12, color: t.text3 }}>Loading team...</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                  {members.map((m) => (
+                    <div
+                      key={m.id || m.email}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "8px 12px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.md,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div
+                          style={{
+                            width: 30, height: 30, borderRadius: "50%",
+                            background: m.isOwner ? t.accent : t.brain,
+                            color: "#fff", display: "grid", placeItems: "center",
+                            fontSize: 11, fontWeight: 700, fontFamily: MONO,
+                          }}
+                        >
+                          {m.email.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+                            {m.name || m.email.split("@")[0]}
+                          </div>
+                          <div style={{ fontSize: 11, color: t.text3, fontFamily: MONO }}>{m.email}</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: 10, fontWeight: 700, fontFamily: MONO,
+                            padding: "2px 8px", borderRadius: 999,
+                            background: m.isOwner ? t.accentSoft : t.surface3,
+                            color: m.isOwner ? t.accentText : t.text2,
+                            border: `1px solid ${t.border}`,
+                          }}
+                        >
+                          {m.role} {m.status === "pending" ? "(Pending)" : ""}
+                        </span>
+
+                        {!m.isOwner && (
+                          <button
+                            onClick={() => handleRemoveMember(m.id)}
+                            title="Remove invitation"
+                            style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", padding: 4 }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Project Modal */}
       {showModal && (
         <div
           onClick={() => { if (!aiPhase) { setShowModal(false); setAiPhase(null); setAiResult(null); } }}
@@ -267,7 +680,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                   <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>New Campaign Project</span>
                 </div>
                 <p style={{ fontSize: 12.5, color: t.text3, margin: 0, paddingLeft: 40 }}>
-                  Opens the multi-agent workflow canvas with your brief pre-loaded.
+                  Link campaign to a brand and launch the multi-agent workflow.
                 </p>
               </div>
               <button
@@ -280,14 +693,40 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
             {/* Form fields */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              
+              {/* Brand Selector */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Project Name <span style={{ color: "#EF4444" }}>*</span>
+                  Select Brand <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <select
+                  value={form.brandId}
+                  onChange={(e) => { setForm((f) => ({ ...f, brandId: e.target.value })); setBrandError(false); }}
+                  style={{
+                    width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                    border: `1px solid ${brandError ? "#EF4444" : t.border}`, background: t.surface2,
+                    color: t.text, fontFamily: FONT, fontSize: 13.5, outline: "none",
+                  }}
+                >
+                  {brands.length === 0 && <option value="">No brands available</option>}
+                  {brands.map((b) => (
+                    <option key={b.id || b.brandName} value={b.id || b.brandName}>
+                      {b.brandName} {b.industry ? `(${b.industry})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {brandError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Brand selection is required.</p>}
+              </div>
+
+              {/* Campaign Name */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                  Campaign Name <span style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <input
                   value={form.name}
                   onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setNameError(false); }}
-                  placeholder="e.g. Spring Drop Campaign"
+                  placeholder="e.g. Q3 Festive Push"
                   autoFocus
                   style={{
                     width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
@@ -296,9 +735,10 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                     transition: "border-color .15s",
                   }}
                 />
-                {nameError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Project name is required.</p>}
+                {nameError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Campaign name is required.</p>}
               </div>
 
+              {/* Campaign Brief */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
                   Campaign Brief <span style={{ color: "#EF4444" }}>*</span>
@@ -306,7 +746,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                 <textarea
                   value={form.brief}
                   onChange={(e) => { setForm((f) => ({ ...f, brief: e.target.value })); setBriefError(false); }}
-                  placeholder="Describe your campaign — product, audience, tone, visual style, goals..."
+                  placeholder="Describe your campaign — product, target audience, key message, visual goals..."
                   rows={4}
                   style={{
                     width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
@@ -318,9 +758,10 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                 {briefError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Brief is required.</p>}
               </div>
 
+              {/* Asset Type */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Target Asset Type
+                  Primary Target Asset Type
                 </label>
                 <select
                   value={form.assetType}
@@ -349,72 +790,69 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                   <div style={{
                     width: 56, height: 56, borderRadius: 16,
                     background: aiPhase === "done"
-                      ? "linear-gradient(135deg, #22C55E, #16A34A)"
-                      : `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
+                      ? "rgba(34,197,94,0.15)"
+                      : `linear-gradient(135deg, ${t.brain}, ${t.accent})`,
                     display: "grid", placeItems: "center",
-                    boxShadow: aiPhase === "done" ? "0 6px 20px rgba(34,197,94,0.4)" : `0 6px 20px ${t.brain}55`,
-                    transition: "all .4s",
+                    boxShadow: aiPhase === "done" ? "0 8px 24px rgba(34,197,94,0.2)" : `0 8px 24px ${t.brain}33`,
                   }}>
-                    {aiPhase === "done"
-                      ? <CheckCircle size={26} color="#fff" />
-                      : <Brain size={26} color="#fff" style={{ animation: "pulse 1.2s ease-in-out infinite" }} />}
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontWeight: 800, fontSize: 15, color: t.text, marginBottom: 5 }}>
-                      {aiPhase === "analyzing" && "🧠 Reading your brief..."}
-                      {aiPhase === "designing" && "⚙️ Designing workflow..."}
-                      {aiPhase === "done" && "✅ Workflow configured!"}
-                    </div>
-                    <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, maxWidth: 280, lineHeight: 1.5 }}>
-                      {aiPhase === "analyzing" && "AI agent is analyzing brand, industry, tone, and visual style from your brief."}
-                      {aiPhase === "designing" && "Configuring agent system prompts, models, temperatures, and Genfy parameters."}
-                      {aiPhase === "done" && aiResult && (
-                        <span style={{ color: t.brain }}>
-                          {aiResult.workflow_name}{aiResult.inferred?.industry ? ` · ${aiResult.inferred.industry}` : ""}
-                        </span>
-                      )}
-                    </div>
-                    {aiPhase === "done" && aiResult?.reasoning && (
-                      <div style={{
-                        marginTop: 10, padding: "8px 12px", borderRadius: R.md,
-                        background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)",
-                        fontSize: 11.5, color: t.text2, lineHeight: 1.5, textAlign: "left",
-                      }}>
-                        {aiResult.reasoning}
-                      </div>
+                    {aiPhase === "done" ? (
+                      <CheckCircle size={28} style={{ color: "#22C55E" }} />
+                    ) : (
+                      <Brain size={28} color="#fff" style={{ animation: "pulse 1.5s ease-in-out infinite" }} />
                     )}
                   </div>
-                  {aiPhase !== "done" && (
-                    <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
-                      {[0, 1, 2].map(i => (
-                        <div key={i} style={{
-                          width: 6, height: 6, borderRadius: 3,
-                          background: t.brain,
-                          opacity: 0.4,
-                          animation: `bounce 1s ease-in-out ${i * 0.15}s infinite`,
-                        }} />
+
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: t.text, marginBottom: 4 }}>
+                      {aiPhase === "analyzing" && "Analyzing Campaign Brief..."}
+                      {aiPhase === "designing" && "Configuring Multi-Agent Workflow..."}
+                      {aiPhase === "done" && "Workflow Configured!"}
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 11.5, color: t.text3 }}>
+                      {aiPhase === "analyzing" && "Extracting brand voice, audience & key message"}
+                      {aiPhase === "designing" && "Setting up Strategy → Copy → Image Agents"}
+                      {aiPhase === "done" && `${aiResult?.recommended_flow?.length || 4} workflow steps initialized`}
+                    </div>
+                  </div>
+
+                  {aiPhase === "done" && aiResult?.recommended_flow && (
+                    <div style={{
+                      display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center",
+                      maxWidth: 380, marginTop: 4,
+                    }}>
+                      {aiResult.recommended_flow.map((step, idx) => (
+                        <span key={idx} style={{
+                          fontFamily: MONO, fontSize: 10, padding: "3px 8px", borderRadius: 4,
+                          background: t.surface2, border: `1px solid ${t.border}`, color: t.text2,
+                        }}>
+                          {idx + 1}. {step.agent || step}
+                        </span>
                       ))}
+                    </div>
+                  )}
+
+                  {aiPhase !== "done" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                      <Loader2 size={14} style={{ color: t.brain, animation: "spin 1s linear infinite" }} />
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: t.brain }}>AI Studio Engine active</span>
                     </div>
                   )}
                 </div>
               )}
+            </div>
 
-              <Btn t={t} kind="accent" icon={aiPhase ? Loader2 : Brain} onClick={handleCreate}
-                disabled={!!aiPhase}
-                style={{ width: "100%", justifyContent: "center", marginTop: 6, position: "relative", zIndex: 5 }}>
-                {aiPhase ? "AI Designing Workflow..." : "🧠 Analyze & Design Workflow →"}
+            {/* Modal actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 18, borderTop: `1px solid ${t.border}` }}>
+              <Btn t={t} kind="ghost" onClick={() => { setShowModal(false); setAiPhase(null); setAiResult(null); }} disabled={!!aiPhase}>
+                Cancel
+              </Btn>
+              <Btn t={t} kind="accent" icon={Sparkles} onClick={handleCreate} disabled={!!aiPhase}>
+                Launch Workflow →
               </Btn>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.85; } }
-        @keyframes bounce { 0%,100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-5px); opacity: 1; } }
-      `}</style>
     </div>
   );
 }
-
-function delay(ms) { return new Promise(r => setTimeout(r, ms)); }

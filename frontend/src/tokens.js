@@ -6,11 +6,12 @@
 
 export const TOKENS = {
   light: {
-    bg: "#F7F6F4",
-    surface: "#FFFFFF",
-    surface2: "#F1EFEC",
-    surface3: "#E9E6E1",
-    border: "#E3E0DA",
+    bg: "#FFFFFF",
+    surface: "#F7F6F4",
+    surface2: "#EEECEA",
+    surface3: "#E3E0DA",
+    border: "#D8D4CE",
+
     borderStrong: "#CFCAC2",
     text: "#211E1A",
     text2: "#5C574F",

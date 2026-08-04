@@ -74,6 +74,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
     try {
       const res = await fetch("/bff/auth/google", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: response.credential }),
       });
@@ -146,6 +147,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
         const fullName = `${firstName.trim()} ${lastName.trim()}`;
         const res = await fetch("/bff/auth/signup", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name: fullName }),
         });
@@ -157,6 +159,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
       } else {
         const res = await fetch("/bff/auth/login", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
@@ -187,6 +190,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
     try {
       const res = await fetch("/bff/auth/verify-otp", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp }),
       });
@@ -209,6 +213,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
     try {
       const res = await fetch("/bff/auth/resend-otp", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });

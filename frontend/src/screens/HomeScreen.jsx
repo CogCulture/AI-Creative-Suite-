@@ -6,7 +6,7 @@ import { Card, Chip, Steps, SectionH, Eyebrow, H1, Sub, Mono } from "../componen
 export default function HomeScreen({ t, nav, showToast }) {
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "32px 40px 80px", fontFamily: FONT }}>
-      <Eyebrow t={t}>OFFGRID workspace</Eyebrow>
+
       <H1 t={t}>Two ways to work.</H1>
       <Sub t={t}>
         Open a single tool for a quick task, or chain tools into a workflow where each step's
@@ -83,26 +83,7 @@ export default function HomeScreen({ t, nav, showToast }) {
         </div>
       </div>
 
-      {/* Active projects */}
-      <SectionH t={t} title="Active projects" link="View all →" onLink={() => nav("projects")} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 14 }}>
-        {PROJECTS.map((p) => (
-          <Card key={p.name} t={t} hoverable onClick={() => nav(p.view || "projects")} style={{ padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <div>
-                <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14.5, color: t.text }}>{p.name}</div>
-                <div style={{ fontFamily: MONO, fontSize: 10, color: t.text3, marginTop: 1 }}>workflow</div>
-              </div>
-              <Chip t={t} dot hue={p.tagHue}>{p.tag.split(" — ")[0]}</Chip>
-            </div>
-            <Steps t={t} steps={p.steps} done={p.done} active={p.active} />
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
-              <Mono t={t}>{p.meta.split(" · ").slice(-1)}</Mono>
-              <span style={{ fontFamily: MONO, fontSize: 10, color: t.text2 }}>{p.done}/{p.steps.length} approved</span>
-            </div>
-          </Card>
-        ))}
-      </div>
+
     </div>
   );
 }
