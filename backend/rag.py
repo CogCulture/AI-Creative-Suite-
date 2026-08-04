@@ -30,7 +30,7 @@ PINECONE_INDEX_NAME  = os.getenv("PINECONE_INDEX_NAME", "cograg")
 PINECONE_NAMESPACE   = os.getenv("PINECONE_NAMESPACE", "__default__")
 GEMINI_API_KEY       = os.getenv("GOOGLE_GEMINI_API_KEY", "")
 EMBEDDING_MODEL      = "models/text-embedding-004"
-EMBEDDING_DIM        = 1536   # text-embedding-004 default; verify matches your index
+EMBEDDING_DIM        = 768    # text-embedding-004 dimension matching cograg index
 CHUNK_TARGET_TOKENS  = 600
 CHUNK_OVERLAP_RATIO  = 0.15
 RETRIEVAL_TOP_K      = 8
@@ -207,32 +207,40 @@ class RAGEngine:
     # ── Known Clients ─────────────────────────────────────────────────────────
     def get_known_clients(self) -> List[str]:
         """
-        Fetch distinct `client` metadata values from Pinecone.
-        Pinecone has no native distinct-values API, so we sample vectors and
-        collect unique client values. Cache results for 10 minutes in-process.
+        Fetch distinct `client` metadata values from Pinecone by iterating
+        over indexed vector IDs and fetching metadata in batches.
         """
         if not self._ensure_index():
             return []
         try:
-            # Query with a zero vector to get a broad sample of metadata
-            # We use list_paginated (v3+) to page through IDs if available
             clients = set()
-            # Strategy: query with generic vector to collect metadata samples
-            dummy = [0.0] * EMBEDDING_DIM
-            resp = self._index.query(
-                vector=dummy,
-                top_k=50,
-                include_metadata=True,
-                namespace=PINECONE_NAMESPACE,
-            )
-            for match in resp.get("matches", []):
-                c = (match.get("metadata") or {}).get("client", "")
-                if c:
-                    clients.add(c)
-            return sorted(clients)
+            # Fetch sample pages of IDs from index
+            raw_pages = list(self._index.list())
+            vector_ids = []
+            for page in raw_pages:
+                for item in page:
+                    item_id = item.id if hasattr(item, "id") else str(item)
+                    vector_ids.append(item_id)
+                if len(vector_ids) >= 1000:
+                    break
+
+            # Fetch metadata in batches of 50
+            batch_size = 50
+            for i in range(0, min(len(vector_ids), 1000), batch_size):
+                batch_ids = vector_ids[i : i + batch_size]
+                try:
+                    fetched = self._index.fetch(ids=batch_ids, namespace=PINECONE_NAMESPACE)
+                    for vec in fetched.vectors.values():
+                        if vec.metadata and vec.metadata.get("client"):
+                            clients.add(vec.metadata["client"].strip())
+                except Exception as b_err:
+                    log.warning(f"[RAG] Batch fetch error: {b_err}")
+
+            return sorted([c for c in clients if c])
         except Exception as exc:
             log.error(f"[RAG] get_known_clients error: {exc}")
             return []
+
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
     async def retrieve_brand_context(

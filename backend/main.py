@@ -981,6 +981,40 @@ async def list_brands(
     user_id = _get_current_user_id(suite_session)
     brands = db.query(SuiteBrand).filter(SuiteBrand.user_id == user_id).order_by(SuiteBrand.created_at.desc()).all()
     
+    # ── Auto-sync Pinecone RAG clients into brands list for this user ─────────────
+    existing_keys_and_names = set()
+    for b in brands:
+        if b.pinecone_client_key:
+            existing_keys_and_names.add(b.pinecone_client_key.strip().lower())
+        if b.brand_name:
+            existing_keys_and_names.add(b.brand_name.strip().lower())
+
+    if _RAG_AVAILABLE and rag_engine and user_id:
+        try:
+            known_clients = await asyncio.get_event_loop().run_in_executor(None, rag_engine.get_known_clients)
+            added_any = False
+            for client_key in known_clients:
+                clean_key = client_key.strip()
+                if clean_key.lower() not in existing_keys_and_names:
+                    # Auto-create Brand entry linked to this Pinecone client
+                    new_brand = SuiteBrand(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        brand_name=clean_key,
+                        pinecone_client_key=clean_key,
+                        rag_linked=True,
+                        rag_linked_at=datetime.utcnow(),
+                        created_at=datetime.utcnow(),
+                    )
+                    db.add(new_brand)
+                    existing_keys_and_names.add(clean_key.lower())
+                    added_any = True
+            if added_any:
+                db.commit()
+                brands = db.query(SuiteBrand).filter(SuiteBrand.user_id == user_id).order_by(SuiteBrand.created_at.desc()).all()
+        except Exception as rag_err:
+            print(f"[RAG Auto-sync Brands Error]: {rag_err}", flush=True)
+
     # Deduplicate by brand_name (case-insensitive) keeping the most recent
     seen_names = set()
     unique_brands = []
