@@ -234,6 +234,26 @@ class SuiteDamFile(SuiteBase):
 # Create tables on first startup
 SuiteBase.metadata.create_all(suite_engine)
 
+# Migration helper for SQLite existing databases
+def _ensure_sqlite_columns():
+    try:
+        with suite_engine.connect() as conn:
+            from sqlalchemy import inspect, text
+            inspector = inspect(suite_engine)
+            cols = [c["name"] for c in inspector.get_columns("suite_brands")]
+            if "pinecone_client_key" not in cols:
+                conn.execute(text("ALTER TABLE suite_brands ADD COLUMN pinecone_client_key VARCHAR(255)"))
+            if "rag_linked" not in cols:
+                conn.execute(text("ALTER TABLE suite_brands ADD COLUMN rag_linked BOOLEAN DEFAULT 0"))
+            if "rag_linked_at" not in cols:
+                conn.execute(text("ALTER TABLE suite_brands ADD COLUMN rag_linked_at DATETIME"))
+            conn.commit()
+    except Exception as _e:
+        print(f"[DB Migration Note]: {_e}", flush=True)
+
+_ensure_sqlite_columns()
+
+
 ADMIN_USER_ID    = "admin-user-id-0001"
 ADMIN_USER_EMAIL = "admin@creative.suite"
 

@@ -29,8 +29,8 @@ PINECONE_API_KEY     = os.getenv("PINECONE_API_KEY", "")
 PINECONE_INDEX_NAME  = os.getenv("PINECONE_INDEX_NAME", "cograg")
 PINECONE_NAMESPACE   = os.getenv("PINECONE_NAMESPACE", "__default__")
 GEMINI_API_KEY       = os.getenv("GOOGLE_GEMINI_API_KEY", "")
-EMBEDDING_MODEL      = "models/text-embedding-004"
-EMBEDDING_DIM        = 768    # text-embedding-004 dimension matching cograg index
+EMBEDDING_MODEL      = "intfloat/e5-base-v2"
+EMBEDDING_DIM        = 768    # intfloat/e5-base-v2 dimension matching cograg index
 CHUNK_TARGET_TOKENS  = 600
 CHUNK_OVERLAP_RATIO  = 0.15
 RETRIEVAL_TOP_K      = 8
@@ -158,50 +158,52 @@ class RAGEngine:
             log.error(f"[RAG] Failed to connect to Pinecone: {exc}")
             return False
 
-    # ── Embedding ─────────────────────────────────────────────────────────────
+    # ── Embedding (intfloat/e5-base-v2) ───────────────────────────────────────
+    def _get_model(self):
+        if not hasattr(self, "_e5_model") or self._e5_model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+                log.info("[RAG] Loading intfloat/e5-base-v2 embedding model...")
+                self._e5_model = SentenceTransformer("intfloat/e5-base-v2")
+            except Exception as exc:
+                log.error(f"[RAG] Failed to load intfloat/e5-base-v2: {exc}")
+                self._e5_model = None
+        return self._e5_model
+
     async def _embed(self, text: str) -> Optional[List[float]]:
-        """Embed text using Google text-embedding-004 via genai SDK."""
+        """Embed search query using intfloat/e5-base-v2 with 'query: ' prefix."""
         try:
-            import google.generativeai as genai
-            api_key = GEMINI_API_KEY or os.getenv("GOOGLE_API_KEY", "")
-            if not api_key:
-                log.warning("[RAG] No Google API key — cannot embed.")
+            model = self._get_model()
+            if not model:
                 return None
-            genai.configure(api_key=api_key)
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
+            # E5 models require 'query: ' prefix for asymmetric retrieval queries
+            formatted_text = f"query: {text.strip()}"
+            embedding = await loop.run_in_executor(
                 None,
-                lambda: genai.embed_content(
-                    model=EMBEDDING_MODEL,
-                    content=text,
-                    task_type="retrieval_query",
-                )
+                lambda: model.encode(formatted_text, normalize_embeddings=True).tolist()
             )
-            return result["embedding"]
+            return embedding
         except Exception as exc:
-            log.error(f"[RAG] Embedding error: {exc}")
+            log.error(f"[RAG] E5 Query Embedding error: {exc}")
             return None
 
     async def _embed_document(self, text: str) -> Optional[List[float]]:
-        """Embed a document chunk (different task_type for better accuracy)."""
+        """Embed a document chunk using intfloat/e5-base-v2 with 'passage: ' prefix."""
         try:
-            import google.generativeai as genai
-            api_key = GEMINI_API_KEY or os.getenv("GOOGLE_API_KEY", "")
-            if not api_key:
+            model = self._get_model()
+            if not model:
                 return None
-            genai.configure(api_key=api_key)
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
+            # E5 models require 'passage: ' prefix for document passages
+            formatted_text = f"passage: {text.strip()}"
+            embedding = await loop.run_in_executor(
                 None,
-                lambda: genai.embed_content(
-                    model=EMBEDDING_MODEL,
-                    content=text,
-                    task_type="retrieval_document",
-                )
+                lambda: model.encode(formatted_text, normalize_embeddings=True).tolist()
             )
-            return result["embedding"]
+            return embedding
         except Exception as exc:
-            log.error(f"[RAG] Document embedding error: {exc}")
+            log.error(f"[RAG] E5 Document Embedding error: {exc}")
             return None
 
     # ── Known Clients ─────────────────────────────────────────────────────────
