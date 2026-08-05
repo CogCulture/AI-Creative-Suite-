@@ -25,6 +25,12 @@ export default function LoginSignup({ onLogin, onNavigate }) {
     try {
       return text ? JSON.parse(text) : {};
     } catch {
+      if (text && text.includes("<html")) {
+        if (res.status === 502) {
+          throw new Error("Backend server is restarting. Please try again in 5 seconds.");
+        }
+        throw new Error(`Server returned error status ${res.status}.`);
+      }
       throw new Error(text || `Request failed (${res.status}).`);
     }
   };
