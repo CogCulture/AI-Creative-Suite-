@@ -52,6 +52,9 @@ export default function App() {
         if (res.ok) {
           return res.json().then((user) => {
             try { localStorage.setItem("studio-user-info", JSON.stringify(user)); } catch (_) {}
+            if (window.location.hash === "#login" || window.location.hash === "#signup") {
+              window.history.replaceState(null, "", window.location.pathname);
+            }
             setIsLoggedIn(true);
           });
         }
