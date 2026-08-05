@@ -1022,7 +1022,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         const r = await fetch("/bff/workflow/step-bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bridge_type: "copy_to_genfy", brief: brandPrefix + brief, copy_output: copyData.bodyText, asset_type: configs.brief.assetType }),
+          body: JSON.stringify({
+            bridge_type: "copy_to_genfy",
+            brief: brandPrefix + brief,
+            copy_output: copyData.bodyText,
+            asset_type: configs.brief.assetType,
+            brand_id: activeProject?.brand_id || activeProject?.brandId || null,
+          }),
         });
         artDirData = await r.json();
         log(`Art Director: image prompt ready — "${artDirData.image_prompt?.slice(0, 50)}..."`, "success");

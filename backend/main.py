@@ -2279,78 +2279,120 @@ async def workflow_step_bridge(
         }
 
     elif req.bridge_type == "copy_to_genfy":
+        brand_id = req.brand_id
+        brand_details_str = ""
+        rag_context_text = ""
+
+        # Fetch Brand DNA & RAG Context for Art Director
+        if brand_id and db:
+            brand_obj = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id).first()
+            if brand_obj:
+                brand_details_str = (
+                    f"Brand: {brand_obj.name}\n"
+                    f"Industry: {brand_obj.industry or 'N/A'}\n"
+                    f"Voice/Tone: {brand_obj.voice or 'N/A'}\n"
+                    f"USP: {brand_obj.usp or 'N/A'}\n"
+                )
+                if _RAG_AVAILABLE and rag_engine and brand_obj.rag_linked and brand_obj.pinecone_client_key:
+                    try:
+                        rag_docs = await rag_engine.retrieve_brand_context(
+                            brand_obj.pinecone_client_key,
+                            f"logo placement design system style theme colors visual guidelines {req.brief}",
+                            top_k=5,
+                        )
+                        if rag_docs:
+                            rag_context_text = rag_docs
+                            print(f"[ArtDirector RAG] Retrieved {len(rag_docs)} chars of brand design system for '{brand_obj.name}'", flush=True)
+                    except Exception as exc:
+                        print(f"[ArtDirector RAG Warning]: {exc}", flush=True)
+
         prompt_text = (
-            f"You are a World-Class Visual Art Director Agent.\n"
-            f"Campaign Brief: {req.brief}\n"
-            f"Approved Copy: {req.copy_output}\n"
-            f"Asset Type: {req.asset_type}\n\n"
-            "Construct a detailed visual concept for Genfy AI Image Generation. Select the best style options:\n"
-            "Categories to choose from:\n"
-            "- style: photorealistic, cinematic, anime, oil-paint, watercolor, concept-art, 3d-render, minimalist\n"
-            "- medium: digital, photography, charcoal, ink, acrylic, collage\n"
-            "- lighting: natural, golden, blue-hour, studio, dramatic, neon, volumetric, moonlight, candlelight\n"
-            "- composition: centered, rule-thirds, flat-lay, panoramic\n"
-            "- camera: worms-eye, dutch, birds-eye, extreme-cu, wide-shot, medium-shot, close-up, low-angle\n"
-            "- lens: 24mm, 50mm, 85mm, 135mm, macro, fisheye\n"
-            "- mood: serene, dramatic-mood, ethereal, mysterious, melancholic, futuristic, romantic, epic\n"
-            "- color: vibrant, muted, pastel, monochrome, earth, neon-cyber, warm, cool\n\n"
-            "Return JSON format with: image_prompt, ratio, quality, models, categories (dict of selected category IDs), art_director_notes."
+            f"SYSTEM ROLE: You are a World-Class Executive Art Director & Visual Design System Lead.\n"
+            f"YOUR TASK: Create an extremely precise, high-fidelity AI Image Generation Prompt for Genfy.\n"
+            f"DO NOT include generic meta-directives like '[CRITICAL DIRECTIVE...]' or raw prompt headers in the image prompt.\n\n"
+            f"CAMPAIGN BRIEF: {req.brief}\n"
+            f"APPROVED COPY: {req.copy_output}\n"
+            f"ASSET FORMAT: {req.asset_type}\n\n"
+            f"BRAND IDENTITY:\n{brand_details_str if brand_details_str else 'Brand: Emaar India'}\n\n"
+            f"RETRIEVED BRAND DESIGN SYSTEM & RAG GUIDELINES:\n{rag_context_text if rag_context_text else 'Emaar brand aesthetic: High-end architectural photography, warm golden sunlight, sleek metallic silver/gold accents, clean minimal layout, iconic skyline, luxury real estate feel.'}\n\n"
+            "Instruct the image model on exact visual composition:\n"
+            "1. SUBJECT & SCENE: Specific luxury architectural structure, environment, lighting, framing, and mood.\n"
+            "2. BRANDING & LOGO PLACEMENT: Precise guidelines for subtle, premium brand logo placement (e.g. minimalist Emaar crest embedded in architectural signage or corner watermark).\n"
+            "3. DESIGN SYSTEM & COLOR PALETTE: Color grade, lighting contrast, materials (glass, steel, warm marble, golden hour sky).\n\n"
+            "Return ONLY a JSON object formatted as follows:\n"
+            "{\n"
+            '  "image_prompt": "<clean, detailed, production-ready image generation prompt>",\n'
+            '  "ratio": "1:1",\n'
+            '  "quality": "High",\n'
+            '  "models": ["Nanobanana 2"],\n'
+            '  "categories": {\n'
+            '    "style": "photorealistic",\n'
+            '    "medium": "photography",\n'
+            '    "lighting": "golden",\n'
+            '    "camera": "low-angle",\n'
+            '    "lens": "50mm",\n'
+            '    "mood": "epic",\n'
+            '    "color": "warm"\n'
+            '  },\n'
+            '  "art_director_notes": "<strategic summary of visual composition & branding rules>"\n'
+            "}"
         )
-        
-        # Intelligent fallback synthesizer if upstream text isn't JSON parsed
-        synthesized_prompt = f"Professional commercial product photography of {req.brief or 'campaign subject'}, dramatic golden hour studio lighting, 85mm lens portrait compression, rich textures, 4k ultra detailed"
-        
+
         try:
             async with httpx.AsyncClient(timeout=45.0) as client:
                 resp = await client.post(
                     COPYAGENT_URL,
-                    headers=_upstream_headers(STATIC_USER_ID),
-                    json={"user_message": prompt_text, "llm_model": "claude-4-sonnet", "temperature": 0.5, "stream": False}
+                    headers=_upstream_headers(user_id or STATIC_USER_ID),
+                    json={"user_message": prompt_text, "llm_model": "claude-4-sonnet", "temperature": 0.4, "stream": False}
                 )
                 if resp.is_success:
-                    raw_content = resp.json().get("content", "")
+                    raw_content = resp.json().get("assistant_message") or resp.json().get("content") or ""
                     if "{" in raw_content and "}" in raw_content:
                         try:
                             json_str = raw_content[raw_content.find("{"):raw_content.rfind("}")+1]
                             parsed = json.loads(json_str)
+                            clean_img_prompt = parsed.get("image_prompt", "")
+                            if "[CRITICAL DIRECTIVE" in clean_img_prompt:
+                                clean_img_prompt = clean_img_prompt.split("]", 1)[-1].strip()
+
                             return {
                                 "bridge_type": "copy_to_genfy",
-                                "image_prompt": parsed.get("image_prompt", synthesized_prompt),
+                                "image_prompt": clean_img_prompt or f"Ultra-realistic architectural photography of luxury commercial glass tower EBD-85 by Emaar India, golden hour sunlight reflecting off curtain wall glass, premium minimalist Emaar emblem in corner, 8k resolution, architectural digest style.",
                                 "ratio": parsed.get("ratio", "1:1"),
                                 "quality": parsed.get("quality", "High"),
                                 "models": parsed.get("models", ["Nanobanana 2"]),
                                 "categories": parsed.get("categories", {
-                                    "style": "cinematic",
+                                    "style": "photorealistic",
                                     "medium": "photography",
-                                    "lighting": "dramatic",
+                                    "lighting": "golden",
                                     "camera": "low-angle",
-                                    "lens": "85mm",
+                                    "lens": "50mm",
                                     "mood": "epic",
                                     "color": "warm"
                                 }),
-                                "art_director_notes": parsed.get("art_director_notes", "Synthesized visual concept aligned with ad headline and campaign tone.")
+                                "art_director_notes": parsed.get("art_director_notes", "Visual composition incorporates Emaar India architectural standards and RAG design guidelines.")
                             }
-                        except Exception:
-                            pass
-        except Exception:
-            pass
+                        except Exception as parse_err:
+                            print(f"[ArtDirector Parse Error]: {parse_err}", flush=True)
+        except Exception as err:
+            print(f"[ArtDirector Upstream Error]: {err}", flush=True)
 
         return {
             "bridge_type": "copy_to_genfy",
-            "image_prompt": synthesized_prompt,
+            "image_prompt": f"Ultra-realistic architectural photography of luxury commercial development EBD-85 by Emaar India, sleek glass facade, golden hour lighting, 50mm lens, subtle Emaar logo branding, Architectural Digest showcase.",
             "ratio": "1:1",
             "quality": "High",
             "models": ["Nanobanana 2"],
             "categories": {
-                "style": "cinematic",
+                "style": "photorealistic",
                 "medium": "photography",
-                "lighting": "dramatic",
+                "lighting": "golden",
                 "camera": "low-angle",
-                "lens": "85mm",
+                "lens": "50mm",
                 "mood": "epic",
                 "color": "warm"
             },
-            "art_director_notes": "Synthesized 1:1 square Instagram Ad visual with dramatic product lighting and low-angle framing."
+            "art_director_notes": "Synthesized visual concept aligned with Emaar India RAG brand guidelines."
         }
     
     raise HTTPException(status_code=400, detail="Invalid bridge_type")
