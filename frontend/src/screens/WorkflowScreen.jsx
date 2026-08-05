@@ -690,15 +690,18 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     const brief = configs.brief.brief?.trim();
     if (!brief) { showToast("Please enter a campaign brief first."); setSelectedNodeId("brief"); return; }
 
-    // Read brand context from localStorage if available
+    // Read brand context from active project or localStorage
     let brandContext = null;
     try {
       const raw = localStorage.getItem("studio-brand-context");
       if (raw) brandContext = JSON.parse(raw);
     } catch (_) {}
 
-    const brandPrefix = brandContext
-      ? `BRAND CONTEXT:\nBrand: ${brandContext.brandName || ""}\nIndustry: ${brandContext.industry || ""}\nAudience: ${brandContext.audience || ""}\nVoice/Tone: ${brandContext.primaryTone || ""}\nArchetype: ${brandContext.archetype || ""}\nUSP: ${brandContext.usp || ""}\nWords to use: ${brandContext.wordsToUse || ""}\nWords to avoid: ${brandContext.wordsToAvoid || ""}\n\nCAMPAIGN BRIEF:\n`
+    const projectBrandName = activeProject?.brand_name || activeProject?.brandName || brandContext?.brandName || "";
+
+    const brandPrefix = (brandContext || projectBrandName)
+      ? `[CRITICAL DIRECTIVE: You MUST explicitly feature and mention the Brand Name ("${projectBrandName || "Emaar India"}") throughout the social media copy alongside the campaign product name.]\n\n` +
+        `BRAND CONTEXT:\nBrand Name: ${projectBrandName || "Emaar India"}\nIndustry: ${brandContext?.industry || "Real Estate"}\nAudience: ${brandContext?.audience || ""}\nVoice/Tone: ${brandContext?.primaryTone || ""}\nArchetype: ${brandContext?.archetype || ""}\nUSP: ${brandContext?.usp || ""}\nWords to use: ${brandContext?.wordsToUse || ""}\nWords to avoid: ${brandContext?.wordsToAvoid || ""}\n\nCAMPAIGN BRIEF:\n`
       : "";
 
     setIsRunning(true);
