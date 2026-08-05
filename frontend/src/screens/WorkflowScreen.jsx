@@ -213,7 +213,11 @@ function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
     if (!aiPrompt.trim() || isTweaking) return;
     setIsTweaking(true);
     try {
-      const promptToAgent = `ORIGINAL OUTPUT:\n${output.bodyText || output.image_prompt || JSON.stringify(output)}\n\nUSER TWEAK REQUEST:\n${aiPrompt}\n\nPlease rewrite the text directly incorporating the user tweak request. Return ONLY the refined copy content directly without markdown codeblocks or raw JSON wrappers.`;
+      const currentContent = typeof output.bodyText === "string"
+        ? cleanRawJson(output.bodyText)
+        : output.image_prompt || JSON.stringify(output);
+
+      const promptToAgent = `ORIGINAL COPY:\n${currentContent}\n\nUSER TWEAK REQUEST:\n${aiPrompt}\n\n[DIRECTIVE: Write natural, compelling advertising copy for social media. DO NOT output JSON syntax, keys, or curly braces. Output clean, human-readable copy paragraphs directly.]`;
       const r = await fetch("/bff/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -221,31 +225,19 @@ function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
       });
       const raw = await r.json();
       let text = raw.assistant_message || raw.content || raw.text || "";
-      text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-
-      // Try parsing if model returned JSON structure
-      let parsed = null;
-      try { parsed = JSON.parse(text); } catch (_) {}
+      text = cleanRawJson(text);
 
       if (node.id === "copy") {
-        if (parsed && (parsed.bodyText || parsed.headline)) {
-          onUpdateOutput(node.id, {
-            ...output,
-            headline: parsed.headline || extractHeadline(parsed.bodyText || text, "Copy"),
-            bodyText: parsed.bodyText || text,
-            cta: parsed.cta || output.cta || "Shop Now",
-          });
-        } else {
-          onUpdateOutput(node.id, {
-            ...output,
-            headline: extractHeadline(text, "Copy"),
-            bodyText: text,
-          });
-        }
+        onUpdateOutput(node.id, {
+          ...output,
+          headline: extractHeadline(text, "Copy"),
+          bodyText: text,
+          cta: output.cta || "Shop Now",
+        });
       } else if (node.id === "agent_artdir") {
-        onUpdateOutput(node.id, { ...output, image_prompt: parsed?.image_prompt || text });
+        onUpdateOutput(node.id, { ...output, image_prompt: text });
       } else if (node.id === "agent_strategy") {
-        onUpdateOutput(node.id, { ...output, target_audience: parsed?.target_audience || output.target_audience, copy_specs: text });
+        onUpdateOutput(node.id, { ...output, copy_specs: text });
       }
       setAiPrompt("");
     } catch (e) {
@@ -975,10 +967,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           (raw.choices && raw.choices[0]?.message?.content) ||
           (raw.choices && raw.choices[0]?.text);
 
-        if (!generatedText) {
-          throw new Error("No text content returned from CopyAgent API");
-        }
-        copyData = { headline: extractHeadline(generatedText, configs.brief.assetType), bodyText: generatedText, cta: "Shop Now" };
+        const cleanText = cleanRawJson(generatedText);
+        copyData = { headline: extractHeadline(cleanText, configs.brief.assetType), bodyText: cleanText, cta: "Shop Now" };
         log("Copy Agent: unique copy generated successfully", "success");
       } catch (err) {
         console.warn("[Workflow CopyAgent Error]:", err);
@@ -1512,10 +1502,27 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-function extractHeadline(text, assetType) {
+function cleanRawJson(text) {
+  if (!text || typeof text !== "string") return "";
+  let str = text.trim();
+  str = str.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+  if (str.startsWith("{") && str.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(str);
+      if (parsed.bodyText) return parsed.bodyText;
+      if (parsed.headline && parsed.bodyText) return `${parsed.headline}\n\n${parsed.bodyText}`;
+      if (parsed.content) return parsed.content;
+    } catch (_) {}
+  }
+  return str;
+}
+
+function extractHeadline(rawText, assetType) {
+  const text = cleanRawJson(rawText);
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
   for (const l of lines) {
-    if (l.length > 10 && l.length < 80 && !l.startsWith("-") && !l.startsWith("*")) return l;
+    if (l.length > 10 && l.length < 80 && !l.startsWith("-") && !l.startsWith("*") && !l.startsWith("{") && !l.includes('":')) return l;
   }
   return `${assetType} Campaign`;
 }
