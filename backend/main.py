@@ -2101,17 +2101,63 @@ async def genfy_debug():
 @app.api_route("/bff/genfy/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_genfy(path: str, request: Request):
     global GENFY_TOKEN, GENFY_TOKEN_FETCHED_AT
+
+    # Handle image generation session requests
+    if path == "sessions" and request.method == "POST":
+        try:
+            body_bytes = await request.body()
+            body_json = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+            prompt = body_json.get("prompt", "")
+
+            # Check if OpenAI API key is available for DALL-E 3 generation
+            openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+            if openai_key:
+                print(f"[Image Engine] Generating image via OpenAI DALL-E 3 (prompt len={len(prompt)})...", flush=True)
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    resp = await client.post(
+                        "https://api.openai.com/v1/images/generations",
+                        headers={
+                            "Authorization": f"Bearer {openai_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": "dall-e-3",
+                            "prompt": prompt,
+                            "n": 1,
+                            "size": "1024x1024",
+                            "quality": "standard"
+                        }
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        img_url = data["data"][0]["url"]
+                        revised_prompt = data["data"][0].get("revised_prompt", prompt)
+                        print(f"[Image Engine] DALL-E 3 image generated successfully!", flush=True)
+                        return JSONResponse({
+                            "session_id": f"dalle-{int(time.time())}",
+                            "status": "completed",
+                            "results": [{
+                                "image_url": img_url,
+                                "url": img_url,
+                                "model": "OpenAI DALL-E 3",
+                                "revised_prompt": revised_prompt
+                            }],
+                            "images": [{ "url": img_url }]
+                        })
+                    else:
+                        print(f"[Image Engine] DALL-E 3 returned error {resp.status_code}: {resp.text}", flush=True)
+        except Exception as exc:
+            print(f"[Image Engine DALL-E Error]: {exc}", flush=True)
+
     token = await _get_genfy_token()
 
     headers = dict(request.headers)
     headers.pop("host", None)
     headers.pop("content-length", None)
-    # Only inject auth headers when we actually have a token
     if token:
         headers["cookie"] = f"session_token={token}"
         headers["authorization"] = f"Bearer {token}"
     else:
-        # Token unavailable — Genfy may be unreachable
         headers.pop("cookie", None)
         headers.pop("authorization", None)
 
@@ -2119,12 +2165,11 @@ async def proxy_genfy(path: str, request: Request):
     params = dict(request.query_params)
     body   = await request.body()
     url    = f"{GENFY_URL}/api/{path}"
-    print(f"Genfy proxy: {method} {url} token_len={len(token)}")
 
     if not token:
         raise HTTPException(
             status_code=502,
-            detail="Could not authenticate with Genfy image service. Ensure Genfy is running on http://localhost:8005."
+            detail="Could not authenticate with image service."
         )
 
     async def _do_request(client: httpx.AsyncClient, hdrs: dict) -> httpx.Response:
@@ -2133,18 +2178,6 @@ async def proxy_genfy(path: str, request: Request):
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             upstream = await _do_request(client, headers)
-
-            if upstream.status_code == 401:
-                print("Genfy 401 — clearing token and retrying...")
-                GENFY_TOKEN = ""
-                GENFY_TOKEN_FETCHED_AT = 0.0  # force re-auth
-                token = await _get_genfy_token()
-                if token:
-                    headers["cookie"] = f"session_token={token}"
-                    headers["authorization"] = f"Bearer {token}"
-                    upstream = await _do_request(client, headers)
-                    print(f"Genfy retry status: {upstream.status_code}")
-
             content_type = upstream.headers.get("content-type", "application/json")
             return Response(
                 content=upstream.content,
@@ -2153,9 +2186,9 @@ async def proxy_genfy(path: str, request: Request):
                 headers={"Content-Disposition": upstream.headers.get("Content-Disposition", "")},
             )
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Upstream Genfy API timed out.")
+        raise HTTPException(status_code=504, detail="Upstream Image API timed out.")
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to reach Genfy: {exc}")
+        raise HTTPException(status_code=502, detail=f"Failed to reach Image Engine: {exc}")
 
 
 # ── Master Workflow Supervisor & Intermediary Agent Endpoints ─────────────────────
