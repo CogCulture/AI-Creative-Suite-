@@ -360,6 +360,7 @@ function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
               </button>
             </div>
           ) : (
+            <>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <button onClick={() => setIsEditing(true)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface2, color: t.text, fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
                   ✏️ Edit Manually
