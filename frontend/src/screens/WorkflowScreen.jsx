@@ -87,7 +87,7 @@ function StatusBadge({ status }) {
 }
 
 // ── Node Card ─────────────────────────────────────────────────────────────────
-function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdateOutput, t }) {
+function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdateOutput, onRunFromNode, t }) {
   const isAgent = node.type === "agent";
   const isDone = status === "done";
   const isActive = status === "active";
@@ -160,7 +160,7 @@ function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdat
           marginTop: 10, paddingTop: 10, paddingLeft: isAgent ? 0 : 6,
           borderTop: `1px solid ${t.border}`,
         }}>
-          <NodeOutputPreview node={node} output={output} onUpdateOutput={onUpdateOutput} t={t} />
+          <NodeOutputPreview node={node} output={output} onUpdateOutput={onUpdateOutput} onRunFromNode={onRunFromNode} t={t} />
         </div>
       )}
 
@@ -177,7 +177,7 @@ function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdat
 }
 
 // ── Output preview per node with Editable Mode & AI Refinement ─────────────────
-function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
+function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, t }) {
   const [isEditing, setIsEditing] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isTweaking, setIsTweaking] = useState(false);
@@ -249,6 +249,21 @@ function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
 
   return (
     <div style={{ position: "relative" }}>
+      {/* Action Buttons: Manual Edit, AI Prompt Tweaker & Continue Workflow */}
+      <div style={{ marginBottom: 8, display: "flex", gap: 6, justifyContent: "flex-end" }}>
+        <button
+          onClick={() => onRunFromNode && onRunFromNode(node.id)}
+          title="Resume & run downstream agents from this node"
+          style={{
+            padding: "4px 10px", borderRadius: 6, border: "none",
+            background: "#22C55E", color: "#fff", fontWeight: 700, fontSize: 10.5,
+            cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+            boxShadow: "0 2px 4px rgba(34, 197, 94, 0.2)"
+          }}
+        >
+          ▶ Continue from this Step
+        </button>
+      </div>
       {/* Node specific rendering */}
       {node.id === "brief" && (
         <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
@@ -829,8 +844,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     }
   };
 
-  // ── Run Workflow ─────────────────────────────────────────────────────────────
-  const handleRun = async () => {
+  // ── Run Workflow (Supports Starting / Continuing from any Node) ───────────
+  const handleRun = async (startFromNodeId = "brief") => {
     if (isRunning) return;
     const brief = configs.brief.brief?.trim();
     if (!brief) { showToast("Please enter a campaign brief first."); setSelectedNodeId("brief"); return; }
@@ -851,239 +866,261 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
     setIsRunning(true);
     setPendingApproval(null);
-    setNodeStatus({});
-    setNodeInputs({});
-    setNodeOutputs({});
+
+    // If starting fresh from beginning, reset status and outputs. If continuing from a node, preserve prior completed outputs.
+    if (startFromNodeId === "brief") {
+      setNodeStatus({});
+      setNodeInputs({});
+      setNodeOutputs({});
+    }
+
     setMasterState("supervising");
-    setMasterFeedback("Initializing pipeline supervision...");
-    setLogs([]);
+    setMasterFeedback(`Continuing execution from node: ${startFromNodeId}...`);
     setLogsOpen(true);
 
-    log("👑 Master Supervisor Agent activated", "agent");
+    log(`👑 Master Supervisor Agent active (Resuming from ${startFromNodeId})`, "agent");
     log(`Campaign goal: ${brief.slice(0, 80)}...`, "info");
     if (approvalMode) {
-      log("⏸ Interactive Approval Mode: pipeline will pause after each node for user approval", "agent");
+      log("⏸ Interactive Approval Mode active", "agent");
     }
-    if (brandContext) {
-      log(`🧠 Brand Brain active: ${brandContext.brandName || "Brand"} · ${brandContext.primaryTone || ""} tone`, "agent");
-    }
+
+    const NODE_ORDER = ["brief", "agent_strategy", "copy", "agent_artdir", "genfy"];
+    const startIndex = NODE_ORDER.indexOf(startFromNodeId) !== -1 ? NODE_ORDER.indexOf(startFromNodeId) : 0;
 
     try {
       // ── STEP 1: Brief node ─────────────────────────────────────────────────
-      setStatus("brief", "active");
-      setSelectedNodeId("brief");
-      log("Node 1: Campaign Brief — locked and loaded", "info");
-      await delay(400);
-      const briefOutput = { brief, assetType: configs.brief.assetType };
-      setInput("brief", { brief: configs.brief.brief, assetType: configs.brief.assetType });
-      setOutput("brief", briefOutput);
-      setStatus("brief", "done");
+      let briefOutput = nodeOutputs.brief || { brief, assetType: configs.brief.assetType };
+      if (startIndex <= 0) {
+        setStatus("brief", "active");
+        setSelectedNodeId("brief");
+        log("Node 1: Campaign Brief — locked and loaded", "info");
+        await delay(400);
+        briefOutput = { brief, assetType: configs.brief.assetType };
+        setInput("brief", { brief: configs.brief.brief, assetType: configs.brief.assetType });
+        setOutput("brief", briefOutput);
+        setStatus("brief", "done");
 
-      if (approvalMode) {
-        log("⏸ Brief Step complete. Waiting for user approval to run Strategy Agent...", "agent");
-        setMasterFeedback("Node 1 Complete — Awaiting your approval to proceed to Strategy Agent...");
-        await waitForUserApproval("brief", briefOutput);
-        log("✓ Brief approved by user", "success");
+        if (approvalMode) {
+          log("⏸ Brief Step complete. Waiting for user approval to run Strategy Agent...", "agent");
+          setMasterFeedback("Node 1 Complete — Awaiting your approval to proceed to Strategy Agent...");
+          await waitForUserApproval("brief", briefOutput);
+          log("✓ Brief approved by user", "success");
+        }
       }
 
       // ── STEP 2: Strategy Agent ─────────────────────────────────────────────
-      setStatus("agent_strategy", "active");
-      setSelectedNodeId("agent_strategy");
-      log("⬡ Strategy Agent: analyzing brief & building copy specs...", "agent");
-      setMasterFeedback("Supervising Brief → Copy strategy handoff...");
+      let strategyData = nodeOutputs.agent_strategy || null;
+      if (startIndex <= 1) {
+        setStatus("agent_strategy", "active");
+        setSelectedNodeId("agent_strategy");
+        log("⬡ Strategy Agent: analyzing brief & building copy specs...", "agent");
+        setMasterFeedback("Supervising Brief → Copy strategy handoff...");
 
-      let strategyData = null;
-      setInput("agent_strategy", {
-        brief,
-        assetType: configs.brief.assetType,
-      });
-      try {
-        const r = await fetch("/bff/workflow/step-bridge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bridge_type: "brief_to_copy",
-            brief: brandPrefix + brief,
-            asset_type: configs.brief.assetType,
-            brand_id: activeProject?.brand_id || activeProject?.brandId || null,
-          }),
+        setInput("agent_strategy", {
+          brief,
+          assetType: configs.brief.assetType,
         });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        strategyData = await r.json();
-        log(`Strategy Agent: audience = "${strategyData.target_audience}"`, "success");
-      } catch (err) {
-        console.warn("[Strategy Agent Error]:", err);
-        strategyData = {
-          target_audience: "High-Net-Worth Investors & Modern Business Leaders",
-          copy_specs: `📊 STRATEGIC MARKET INTELLIGENCE REPORT:\n\n1. TARGET AUDIENCE ANALYSIS:\n   • Demographics: HNI Real Estate Investors & Corporate Executives seeking high-yield assets in Gurugram.\n   • Psychographics: Prestige-driven, equity-focused, values international architectural standards.\n\n2. BRAND DNA & RAG SYNTHESIS:\n   • Brand Identity: Emaar India — Icon of global architectural innovation and master-planned excellence.\n   • Positioning: Premium commercial spaces (EBD-85) engineered for serious business ambitions.\n\n3. COMPETITOR BENCHMARKING (DLF, M3M, Elan Group):\n   • Competitor Vulnerability: Local developments focusing on volume over long-term community asset value.\n   • Strategic Advantage: Global heritage, superior infrastructure, iconic skyline presence, and prime location.\n\n4. STRATEGIC MESSAGING PILLARS:\n   • Pillar 1: Prestige & Global Legacy (Emaar Brand Trust).\n   • Pillar 2: High Asset Growth & Capital Appreciation.`,
-          recommended_copy_prompt: `Write high-converting ${configs.brief.assetType} copy based on this brief: ${brief}`
-        };
-        log("Strategy Agent: generated deep strategic analysis", "info");
-      }
-      setOutput("agent_strategy", strategyData);
-      setStatus("agent_strategy", "done");
+        try {
+          const r = await fetch("/bff/workflow/step-bridge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              bridge_type: "brief_to_copy",
+              brief: brandPrefix + brief,
+              asset_type: configs.brief.assetType,
+              brand_id: activeProject?.brand_id || activeProject?.brandId || null,
+            }),
+          });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          strategyData = await r.json();
+          log(`Strategy Agent: audience = "${strategyData.target_audience}"`, "success");
+        } catch (err) {
+          console.warn("[Strategy Agent Error]:", err);
+          strategyData = {
+            target_audience: "High-Net-Worth Investors & Modern Business Leaders",
+            copy_specs: `📊 STRATEGIC MARKET INTELLIGENCE REPORT:\n\n1. TARGET AUDIENCE ANALYSIS:\n   • Demographics: HNI Real Estate Investors & Corporate Executives seeking high-yield assets in Gurugram.\n   • Psychographics: Prestige-driven, equity-focused, values international architectural standards.\n\n2. BRAND DNA & RAG SYNTHESIS:\n   • Brand Identity: Emaar India — Icon of global architectural innovation and master-planned excellence.\n   • Positioning: Premium commercial spaces (EBD-85) engineered for serious business ambitions.\n\n3. COMPETITOR BENCHMARKING (DLF, M3M, Elan Group):\n   • Competitor Vulnerability: Local developments focusing on volume over long-term community asset value.\n   • Strategic Advantage: Global heritage, superior infrastructure, iconic skyline presence, and prime location.\n\n4. STRATEGIC MESSAGING PILLARS:\n   • Pillar 1: Prestige & Global Legacy (Emaar Brand Trust).\n   • Pillar 2: High Asset Growth & Capital Appreciation.`,
+            recommended_copy_prompt: `Write high-converting ${configs.brief.assetType} copy based on this brief: ${brief}`
+          };
+          log("Strategy Agent: generated deep strategic analysis", "info");
+        }
+        setOutput("agent_strategy", strategyData);
+        setStatus("agent_strategy", "done");
 
-      if (approvalMode) {
-        log("⏸ Strategy Step complete. Review Strategy Output and click Approve to run Copy Agent...", "agent");
-        setMasterFeedback("Strategy Node Complete — Awaiting your approval to proceed to Copy Agent...");
-        await waitForUserApproval("agent_strategy", strategyData);
-        log("✓ Strategy output approved by user", "success");
-      }
+        if (approvalMode) {
+          log("⏸ Strategy Step complete. Review Strategy Output and click Approve to run Copy Agent...", "agent");
+          setMasterFeedback("Strategy Node Complete — Awaiting your approval to proceed to Copy Agent...");
+          await waitForUserApproval("agent_strategy", strategyData);
+          log("✓ Strategy output approved by user", "success");
+        }
 
-      // Master audit step 1 — non-blocking, log failures instead of swallowing
-      fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "2. Strategy Analysis", step_data: strategyData }) })
-        .then(r => { if (!r.ok) console.warn("[Orchestrator] audit step 1 returned", r.status); })
-        .catch(err => console.warn("[Orchestrator] audit step 1 error:", err));
+        // Master audit step 1 — non-blocking
+        fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "2. Strategy Analysis", step_data: strategyData }) })
+          .then(r => { if (!r.ok) console.warn("[Orchestrator] audit step 1 returned", r.status); })
+          .catch(err => console.warn("[Orchestrator] audit step 1 error:", err));
+      }
 
       // ── STEP 3: Copy Agent ─────────────────────────────────────────────────
-      setStatus("copy", "active");
-      setSelectedNodeId("copy");
-      log("Node 3: Copy Agent — generating campaign copy via CopyAgent API...", "info");
-      setMasterFeedback("Supervising Copy Agent output quality...");
+      let copyData = nodeOutputs.copy || null;
+      if (startIndex <= 2) {
+        setStatus("copy", "active");
+        setSelectedNodeId("copy");
+        log("Node 3: Copy Agent — generating campaign copy via CopyAgent API...", "info");
+        setMasterFeedback("Supervising Copy Agent output quality...");
 
-      const copyPrompt = strategyData.recommended_copy_prompt
-        ? (brandPrefix ? brandPrefix + strategyData.recommended_copy_prompt : strategyData.recommended_copy_prompt)
-        : `Write high-converting ${configs.brief.assetType} copy for: ${brandPrefix}${brief}`;
-      let copyData = null;
-      setInput("copy", {
-        user_message: copyPrompt,
-        llm_model: configs.copy.model,
-        temperature: configs.copy.temperature,
-      });
-      try {
-        const payload = {
-          user_message: `${copyPrompt}\n\n[Run Variation Nonce: ${Date.now()}]`,
+        const copyPrompt = (strategyData && strategyData.recommended_copy_prompt)
+          ? (brandPrefix ? brandPrefix + strategyData.recommended_copy_prompt : strategyData.recommended_copy_prompt)
+          : `Write high-converting ${configs.brief.assetType} copy for: ${brandPrefix}${brief}`;
+
+        setInput("copy", {
+          user_message: copyPrompt,
           llm_model: configs.copy.model,
-          temperature: configs.copy.temperature || 0.8,
-          stream: false,
-        };
-        if (activeProject && (activeProject.brand_id || activeProject.brandId)) {
-          payload.external_project_data = { brand_id: activeProject.brand_id || activeProject.brandId };
-        }
-        const r = await fetch("/bff/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          temperature: configs.copy.temperature,
         });
-        if (!r.ok) {
-          throw new Error(`BFF server returned status ${r.status}`);
+        try {
+          const payload = {
+            user_message: `${copyPrompt}\n\n[Run Variation Nonce: ${Date.now()}]`,
+            llm_model: configs.copy.model,
+            temperature: configs.copy.temperature || 0.8,
+            stream: false,
+          };
+          if (activeProject && (activeProject.brand_id || activeProject.brandId)) {
+            payload.external_project_data = { brand_id: activeProject.brand_id || activeProject.brandId };
+          }
+          const r = await fetch("/bff/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!r.ok) {
+            throw new Error(`BFF server returned status ${r.status}`);
+          }
+          const raw = await r.json();
+          const generatedText =
+            raw.assistant_message ||
+            raw.content ||
+            raw.response ||
+            raw.text ||
+            raw.message ||
+            (raw.choices && raw.choices[0]?.message?.content) ||
+            (raw.choices && raw.choices[0]?.text);
+
+          const cleanText = cleanRawJson(generatedText);
+          copyData = { headline: extractHeadline(cleanText, configs.brief.assetType), bodyText: cleanText, cta: "Shop Now" };
+          log("Copy Agent: unique copy generated successfully", "success");
+        } catch (err) {
+          console.warn("[Workflow CopyAgent Error]:", err);
+          const dynamicId = Math.floor(Math.random() * 899 + 100);
+          copyData = {
+            headline: `${configs.brief.assetType} — High-Impact Edition #${dynamicId}`,
+            bodyText: `Experience peak performance with ${configs.brief.assetType}. Specially engineered for modern professionals seeking uncompromised quality.`,
+            cta: "Discover More",
+          };
+          log(`Copy Agent: API fallback engaged (#${dynamicId})`, "info");
         }
-        const raw = await r.json();
-        const generatedText =
-          raw.assistant_message ||
-          raw.content ||
-          raw.response ||
-          raw.text ||
-          raw.message ||
-          (raw.choices && raw.choices[0]?.message?.content) ||
-          (raw.choices && raw.choices[0]?.text);
+        setOutput("copy", copyData);
+        setStatus("copy", "done");
 
-        const cleanText = cleanRawJson(generatedText);
-        copyData = { headline: extractHeadline(cleanText, configs.brief.assetType), bodyText: cleanText, cta: "Shop Now" };
-        log("Copy Agent: unique copy generated successfully", "success");
-      } catch (err) {
-        console.warn("[Workflow CopyAgent Error]:", err);
-        const dynamicId = Math.floor(Math.random() * 899 + 100);
-        copyData = {
-          headline: `${configs.brief.assetType} — High-Impact Edition #${dynamicId}`,
-          bodyText: `Experience peak performance with ${configs.brief.assetType}. Specially engineered for modern professionals seeking uncompromised quality.`,
-          cta: "Discover More",
-        };
-        log(`Copy Agent: API fallback engaged (#${dynamicId})`, "info");
+        if (approvalMode) {
+          log("⏸ Copy Generation complete. Review Copy Output and click Approve to run Art Director...", "agent");
+          setMasterFeedback("Copy Agent Node Complete — Awaiting your approval to proceed to Art Director...");
+          await waitForUserApproval("copy", copyData);
+          log("✓ Copy output approved by user", "success");
+        }
+
+        // Master audit step 2 — non-blocking
+        fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "3. Copy Generation", step_data: copyData }) })
+          .then(r => { if (!r.ok) console.warn("[Orchestrator] audit step 2 returned", r.status); })
+          .catch(err => console.warn("[Orchestrator] audit step 2 error:", err));
       }
-      setOutput("copy", copyData);
-      setStatus("copy", "done");
-
-      if (approvalMode) {
-        log("⏸ Copy Generation complete. Review Copy Output and click Approve to run Art Director...", "agent");
-        setMasterFeedback("Copy Agent Node Complete — Awaiting your approval to proceed to Art Director...");
-        await waitForUserApproval("copy", copyData);
-        log("✓ Copy output approved by user", "success");
-      }
-
-      // Master audit step 2 — non-blocking, log failures instead of swallowing
-      fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "3. Copy Generation", step_data: copyData }) })
-        .then(r => { if (!r.ok) console.warn("[Orchestrator] audit step 2 returned", r.status); })
-        .catch(err => console.warn("[Orchestrator] audit step 2 error:", err));
 
       // ── STEP 4: Art Director Agent ─────────────────────────────────────────
-      setStatus("agent_artdir", "active");
-      setSelectedNodeId("agent_artdir");
-      log("⬡ Art Director Agent: mapping copy to Genfy visual parameters...", "agent");
-      setMasterFeedback("Supervising Art Director visual parameter selection...");
+      let artDirData = nodeOutputs.agent_artdir || null;
+      if (startIndex <= 3) {
+        setStatus("agent_artdir", "active");
+        setSelectedNodeId("agent_artdir");
+        log("⬡ Art Director Agent: mapping copy to Genfy visual parameters...", "agent");
+        setMasterFeedback("Supervising Art Director visual parameter selection...");
 
-      let artDirData = null;
-      setInput("agent_artdir", {
-        brief,
-        copy_output: copyData.bodyText,
-        asset_type: configs.brief.assetType,
-      });
-      try {
-        const r = await fetch("/bff/workflow/step-bridge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bridge_type: "copy_to_genfy",
-            brief: brandPrefix + brief,
-            copy_output: copyData.bodyText,
-            asset_type: configs.brief.assetType,
-            brand_id: activeProject?.brand_id || activeProject?.brandId || null,
-          }),
+        const copyTextForArtDir = (copyData && copyData.bodyText) ? copyData.bodyText : brief;
+        setInput("agent_artdir", {
+          brief,
+          copy_output: copyTextForArtDir,
+          asset_type: configs.brief.assetType,
         });
-        artDirData = await r.json();
-        log(`Art Director: image prompt ready — "${artDirData.image_prompt?.slice(0, 50)}..."`, "success");
-      } catch {
-        artDirData = {
-          image_prompt: `Professional ${configs.brief.assetType} visual — dramatic golden hour lighting, 85mm lens, cinematic quality`,
-          ratio: configs.genfy.ratio, quality: configs.genfy.quality,
-          models: ["Nanobanana 2"],
-          categories: { style: "cinematic", medium: "photography", lighting: "golden", camera: "low-angle", lens: "85mm", mood: "epic", color: "warm" },
-        };
-        log("Art Director: using synthesized visual concept", "info");
-      }
-      setOutput("agent_artdir", artDirData);
-      setStatus("agent_artdir", "done");
+        try {
+          const r = await fetch("/bff/workflow/step-bridge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              bridge_type: "copy_to_genfy",
+              brief: brandPrefix + brief,
+              copy_output: copyTextForArtDir,
+              asset_type: configs.brief.assetType,
+              brand_id: activeProject?.brand_id || activeProject?.brandId || null,
+            }),
+          });
+          artDirData = await r.json();
+          log(`Art Director: image prompt ready — "${artDirData.image_prompt?.slice(0, 50)}..."`, "success");
+        } catch {
+          artDirData = {
+            image_prompt: `Professional ${configs.brief.assetType} visual — dramatic golden hour lighting, 85mm lens, cinematic quality`,
+            ratio: configs.genfy.ratio, quality: configs.genfy.quality,
+            models: ["Nanobanana 2"],
+            categories: { style: "cinematic", medium: "photography", lighting: "golden", camera: "low-angle", lens: "85mm", mood: "epic", color: "warm" },
+          };
+          log("Art Director: using synthesized visual concept", "info");
+        }
+        setOutput("agent_artdir", artDirData);
+        setStatus("agent_artdir", "done");
 
-      if (approvalMode) {
-        log("⏸ Art Director Step complete. Review Visual Prompt and click Approve to render Image...", "agent");
-        setMasterFeedback("Art Director Node Complete — Awaiting your approval to render Image...");
-        await waitForUserApproval("agent_artdir", artDirData);
-        log("✓ Art Director output approved by user", "success");
+        if (approvalMode) {
+          log("⏸ Art Director Step complete. Review Visual Prompt and click Approve to render Image...", "agent");
+          setMasterFeedback("Art Director Node Complete — Awaiting your approval to render Image...");
+          await waitForUserApproval("agent_artdir", artDirData);
+          log("✓ Art Director output approved by user", "success");
+        }
       }
 
       // ── STEP 5: Genfy Image Engine ─────────────────────────────────────────
-      setStatus("genfy", "active");
-      setSelectedNodeId("genfy");
-      log("Node 5: Genfy Image Engine — requesting Nanobanana 2 generation...", "info");
-      setMasterFeedback("Supervising Genfy image rendering process...");
+      let genfyResult = nodeOutputs.genfy || null;
+      if (startIndex <= 4) {
+        setStatus("genfy", "active");
+        setSelectedNodeId("genfy");
+        log("Node 5: Genfy Image Engine — requesting generation...", "info");
+        setMasterFeedback("Supervising image rendering process...");
 
-      let genfyResult = null;
-      setInput("genfy", {
-        prompt: artDirData.image_prompt,
-        model_ids: artDirData.models || ["Nanobanana 2"],
-        ratio: artDirData.ratio || configs.genfy.ratio,
-        quality: artDirData.quality || configs.genfy.quality,
-        categories: artDirData.categories || { style: "cinematic", lighting: "golden" },
-      });
-      try {
-        const r = await fetch("/bff/genfy/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: artDirData.image_prompt,
-            model_ids: artDirData.models || ["Nanobanana 2"],
-            ratio: artDirData.ratio || configs.genfy.ratio,
-            quality: artDirData.quality || configs.genfy.quality,
-            categories: artDirData.categories || { style: "cinematic", lighting: "golden" },
-          }),
+        const imgPrompt = artDirData?.image_prompt || brief;
+        setInput("genfy", {
+          prompt: imgPrompt,
+          model_ids: artDirData?.models || ["Nanobanana 2"],
+          ratio: artDirData?.ratio || configs.genfy.ratio,
+          quality: artDirData?.quality || configs.genfy.quality,
+          categories: artDirData?.categories || { style: "cinematic", lighting: "golden" },
         });
-        const genfySessionData = await r.json();
-        if (genfySessionData?.session_id) {
-          log(`Genfy: session ${genfySessionData.session_id.slice(0, 8)}... opened — polling for image...`, "info");
-          genfyResult = await pollGenfySession(genfySessionData.session_id, log);
+        try {
+          const r = await fetch("/bff/genfy/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: imgPrompt,
+              model_ids: artDirData?.models || ["Nanobanana 2"],
+              ratio: artDirData?.ratio || configs.genfy.ratio,
+              quality: artDirData?.quality || configs.genfy.quality,
+              categories: artDirData?.categories || { style: "cinematic", lighting: "golden" },
+            }),
+          });
+          const genfySessionData = await r.json();
+          if (genfySessionData?.session_id) {
+            log(`Genfy: session ${genfySessionData.session_id.slice(0, 8)}... opened — rendering image...`, "info");
+            genfyResult = await pollGenfySession(genfySessionData.session_id, log);
+          } else if (genfySessionData?.images && genfySessionData.images[0]?.url) {
+            genfyResult = { url: genfySessionData.images[0].url, status: "completed" };
+          } else if (genfySessionData?.results && genfySessionData.results[0]?.url) {
+            genfyResult = { url: genfySessionData.results[0].url, status: "completed" };
+          }
+        } catch (e) {
+          log(`Genfy: ${e.message?.slice(0, 60) || "API unavailable"}`, "error");
         }
-      } catch (e) {
-        log(`Genfy: ${e.message?.slice(0, 60) || "API unavailable"}`, "error");
       }
 
       if (!genfyResult) {
@@ -1395,6 +1432,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                     isSelected={selectedNodeId === node.id}
                     onSelect={setSelectedNodeId}
                     onUpdateOutput={setOutput}
+                    onRunFromNode={handleRun}
                     t={t}
                   />
                   {i < PIPELINE.length - 1 && (
