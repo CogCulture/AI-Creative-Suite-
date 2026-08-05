@@ -87,7 +87,7 @@ function StatusBadge({ status }) {
 }
 
 // ── Node Card ─────────────────────────────────────────────────────────────────
-function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdateOutput, t }) {
+function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdateOutput, onRollback, t }) {
   const isAgent = node.type === "agent";
   const isDone = status === "done";
   const isActive = status === "active";
@@ -160,7 +160,7 @@ function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdat
           marginTop: 10, paddingTop: 10, paddingLeft: isAgent ? 0 : 6,
           borderTop: `1px solid ${t.border}`,
         }}>
-          <NodeOutputPreview node={node} output={output} onUpdateOutput={onUpdateOutput} t={t} />
+          <NodeOutputPreview node={node} output={output} onUpdateOutput={onUpdateOutput} onRollback={onRollback} t={t} />
         </div>
       )}
 
@@ -360,10 +360,16 @@ function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
               </button>
             </div>
           ) : (
-            <>
-              <button onClick={() => setIsEditing(true)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface2, color: t.text, fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                ✏️ Edit Manually
-              </button>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <button onClick={() => setIsEditing(true)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface2, color: t.text, fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  ✏️ Edit Manually
+                </button>
+                {onRollback && (
+                  <button onClick={() => onRollback(node.id)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface3, color: t.text2, fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    ↩ Rollback Node
+                  </button>
+                )}
+              </div>
 
               <div style={{ display: "flex", gap: 6, flex: 1, maxWidth: 300 }}>
                 <input
@@ -827,6 +833,36 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setPendingApproval(null);
       resolve({ approved: true });
     }
+  };
+
+  const handleRollbackToNode = (targetNodeId) => {
+    if (isRunning) return;
+    const targetIdx = PIPELINE.findIndex(n => n.id === targetNodeId);
+    if (targetIdx === -1) return;
+
+    // Reset status and outputs for target node and all downstream nodes
+    const updatedStatus = { ...nodeStatus };
+    const updatedOutputs = { ...nodeOutputs };
+
+    PIPELINE.forEach((node, idx) => {
+      if (idx >= targetIdx) {
+        delete updatedStatus[node.id];
+        delete updatedOutputs[node.id];
+      }
+    });
+
+    setNodeStatus(updatedStatus);
+    setNodeOutputs(updatedOutputs);
+    setSelectedNodeId(targetNodeId);
+    setPendingApproval(null);
+
+    // Save cleared state to localStorage
+    try {
+      localStorage.setItem(`${stateStorageKey}-status`, JSON.stringify(updatedStatus));
+      localStorage.setItem(`${stateStorageKey}-outputs`, JSON.stringify(updatedOutputs));
+    } catch (_) {}
+
+    showToast(`Rolled back to ${PIPELINE[targetIdx].label}. Ready to re-run.`);
   };
 
   // ── Run Workflow ─────────────────────────────────────────────────────────────
@@ -1323,19 +1359,33 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                   Review the output below for <b>{PIPELINE.find(n => n.id === pendingApproval.nodeId)?.label}</b>. Click <b>Approve Node Output & Proceed</b> to run the next step.
                 </div>
               </div>
-              <button
-                onClick={handleApproveStep}
-                style={{
-                  padding: "10px 22px", borderRadius: 10, border: "none",
-                  background: "#22C55E", color: "#fff", fontWeight: 800, fontSize: 13,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-                  fontFamily: FONT, flexShrink: 0,
-                  boxShadow: "0 4px 14px rgba(34,197,94,0.4)",
-                }}
-              >
-                <CheckCircle size={16} />
-                Approve & Proceed
-              </button>
+              <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+                <button
+                  onClick={() => handleRollbackToNode(pendingApproval.nodeId)}
+                  style={{
+                    padding: "10px 16px", borderRadius: 10, border: `1px solid ${t.border}`,
+                    background: t.surface2, color: t.text, fontWeight: 700, fontSize: 12,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    fontFamily: FONT,
+                  }}
+                >
+                  <RotateCcw size={14} />
+                  ↩ Rollback & Re-Run Node
+                </button>
+                <button
+                  onClick={handleApproveStep}
+                  style={{
+                    padding: "10px 22px", borderRadius: 10, border: "none",
+                    background: "#22C55E", color: "#fff", fontWeight: 800, fontSize: 13,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                    fontFamily: FONT,
+                    boxShadow: "0 4px 14px rgba(34,197,94,0.4)",
+                  }}
+                >
+                  <CheckCircle size={16} />
+                  Approve & Proceed
+                </button>
+              </div>
             </div>
           )}
 
@@ -1395,6 +1445,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                     isSelected={selectedNodeId === node.id}
                     onSelect={setSelectedNodeId}
                     onUpdateOutput={setOutput}
+                    onRollback={handleRollbackToNode}
                     t={t}
                   />
                   {i < PIPELINE.length - 1 && (
