@@ -87,7 +87,7 @@ function StatusBadge({ status }) {
 }
 
 // ── Node Card ─────────────────────────────────────────────────────────────────
-function NodeCard({ node, status = "idle", output, isSelected, onSelect, t }) {
+function NodeCard({ node, status = "idle", output, isSelected, onSelect, onUpdateOutput, t }) {
   const isAgent = node.type === "agent";
   const isDone = status === "done";
   const isActive = status === "active";
@@ -160,7 +160,7 @@ function NodeCard({ node, status = "idle", output, isSelected, onSelect, t }) {
           marginTop: 10, paddingTop: 10, paddingLeft: isAgent ? 0 : 6,
           borderTop: `1px solid ${t.border}`,
         }}>
-          <NodeOutputPreview node={node} output={output} t={t} />
+          <NodeOutputPreview node={node} output={output} onUpdateOutput={onUpdateOutput} t={t} />
         </div>
       )}
 
@@ -176,77 +176,211 @@ function NodeCard({ node, status = "idle", output, isSelected, onSelect, t }) {
   );
 }
 
-// ── Output preview per node ───────────────────────────────────────────────────
-function NodeOutputPreview({ node, output, t }) {
-  if (node.id === "brief") {
-    return (
-      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
-        <div style={{ fontWeight: 700, fontSize: 10, color: t.text3, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Brief Input</div>
-        {output.brief}
-      </div>
-    );
-  }
-  if (node.id === "agent_strategy") {
-    return (
-      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
-        <div style={{ fontWeight: 700, fontSize: 10, color: t.brain, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Strategy Output</div>
-        <div><b style={{ color: t.text }}>Target Audience:</b> {output.target_audience}</div>
-        {output.copy_specs && <div style={{ color: t.text2, marginTop: 4 }}><b>Strategy Specs:</b> {output.copy_specs}</div>}
-        {output.recommended_copy_prompt && (
-          <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px dashed ${t.border}`, fontSize: 11, color: t.text3 }}>
-            <b>Prompt Strategy:</b> {output.recommended_copy_prompt}
-          </div>
-        )}
-      </div>
-    );
-  }
-  if (node.id === "copy") {
-    return (
-      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
-        <div style={{ fontWeight: 700, fontSize: 10, color: "#8B5CF6", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Generated Copy</div>
-        {output.headline && <div style={{ fontWeight: 700, color: t.text, fontSize: 13, marginBottom: 4 }}>{output.headline}</div>}
-        <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{output.bodyText}</div>
-        {output.cta && <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: "#8B5CF6" }}>CTA: {output.cta}</div>}
-      </div>
-    );
-  }
-  if (node.id === "agent_artdir") {
-    return (
-      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
-        <div style={{ fontWeight: 700, fontSize: 10, color: "#E8552A", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Art Director Specs</div>
-        <div><b style={{ color: t.text }}>Image Prompt:</b> {output.image_prompt}</div>
-        <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-          {["ratio", "quality", "style", "lighting", "medium"].map(k => output[k] && (
-            <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
-              {k}: {output[k]}
-            </span>
-          ))}
-          {output.categories && Object.entries(output.categories).map(([k, v]) => (
-            <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
-              {k}: {v}
-            </span>
-          ))}
+// ── Output preview per node with Editable Mode & AI Refinement ─────────────────
+function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isTweaking, setIsTweaking] = useState(false);
+
+  // Manual edit draft state
+  const [editHeadline, setEditHeadline] = useState(output.headline || "");
+  const [editBody, setEditBody] = useState(output.bodyText || output.brief || output.image_prompt || "");
+  const [editAudience, setEditAudience] = useState(output.target_audience || "");
+  const [editPrompt, setEditPrompt] = useState(output.image_prompt || output.recommended_copy_prompt || "");
+
+  // Sync edit drafts when output prop changes
+  useEffect(() => {
+    setEditHeadline(output.headline || "");
+    setEditBody(output.bodyText || output.brief || output.image_prompt || "");
+    setEditAudience(output.target_audience || "");
+    setEditPrompt(output.image_prompt || output.recommended_copy_prompt || "");
+  }, [output]);
+
+  const handleSaveManual = () => {
+    if (node.id === "copy") {
+      onUpdateOutput(node.id, { ...output, headline: editHeadline, bodyText: editBody });
+    } else if (node.id === "agent_strategy") {
+      onUpdateOutput(node.id, { ...output, target_audience: editAudience, recommended_copy_prompt: editPrompt });
+    } else if (node.id === "agent_artdir") {
+      onUpdateOutput(node.id, { ...output, image_prompt: editPrompt });
+    } else if (node.id === "brief") {
+      onUpdateOutput(node.id, { ...output, brief: editBody });
+    }
+    setIsEditing(false);
+  };
+
+  const handleAiRefine = async () => {
+    if (!aiPrompt.trim() || isTweaking) return;
+    setIsTweaking(true);
+    try {
+      const promptToAgent = `ORIGINAL OUTPUT:\n${JSON.stringify(output, null, 2)}\n\nUSER TWEAK REQUEST:\n${aiPrompt}\n\nRewrite and return the improved JSON output structure.`;
+      const r = await fetch("/bff/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_message: promptToAgent, llm_model: "claude-4-sonnet", temperature: 0.7, stream: false }),
+      });
+      const raw = await r.json();
+      const text = raw.assistant_message || raw.content || raw.text || "";
+      if (node.id === "copy") {
+        onUpdateOutput(node.id, { ...output, bodyText: text });
+      } else if (node.id === "agent_artdir") {
+        onUpdateOutput(node.id, { ...output, image_prompt: text });
+      } else if (node.id === "agent_strategy") {
+        onUpdateOutput(node.id, { ...output, copy_specs: text });
+      }
+      setAiPrompt("");
+    } catch (e) {
+      console.warn("[AI Tweak Error]:", e);
+    } finally {
+      setIsTweaking(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      {/* Node specific rendering */}
+      {node.id === "brief" && (
+        <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+          <div style={{ fontWeight: 700, fontSize: 10, color: t.text3, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Brief Input</div>
+          {isEditing ? (
+            <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={3} style={cfgTextarea(t)} />
+          ) : (
+            output.brief
+          )}
         </div>
-      </div>
-    );
-  }
-  if (node.id === "genfy") {
-    if (output.url || output.base64) {
-      const src = output.url || `data:image/png;base64,${output.base64}`;
-      return (
+      )}
+
+      {node.id === "agent_strategy" && (
+        <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+          <div style={{ fontWeight: 700, fontSize: 10, color: t.brain, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Strategy Output</div>
+          {isEditing ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: t.text3 }}>Target Audience</label>
+                <input type="text" value={editAudience} onChange={e => setEditAudience(e.target.value)} style={cfgSelect(t)} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: t.text3 }}>Prompt Strategy</label>
+                <textarea value={editPrompt} onChange={e => setEditPrompt(e.target.value)} rows={2} style={cfgTextarea(t)} />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div><b style={{ color: t.text }}>Target Audience:</b> {output.target_audience}</div>
+              {output.copy_specs && <div style={{ color: t.text2, marginTop: 4 }}><b>Strategy Specs:</b> {output.copy_specs}</div>}
+              {output.recommended_copy_prompt && (
+                <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px dashed ${t.border}`, fontSize: 11, color: t.text3 }}>
+                  <b>Prompt Strategy:</b> {output.recommended_copy_prompt}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {node.id === "copy" && (
+        <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+          <div style={{ fontWeight: 700, fontSize: 10, color: "#8B5CF6", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Generated Copy</div>
+          {isEditing ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input type="text" value={editHeadline} onChange={e => setEditHeadline(e.target.value)} placeholder="Headline" style={{ ...cfgSelect(t), fontWeight: 700 }} />
+              <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={5} style={cfgTextarea(t)} />
+            </div>
+          ) : (
+            <>
+              {output.headline && <div style={{ fontWeight: 700, color: t.text, fontSize: 13, marginBottom: 4 }}>{output.headline}</div>}
+              <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{output.bodyText}</div>
+              {output.cta && <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: "#8B5CF6" }}>CTA: {output.cta}</div>}
+            </>
+          )}
+        </div>
+      )}
+
+      {node.id === "agent_artdir" && (
+        <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+          <div style={{ fontWeight: 700, fontSize: 10, color: "#E8552A", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Art Director Specs</div>
+          {isEditing ? (
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: t.text3 }}>Image Prompt</label>
+              <textarea value={editPrompt} onChange={e => setEditPrompt(e.target.value)} rows={3} style={cfgTextarea(t)} />
+            </div>
+          ) : (
+            <>
+              <div><b style={{ color: t.text }}>Image Prompt:</b> {output.image_prompt}</div>
+              <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                {["ratio", "quality", "style", "lighting", "medium"].map(k => output[k] && (
+                  <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
+                    {k}: {output[k]}
+                  </span>
+                ))}
+                {output.categories && Object.entries(output.categories).map(([k, v]) => (
+                  <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
+                    {k}: {v}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {node.id === "genfy" && (output.url || output.base64) && (
         <div style={{ borderRadius: 10, overflow: "hidden", border: `1px solid ${t.border}` }}>
-          <img src={src} alt="Generated visual" style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }} />
+          <img src={output.url || `data:image/png;base64,${output.base64}`} alt="Generated visual" style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }} />
           <div style={{ padding: "8px 12px", background: t.surface2, fontSize: 11, color: t.text2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>Final Visual Rendered</span>
-            <a href={src} download="campaign-creative.png" target="_blank" rel="noreferrer" style={{ color: t.brain, fontWeight: 700, textDecoration: "none" }}>
+            <a href={output.url || `data:image/png;base64,${output.base64}`} download="campaign-creative.png" target="_blank" rel="noreferrer" style={{ color: t.brain, fontWeight: 700, textDecoration: "none" }}>
               Download High-Res
             </a>
           </div>
         </div>
-      );
-    }
-  }
-  return null;
+      )}
+
+      {/* Action Buttons: Manual Edit & AI Prompt Tweaker */}
+      {node.id !== "genfy" && (
+        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          {isEditing ? (
+            <div style={{ display: "flex", gap: 6, width: "100%", justifyContent: "flex-end" }}>
+              <button onClick={() => setIsEditing(false)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface, color: t.text2, fontSize: 11, cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button onClick={handleSaveManual} style={{ padding: "4px 12px", borderRadius: 6, border: "none", background: "#22C55E", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                Save Tweaks ✓
+              </button>
+            </div>
+          ) : (
+            <>
+              <button onClick={() => setIsEditing(true)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface2, color: t.text, fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                ✏️ Edit Manually
+              </button>
+
+              <div style={{ display: "flex", gap: 6, flex: 1, maxWidth: 300 }}>
+                <input
+                  type="text"
+                  placeholder="✨ AI Tweak (e.g. make punchier...)"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleAiRefine()}
+                  style={{ ...cfgSelect(t), fontSize: 11, padding: "4px 8px" }}
+                />
+                <button
+                  onClick={handleAiRefine}
+                  disabled={isTweaking || !aiPrompt.trim()}
+                  style={{
+                    padding: "4px 10px", borderRadius: 6, border: "none",
+                    background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
+                    color: "#fff", fontWeight: 700, fontSize: 10.5, cursor: "pointer", flexShrink: 0,
+                  }}
+                >
+                  {isTweaking ? "..." : "Refine"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Config Panel ──────────────────────────────────────────────────────────────
@@ -1234,6 +1368,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                     output={nodeOutputs[node.id] || null}
                     isSelected={selectedNodeId === node.id}
                     onSelect={setSelectedNodeId}
+                    onUpdateOutput={setOutput}
                     t={t}
                   />
                   {i < PIPELINE.length - 1 && (
