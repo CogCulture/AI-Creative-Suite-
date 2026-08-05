@@ -741,7 +741,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const genfyPollRef = useRef(null);
   const logsBottomRef = useRef(null);
 
-  // Restore stored pipeline state whenever activeProject changes
+  // Restore stored pipeline state & configs whenever activeProject changes
   useEffect(() => {
     if (activeProject?.id) {
       try {
@@ -750,13 +750,17 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         const sOutputs  = localStorage.getItem(`studio-wf-state-${activeProject.id}-outputs`);
         const sMaster   = localStorage.getItem(`studio-wf-state-${activeProject.id}-masterState`);
         const sFeedback = localStorage.getItem(`studio-wf-state-${activeProject.id}-masterFeedback`);
+        const sConfigs  = localStorage.getItem(`studio-wf-config-${activeProject.id}`);
 
         if (sStatus)   setNodeStatus(JSON.parse(sStatus));   else setNodeStatus({});
         if (sInputs)   setNodeInputs(JSON.parse(sInputs));   else setNodeInputs({});
         if (sOutputs)  setNodeOutputs(JSON.parse(sOutputs));  else setNodeOutputs({});
         if (sMaster)   setMasterState(JSON.parse(sMaster));  else setMasterState("idle");
         if (sFeedback) setMasterFeedback(JSON.parse(sFeedback)); else setMasterFeedback("");
+        if (sConfigs)  setConfigs(JSON.parse(sConfigs));     else setConfigs(buildDefaultConfigs());
       } catch (_) {}
+    } else {
+      setConfigs(buildDefaultConfigs());
     }
   }, [activeProject?.id]);
 
