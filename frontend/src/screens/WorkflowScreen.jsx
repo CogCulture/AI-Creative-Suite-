@@ -641,10 +641,10 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     ? `studio-wf-config-${activeProject.id}`
     : "studio-wf-config-default";
 
-  const buildDefaultConfigs = () => ({
+  const buildDefaultConfigs = useCallback(() => ({
     brief: {
       brief: activeProject?.brief || "Create an Instagram Ad image for FrostBrew Organic Cold Brew Coffee — bold, energizing, modern aesthetic with rich golden hour lighting.",
-      assetType: activeProject?.assetType || "Instagram Ad Image",
+      assetType: activeProject?.assetType || activeProject?.asset_type || "Instagram Ad Image",
     },
     agent_strategy: {
       model: "claude-4-sonnet",
@@ -668,7 +668,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       ratio: "1:1",
       ...(aiCfg.genfy || {}),
     },
-  });
+  }), [activeProject, aiCfg, defaultStrategyPrompt, defaultArtDirPrompt]);
 
   const [configs, setConfigs] = useState(() => {
     try {
