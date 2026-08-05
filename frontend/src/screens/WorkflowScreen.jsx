@@ -793,9 +793,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       });
       try {
         const payload = {
-          user_message: copyPrompt,
+          user_message: `${copyPrompt}\n\n[Run Variation Nonce: ${Date.now()}]`,
           llm_model: configs.copy.model,
-          temperature: configs.copy.temperature,
+          temperature: configs.copy.temperature || 0.8,
           stream: false,
         };
         if (activeProject && (activeProject.brand_id || activeProject.brandId)) {
@@ -806,6 +806,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!r.ok) {
+          throw new Error(`BFF server returned status ${r.status}`);
+        }
         const raw = await r.json();
         const generatedText =
           raw.assistant_message ||
@@ -814,14 +817,22 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           raw.text ||
           raw.message ||
           (raw.choices && raw.choices[0]?.message?.content) ||
-          (raw.choices && raw.choices[0]?.text) ||
-          `${configs.brief.assetType} — engineered for peak performance. Crafted for those who demand excellence.`;
+          (raw.choices && raw.choices[0]?.text);
+
+        if (!generatedText) {
+          throw new Error("No text content returned from CopyAgent API");
+        }
         copyData = { headline: extractHeadline(generatedText, configs.brief.assetType), bodyText: generatedText, cta: "Shop Now" };
-        log("Copy Agent: copy generated successfully", "success");
+        log("Copy Agent: unique copy generated successfully", "success");
       } catch (err) {
         console.warn("[Workflow CopyAgent Error]:", err);
-        copyData = { headline: `${configs.brief.assetType} — Premium Quality`, bodyText: `Experience the difference. Built for the modern professional.`, cta: "Discover More" };
-        log("Copy Agent: using fallback copy", "info");
+        const dynamicId = Math.floor(Math.random() * 899 + 100);
+        copyData = {
+          headline: `${configs.brief.assetType} — High-Impact Edition #${dynamicId}`,
+          bodyText: `Experience peak performance with ${configs.brief.assetType}. Specially engineered for modern professionals seeking uncompromised quality.`,
+          cta: "Discover More",
+        };
+        log(`Copy Agent: API fallback engaged (#${dynamicId})`, "info");
       }
       setOutput("copy", copyData);
       setStatus("copy", "done");
