@@ -656,10 +656,6 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     setLogsOpen(true);
   }, []);
 
-  const setStatus = (id, s) => setNodeStatus(prev => ({ ...prev, [id]: s }));
-  const setInput = (id, d) => setNodeInputs(prev => ({ ...prev, [id]: d }));
-  const setOutput = (id, d) => setNodeOutputs(prev => ({ ...prev, [id]: d }));
-
   const updateConfig = (nodeId, field, value) => {
     setConfigs(prev => {
       const next = { ...prev, [nodeId]: { ...prev[nodeId], [field]: value } };
