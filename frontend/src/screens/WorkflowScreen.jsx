@@ -180,38 +180,49 @@ function NodeCard({ node, status = "idle", output, isSelected, onSelect, t }) {
 function NodeOutputPreview({ node, output, t }) {
   if (node.id === "brief") {
     return (
-      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "8px 10px", borderRadius: 6 }}>
-        {output.brief?.slice(0, 120)}{output.brief?.length > 120 ? "..." : ""}
+      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+        <div style={{ fontWeight: 700, fontSize: 10, color: t.text3, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Brief Input</div>
+        {output.brief}
       </div>
     );
   }
   if (node.id === "agent_strategy") {
     return (
-      <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.5 }}>
-        <div><b style={{ color: t.text }}>Audience:</b> {output.target_audience}</div>
-        {output.copy_specs && <div style={{ color: t.text3, marginTop: 3 }}>{output.copy_specs?.slice(0, 90)}...</div>}
+      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+        <div style={{ fontWeight: 700, fontSize: 10, color: t.brain, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Strategy Output</div>
+        <div><b style={{ color: t.text }}>Target Audience:</b> {output.target_audience}</div>
+        {output.copy_specs && <div style={{ color: t.text2, marginTop: 4 }}><b>Strategy Specs:</b> {output.copy_specs}</div>}
+        {output.recommended_copy_prompt && (
+          <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px dashed ${t.border}`, fontSize: 11, color: t.text3 }}>
+            <b>Prompt Strategy:</b> {output.recommended_copy_prompt}
+          </div>
+        )}
       </div>
     );
   }
   if (node.id === "copy") {
     return (
-      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "8px 10px", borderRadius: 6 }}>
-        {output.bodyText?.slice(0, 140)}{output.bodyText?.length > 140 ? "..." : ""}
+      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+        <div style={{ fontWeight: 700, fontSize: 10, color: "#8B5CF6", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Generated Copy</div>
+        {output.headline && <div style={{ fontWeight: 700, color: t.text, fontSize: 13, marginBottom: 4 }}>{output.headline}</div>}
+        <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{output.bodyText}</div>
+        {output.cta && <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: "#8B5CF6" }}>CTA: {output.cta}</div>}
       </div>
     );
   }
   if (node.id === "agent_artdir") {
     return (
-      <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.5 }}>
-        <div><b style={{ color: t.text }}>Prompt:</b> {output.image_prompt?.slice(0, 80)}...</div>
-        <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
-          {["ratio","quality"].map(k => output[k] && (
-            <span key={k} style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 7px", borderRadius: 4, color: t.text3 }}>
+      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+        <div style={{ fontWeight: 700, fontSize: 10, color: "#E8552A", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Art Director Specs</div>
+        <div><b style={{ color: t.text }}>Image Prompt:</b> {output.image_prompt}</div>
+        <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+          {["ratio", "quality", "style", "lighting", "medium"].map(k => output[k] && (
+            <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
               {k}: {output[k]}
             </span>
           ))}
-          {output.categories && Object.entries(output.categories).slice(0, 3).map(([k,v]) => (
-            <span key={k} style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 7px", borderRadius: 4, color: t.text3 }}>
+          {output.categories && Object.entries(output.categories).map(([k, v]) => (
+            <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
               {k}: {v}
             </span>
           ))}
@@ -220,17 +231,17 @@ function NodeOutputPreview({ node, output, t }) {
     );
   }
   if (node.id === "genfy") {
-    if (output.url) {
+    if (output.url || output.base64) {
+      const src = output.url || `data:image/png;base64,${output.base64}`;
       return (
-        <div style={{ borderRadius: 8, overflow: "hidden", maxHeight: 200 }}>
-          <img src={output.url} alt="Generated" style={{ width: "100%", objectFit: "cover", display: "block" }} />
-        </div>
-      );
-    }
-    if (output.base64) {
-      return (
-        <div style={{ borderRadius: 8, overflow: "hidden", maxHeight: 200 }}>
-          <img src={`data:image/png;base64,${output.base64}`} alt="Generated" style={{ width: "100%", objectFit: "cover", display: "block" }} />
+        <div style={{ borderRadius: 10, overflow: "hidden", border: `1px solid ${t.border}` }}>
+          <img src={src} alt="Generated visual" style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }} />
+          <div style={{ padding: "8px 12px", background: t.surface2, fontSize: 11, color: t.text2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>Final Visual Rendered</span>
+            <a href={src} download="campaign-creative.png" target="_blank" rel="noreferrer" style={{ color: t.brain, fontWeight: 700, textDecoration: "none" }}>
+              Download High-Res
+            </a>
+          </div>
         </div>
       );
     }
@@ -574,6 +585,26 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     });
   };
 
+  const [approvalMode, setApprovalMode] = useState(true); // Default to Interactive Approval Mode
+  const [pendingApproval, setPendingApproval] = useState(null); // { nodeId, output, resolveFn }
+  const approvalResolverRef = useRef(null);
+
+  const waitForUserApproval = (nodeId, outputData) => {
+    return new Promise((resolve) => {
+      setPendingApproval({ nodeId, output: outputData });
+      approvalResolverRef.current = resolve;
+    });
+  };
+
+  const handleApproveStep = () => {
+    if (approvalResolverRef.current) {
+      const resolve = approvalResolverRef.current;
+      approvalResolverRef.current = null;
+      setPendingApproval(null);
+      resolve({ approved: true });
+    }
+  };
+
   // ── Run Workflow ─────────────────────────────────────────────────────────────
   const handleRun = async () => {
     if (isRunning) return;
@@ -592,6 +623,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       : "";
 
     setIsRunning(true);
+    setPendingApproval(null);
     setNodeStatus({});
     setNodeInputs({});
     setNodeOutputs({});
@@ -602,6 +634,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
     log("👑 Master Supervisor Agent activated", "agent");
     log(`Campaign goal: ${brief.slice(0, 80)}...`, "info");
+    if (approvalMode) {
+      log("⏸ Interactive Approval Mode: pipeline will pause after each node for user approval", "agent");
+    }
     if (brandContext) {
       log(`🧠 Brand Brain active: ${brandContext.brandName || "Brand"} · ${brandContext.primaryTone || ""} tone`, "agent");
     }
@@ -611,10 +646,18 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setStatus("brief", "active");
       setSelectedNodeId("brief");
       log("Node 1: Campaign Brief — locked and loaded", "info");
-      await delay(600);
+      await delay(400);
+      const briefOutput = { brief, assetType: configs.brief.assetType };
       setInput("brief", { brief: configs.brief.brief, assetType: configs.brief.assetType });
-      setOutput("brief", { brief, assetType: configs.brief.assetType });
+      setOutput("brief", briefOutput);
       setStatus("brief", "done");
+
+      if (approvalMode) {
+        log("⏸ Brief Step complete. Waiting for user approval to run Strategy Agent...", "agent");
+        setMasterFeedback("Node 1 Complete — Awaiting your approval to proceed to Strategy Agent...");
+        await waitForUserApproval("brief", briefOutput);
+        log("✓ Brief approved by user", "success");
+      }
 
       // ── STEP 2: Strategy Agent ─────────────────────────────────────────────
       setStatus("agent_strategy", "active");
@@ -641,6 +684,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
       setOutput("agent_strategy", strategyData);
       setStatus("agent_strategy", "done");
+
+      if (approvalMode) {
+        log("⏸ Strategy Step complete. Review Strategy Output and click Approve to run Copy Agent...", "agent");
+        setMasterFeedback("Strategy Node Complete — Awaiting your approval to proceed to Copy Agent...");
+        await waitForUserApproval("agent_strategy", strategyData);
+        log("✓ Strategy output approved by user", "success");
+      }
 
       // Master audit step 1 — non-blocking, log failures instead of swallowing
       fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "2. Strategy Analysis", step_data: strategyData }) })
@@ -697,6 +747,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       setOutput("copy", copyData);
       setStatus("copy", "done");
 
+      if (approvalMode) {
+        log("⏸ Copy Generation complete. Review Copy Output and click Approve to run Art Director...", "agent");
+        setMasterFeedback("Copy Agent Node Complete — Awaiting your approval to proceed to Art Director...");
+        await waitForUserApproval("copy", copyData);
+        log("✓ Copy output approved by user", "success");
+      }
+
       // Master audit step 2 — non-blocking, log failures instead of swallowing
       fetch("/bff/workflow/orchestrate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ master_goal: brief, current_step: "3. Copy Generation", step_data: copyData }) })
         .then(r => { if (!r.ok) console.warn("[Orchestrator] audit step 2 returned", r.status); })
@@ -733,6 +790,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
       setOutput("agent_artdir", artDirData);
       setStatus("agent_artdir", "done");
+
+      if (approvalMode) {
+        log("⏸ Art Director Step complete. Review Visual Prompt and click Approve to render Image...", "agent");
+        setMasterFeedback("Art Director Node Complete — Awaiting your approval to render Image...");
+        await waitForUserApproval("agent_artdir", artDirData);
+        log("✓ Art Director output approved by user", "success");
+      }
 
       // ── STEP 5: Genfy Image Engine ─────────────────────────────────────────
       setStatus("genfy", "active");
@@ -935,18 +999,85 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 </div>
               )}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <label style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                fontSize: 12, fontWeight: 600, color: t.text2, cursor: "pointer",
+                background: t.surface2, padding: "6px 12px", borderRadius: 8,
+                border: `1px solid ${t.border}`, fontFamily: FONT,
+              }}>
+                <input
+                  type="checkbox"
+                  checked={approvalMode}
+                  onChange={(e) => setApprovalMode(e.target.checked)}
+                  disabled={isRunning}
+                  style={{ accentColor: t.brain }}
+                />
+                Step-by-Step Approval
+              </label>
+
               {(isRunning || Object.keys(nodeStatus).length > 0) && (
                 <Btn t={t} kind="secondary" small icon={RotateCcw} onClick={handleReset} disabled={isRunning}>
                   Reset
                 </Btn>
               )}
-              <Btn t={t} kind="accent" icon={isRunning ? Loader2 : Play} onClick={handleRun} disabled={isRunning}
-                style={{ minWidth: 160, justifyContent: "center" }}>
-                {isRunning ? "Running Pipeline..." : "▶  Launch Workflow"}
-              </Btn>
+
+              {pendingApproval ? (
+                <button
+                  onClick={handleApproveStep}
+                  style={{
+                    padding: "9px 20px", borderRadius: 10, border: "none",
+                    background: "linear-gradient(135deg, #22C55E, #16A34A)",
+                    color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 8, fontFamily: FONT,
+                    boxShadow: "0 4px 14px rgba(34,197,94,0.35)",
+                  }}
+                >
+                  <CheckCircle size={16} />
+                  Approve Node Output & Proceed ▶
+                </button>
+              ) : (
+                <Btn t={t} kind="accent" icon={isRunning ? Loader2 : Play} onClick={handleRun} disabled={isRunning}
+                  style={{ minWidth: 160, justifyContent: "center" }}>
+                  {isRunning ? "Running Pipeline..." : "▶  Launch Workflow"}
+                </Btn>
+              )}
             </div>
           </div>
+
+          {/* Pending Approval Banner when pipeline is paused for user review */}
+          {pendingApproval && (
+            <div style={{
+              marginBottom: 20, padding: "16px 20px", borderRadius: R.lg,
+              background: "linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04))",
+              border: "1.5px solid rgba(34,197,94,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+              boxShadow: "0 6px 20px rgba(34,197,94,0.12)",
+            }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#15803D", fontWeight: 800, fontSize: 14 }}>
+                  <CheckCircle size={18} />
+                  NODE COMPLETED — AWAITING YOUR APPROVAL
+                </div>
+                <div style={{ color: t.text, fontSize: 13, marginTop: 3 }}>
+                  Review the output below for <b>{PIPELINE.find(n => n.id === pendingApproval.nodeId)?.label}</b>. Click <b>Approve Node Output & Proceed</b> to run the next step.
+                </div>
+              </div>
+              <button
+                onClick={handleApproveStep}
+                style={{
+                  padding: "10px 22px", borderRadius: 10, border: "none",
+                  background: "#22C55E", color: "#fff", fontWeight: 800, fontSize: 13,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                  fontFamily: FONT, flexShrink: 0,
+                  boxShadow: "0 4px 14px rgba(34,197,94,0.4)",
+                }}
+              >
+                <CheckCircle size={16} />
+                Approve & Proceed
+              </button>
+            </div>
+          )}
 
           {/* AI reasoning card (only if AI designed the workflow) */}
           {aiDesigned && aiReasoning && (
