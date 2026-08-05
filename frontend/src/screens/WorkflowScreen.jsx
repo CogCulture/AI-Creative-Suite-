@@ -901,7 +901,12 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         const r = await fetch("/bff/workflow/step-bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bridge_type: "brief_to_copy", brief: brandPrefix + brief, asset_type: configs.brief.assetType }),
+          body: JSON.stringify({
+            bridge_type: "brief_to_copy",
+            brief: brandPrefix + brief,
+            asset_type: configs.brief.assetType,
+            brand_id: activeProject?.brand_id || activeProject?.brandId || null,
+          }),
         });
         strategyData = await r.json();
         log(`Strategy Agent: audience = "${strategyData.target_audience}"`, "success");

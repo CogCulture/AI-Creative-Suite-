@@ -2165,6 +2165,7 @@ class StepBridgeRequest(BaseModel):
     brief: Optional[str] = ""
     copy_output: Optional[str] = ""
     asset_type: Optional[str] = "Instagram Ad Image"
+    brand_id: Optional[str] = None
 
 class MasterOrchestrateRequest(BaseModel):
     master_goal: str
@@ -2172,37 +2173,103 @@ class MasterOrchestrateRequest(BaseModel):
     step_data: Optional[dict] = None
 
 @app.post("/bff/workflow/step-bridge")
-async def workflow_step_bridge(req: StepBridgeRequest):
+async def workflow_step_bridge(
+    req: StepBridgeRequest,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
     """
     Intermediary Connection Agent sitting between pipeline nodes.
     Shares context, parses inputs, and builds rich prompt & parameter configurations.
     """
+    user_id = _decode_jwt(suite_session) if suite_session else STATIC_USER_ID
+
     if req.bridge_type == "brief_to_copy":
+        brand_id = req.brand_id
+        brand_info = ""
+        competitors_list = ""
+        rag_context_text = ""
+
+        # Fetch Brand DNA from SQLite DB
+        if brand_id and db:
+            brand_obj = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id).first()
+            if brand_obj:
+                brand_info = (
+                    f"Brand Name: {brand_obj.name}\n"
+                    f"Industry: {brand_obj.industry or 'N/A'}\n"
+                    f"Voice/Tone: {brand_obj.voice or 'N/A'}\n"
+                    f"Archetype: {brand_obj.archetype or 'N/A'}\n"
+                    f"USP: {brand_obj.usp or 'N/A'}\n"
+                    f"Words to Use: {brand_obj.words_to_use or 'N/A'}\n"
+                    f"Words to Avoid: {brand_obj.words_to_avoid or 'N/A'}\n"
+                )
+                if brand_obj.competitors:
+                    try:
+                        comps = json.loads(brand_obj.competitors)
+                        if isinstance(comps, list):
+                            competitors_list = ", ".join([c.get("name", str(c)) if isinstance(c, dict) else str(c) for c in comps])
+                        else:
+                            competitors_list = str(comps)
+                    except Exception:
+                        competitors_list = str(brand_obj.competitors)
+
+                # Fetch RAG context from Pinecone if linked
+                if _RAG_AVAILABLE and rag_engine and brand_obj.rag_linked and brand_obj.pinecone_client_key:
+                    try:
+                        rag_docs = await rag_engine.retrieve_brand_context(
+                            brand_obj.pinecone_client_key,
+                            f"{req.brief} {req.asset_type}",
+                            top_k=4,
+                        )
+                        if rag_docs:
+                            rag_context_text = rag_docs
+                            print(f"[Strategy Agent RAG] Retrieved {len(rag_docs)} chars for brand '{brand_obj.name}'", flush=True)
+                    except Exception as exc:
+                        print(f"[Strategy Agent RAG Warning]: {exc}", flush=True)
+
         prompt_text = (
-            f"You are an expert Strategy Agent. Analyze the following campaign brief for a {req.asset_type}.\n"
-            f"Brief:\n{req.brief}\n\n"
-            "Formulate a structured strategy spec including:\n"
-            "1. Target Audience\n2. Key Value Proposition\n3. Tone of Voice\n4. Copywriting Angle & Requirements for the Copy Agent."
+            f"[ROLE & TASK DIRECTIVE: You are a Senior Strategic Brand Director & Market Researcher. "
+            f"DO NOT WRITE SOCIAL MEDIA COPY OR AD POSTS HERE. "
+            f"Your sole objective is to conduct a strategic analysis, competitor evaluation, and RAG knowledge synthesis.]\n\n"
+            f"CAMPAIGN BRIEF: {req.brief}\n"
+            f"ASSET TYPE: {req.asset_type}\n\n"
+            f"BRAND DNA KNOWLEDGE:\n{brand_info if brand_info else 'Brand: Emaar India'}\n"
+            f"COMPETITORS TO ANALYZE: {competitors_list if competitors_list else 'Direct real estate competitors in Gurugram/India'}\n\n"
+            f"RETRIEVED BRAND RAG KNOWLEDGE:\n{rag_context_text if rag_context_text else 'Standard brand guidelines applied.'}\n\n"
+            "Please provide a structured Strategic Analysis with these exact sections:\n"
+            "1. TARGET AUDIENCE & PERSONA: Demographics, psychographics, and key pain points.\n"
+            "2. BRAND POSITIONING & RAG KNOWLEDGE SUMMARY: Core brand strengths and RAG knowledge highlights.\n"
+            "3. COMPETITOR ANALYSIS & DIFFERENTIATION: Contrast against competitors.\n"
+            "4. STRATEGIC COPY DIRECTION: Recommended angles and guidelines for the Copy Agent."
         )
+
+        analysis_text = ""
+        target_audience = "High-Net-Worth Investors & Modern Urban Professionals"
         try:
             async with httpx.AsyncClient(timeout=45.0) as client:
                 resp = await client.post(
                     COPYAGENT_URL,
-                    headers=_upstream_headers(STATIC_USER_ID),
+                    headers=_upstream_headers(user_id or STATIC_USER_ID),
                     json={"user_message": prompt_text, "llm_model": "claude-4-sonnet", "temperature": 0.7, "stream": False}
                 )
                 if resp.is_success:
-                    analysis_text = resp.json().get("content", "")
-                else:
-                    analysis_text = f"Brief Analysis for {req.asset_type}: Focus on product benefits, strong CTA, and engaging emotional hook."
-        except Exception:
-            analysis_text = f"Targeting modern consumers looking for quality in {req.asset_type}. Emphasize premium value and instant call-to-action."
+                    analysis_text = resp.json().get("assistant_message") or resp.json().get("content") or ""
+        except Exception as err:
+            print(f"[Strategy Agent Error]: {err}", flush=True)
+
+        if not analysis_text:
+            analysis_text = (
+                f"1. TARGET AUDIENCE: HNI Investors & Commercial Space Buyers seeking high-yield assets.\n"
+                f"2. BRAND POSITIONING: Leverage Emaar India's global architectural reputation.\n"
+                f"3. COMPETITOR ANALYSIS: Stand out against local developers by emphasizing architectural legacy and prime location.\n"
+                f"4. STRATEGIC COPY DIRECTION: Focus on prestige, asset growth, and commercial superiority."
+            )
 
         return {
             "bridge_type": "brief_to_copy",
-            "target_audience": "Modern Urban Professionals & Creatives",
+            "target_audience": target_audience,
             "copy_specs": analysis_text,
-            "recommended_copy_prompt": f"Write high-converting {req.asset_type} copy based on this brief: {req.brief}. Analysis: {analysis_text[:200]}..."
+            "recommended_copy_prompt": f"Write high-converting {req.asset_type} copy based on this Strategic Analysis:\n\n{analysis_text}"
         }
 
     elif req.bridge_type == "copy_to_genfy":
