@@ -1089,13 +1089,15 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         log("Node 5: Image Engine — requesting generation via DALL-E 3...", "info");
         setMasterFeedback("Supervising image rendering process...");
 
-        const imgPrompt = artDirData?.image_prompt || brief;
+        const activeArtDir = artDirData || nodeOutputs.agent_artdir || {};
+        const imgPrompt = activeArtDir.image_prompt || (copyData?.bodyText ? `Advertising photography visual representing: ${copyData.bodyText.slice(0, 150)}` : brief);
+
         setInput("genfy", {
           prompt: imgPrompt,
-          model_ids: artDirData?.models || ["Nanobanana 2"],
-          ratio: artDirData?.ratio || configs.genfy.ratio,
-          quality: artDirData?.quality || configs.genfy.quality,
-          categories: artDirData?.categories || { style: "cinematic", lighting: "golden" },
+          model_ids: activeArtDir.models || ["Nanobanana 2"],
+          ratio: activeArtDir.ratio || configs.genfy.ratio,
+          quality: activeArtDir.quality || configs.genfy.quality,
+          categories: activeArtDir.categories || { style: "cinematic", lighting: "golden" },
         });
         try {
           const r = await fetch("/bff/genfy/sessions", {
@@ -1103,10 +1105,10 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               prompt: imgPrompt,
-              model_ids: artDirData?.models || ["Nanobanana 2"],
-              ratio: artDirData?.ratio || configs.genfy.ratio,
-              quality: artDirData?.quality || configs.genfy.quality,
-              categories: artDirData?.categories || { style: "cinematic", lighting: "golden" },
+              model_ids: activeArtDir.models || ["Nanobanana 2"],
+              ratio: activeArtDir.ratio || configs.genfy.ratio,
+              quality: activeArtDir.quality || configs.genfy.quality,
+              categories: activeArtDir.categories || { style: "cinematic", lighting: "golden" },
             }),
           });
           const genfySessionData = await r.json();
