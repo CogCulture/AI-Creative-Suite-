@@ -663,16 +663,34 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         temperature: configs.copy.temperature,
       });
       try {
+        const payload = {
+          user_message: copyPrompt,
+          llm_model: configs.copy.model,
+          temperature: configs.copy.temperature,
+          stream: false,
+        };
+        if (activeProject && (activeProject.brand_id || activeProject.brandId)) {
+          payload.external_project_data = { brand_id: activeProject.brand_id || activeProject.brandId };
+        }
         const r = await fetch("/bff/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_message: copyPrompt, llm_model: configs.copy.model, temperature: configs.copy.temperature, stream: false }),
+          body: JSON.stringify(payload),
         });
         const raw = await r.json();
-        const generatedText = raw.content || raw.text || `${configs.brief.assetType} — engineered for peak performance. Crafted for those who demand excellence.`;
+        const generatedText =
+          raw.assistant_message ||
+          raw.content ||
+          raw.response ||
+          raw.text ||
+          raw.message ||
+          (raw.choices && raw.choices[0]?.message?.content) ||
+          (raw.choices && raw.choices[0]?.text) ||
+          `${configs.brief.assetType} — engineered for peak performance. Crafted for those who demand excellence.`;
         copyData = { headline: extractHeadline(generatedText, configs.brief.assetType), bodyText: generatedText, cta: "Shop Now" };
         log("Copy Agent: copy generated successfully", "success");
-      } catch {
+      } catch (err) {
+        console.warn("[Workflow CopyAgent Error]:", err);
         copyData = { headline: `${configs.brief.assetType} — Premium Quality`, bodyText: `Experience the difference. Built for the modern professional.`, cta: "Discover More" };
         log("Copy Agent: using fallback copy", "info");
       }
