@@ -2112,40 +2112,41 @@ async def proxy_genfy(path: str, request: Request):
             # Check if OpenAI API key is available for DALL-E 3 generation
             openai_key = os.getenv("OPENAI_API_KEY", "").strip()
             if openai_key:
-                print(f"[Image Engine] Generating image via OpenAI DALL-E 3 (prompt len={len(prompt)})...", flush=True)
+                print(f"[Image Engine] Generating image via OpenAI DALL-E (prompt len={len(prompt)})...", flush=True)
                 async with httpx.AsyncClient(timeout=120.0) as client:
-                    resp = await client.post(
-                        "https://api.openai.com/v1/images/generations",
-                        headers={
-                            "Authorization": f"Bearer {openai_key}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": "dall-e-3",
-                            "prompt": prompt,
-                            "n": 1,
-                            "size": "1024x1024",
-                            "quality": "standard"
-                        }
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        img_url = data["data"][0]["url"]
-                        revised_prompt = data["data"][0].get("revised_prompt", prompt)
-                        print(f"[Image Engine] DALL-E 3 image generated successfully!", flush=True)
-                        return JSONResponse({
-                            "session_id": f"dalle-{int(time.time())}",
-                            "status": "completed",
-                            "results": [{
-                                "image_url": img_url,
-                                "url": img_url,
-                                "model": "OpenAI DALL-E 3",
-                                "revised_prompt": revised_prompt
-                            }],
-                            "images": [{ "url": img_url }]
-                        })
-                    else:
-                        print(f"[Image Engine] DALL-E 3 returned error {resp.status_code}: {resp.text}", flush=True)
+                    # Try dall-e-3 first, then fallback to dall-e-2
+                    for model_name in ["dall-e-3", "dall-e-2"]:
+                        resp = await client.post(
+                            "https://api.openai.com/v1/images/generations",
+                            headers={
+                                "Authorization": f"Bearer {openai_key}",
+                                "Content-Type": "application/json"
+                            },
+                            json={
+                                "model": model_name,
+                                "prompt": prompt[:1000],  # cap length for safety
+                                "n": 1,
+                                "size": "1024x1024" if model_name == "dall-e-3" else "1024x1024",
+                            }
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            img_url = data["data"][0]["url"]
+                            revised_prompt = data["data"][0].get("revised_prompt", prompt)
+                            print(f"[Image Engine] OpenAI {model_name} image generated successfully!", flush=True)
+                            return JSONResponse({
+                                "session_id": f"dalle-{int(time.time())}",
+                                "status": "completed",
+                                "results": [{
+                                    "image_url": img_url,
+                                    "url": img_url,
+                                    "model": f"OpenAI {model_name.upper()}",
+                                    "revised_prompt": revised_prompt
+                                }],
+                                "images": [{ "url": img_url }]
+                            })
+                        else:
+                            print(f"[Image Engine] OpenAI {model_name} returned error {resp.status_code}: {resp.text}", flush=True)
         except Exception as exc:
             print(f"[Image Engine DALL-E Error]: {exc}", flush=True)
 
@@ -2225,7 +2226,7 @@ async def workflow_step_bridge(
             brand_obj = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id).first()
             if brand_obj:
                 brand_details_str = (
-                    f"Brand: {brand_obj.name}\n"
+                    f"Brand: {brand_obj.brand_name}\n"
                     f"Industry: {brand_obj.industry or 'Real Estate'}\n"
                     f"Voice: {brand_obj.voice or 'Authoritative, Premium'}\n"
                     f"USP: {brand_obj.usp or 'Global Developer Standard'}\n"
@@ -2321,7 +2322,7 @@ async def workflow_step_bridge(
             brand_obj = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id).first()
             if brand_obj:
                 brand_details_str = (
-                    f"Brand: {brand_obj.name}\n"
+                    f"Brand: {brand_obj.brand_name}\n"
                     f"Industry: {brand_obj.industry or 'N/A'}\n"
                     f"Voice/Tone: {brand_obj.voice or 'N/A'}\n"
                     f"USP: {brand_obj.usp or 'N/A'}\n"
@@ -2335,7 +2336,7 @@ async def workflow_step_bridge(
                         )
                         if rag_docs:
                             rag_context_text = rag_docs
-                            print(f"[ArtDirector RAG] Retrieved {len(rag_docs)} chars of brand design system for '{brand_obj.name}'", flush=True)
+                            print(f"[ArtDirector RAG] Retrieved {len(rag_docs)} chars of brand design system for '{brand_obj.brand_name}'", flush=True)
                     except Exception as exc:
                         print(f"[ArtDirector RAG Warning]: {exc}", flush=True)
 
