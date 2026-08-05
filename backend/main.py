@@ -2251,12 +2251,16 @@ async def workflow_step_bridge(
             print(f"[Strategy Agent Upstream Call Error]: {err}", flush=True)
 
         if not analysis_text:
+            brand_name_display = "Emaar India"
+            if "Brand: " in brand_details_str:
+                brand_name_display = brand_details_str.split("Brand: ")[-1].split("\n")[0]
+
             analysis_text = (
                 f"📊 MARKET & BRAND INTELLIGENCE REPORT:\n\n"
                 f"1. TARGET AUDIENCE ANALYSIS:\n"
                 f"   • HNI & Commercial Real Estate Investors looking for long-term equity growth in Gurugram.\n"
                 f"   • Key Motivation: High rental yields, capital appreciation, and premier address status.\n\n"
-                f"2. BRAND DNA & RAG SYNTHESIS ({brand_details_str.split('Brand: ')[-1].split('\\n')[0] if 'Brand:' in brand_details_str else 'Emaar India'}):\n"
+                f"2. BRAND DNA & RAG SYNTHESIS ({brand_name_display}):\n"
                 f"   • Unmatched international development standards and master-planned architecture.\n"
                 f"   • High trust factor and proven delivery track record.\n\n"
                 f"3. COMPETITOR BENCHMARKING ({comp_str}):\n"
