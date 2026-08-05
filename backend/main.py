@@ -1009,14 +1009,14 @@ async def list_brands(
         if b.brand_name:
             existing_keys_and_names.add(b.brand_name.strip().lower())
 
-    if _RAG_AVAILABLE and rag_engine and user_id:
+    # Background sync: if no brands exist for user, non-blocking check
+    if not brands and _RAG_AVAILABLE and rag_engine and user_id:
         try:
+            # Quick check from DB without blocking full Pinecone scanning
             known_clients = await asyncio.get_event_loop().run_in_executor(None, rag_engine.get_known_clients)
-            added_any = False
             for client_key in known_clients:
                 clean_key = client_key.strip()
                 if clean_key.lower() not in existing_keys_and_names:
-                    # Auto-create Brand entry linked to this Pinecone client
                     new_brand = SuiteBrand(
                         id=str(uuid.uuid4()),
                         user_id=user_id,
@@ -1028,12 +1028,11 @@ async def list_brands(
                     )
                     db.add(new_brand)
                     existing_keys_and_names.add(clean_key.lower())
-                    added_any = True
-            if added_any:
-                db.commit()
-                brands = db.query(SuiteBrand).filter(SuiteBrand.user_id == user_id).order_by(SuiteBrand.created_at.desc()).all()
+            db.commit()
+            brands = db.query(SuiteBrand).filter(SuiteBrand.user_id == user_id).order_by(SuiteBrand.created_at.desc()).all()
         except Exception as rag_err:
-            print(f"[RAG Auto-sync Brands Error]: {rag_err}", flush=True)
+            print(f"[RAG Auto-sync Brands Note]: {rag_err}", flush=True)
+
 
     # Deduplicate by brand_name (case-insensitive) keeping the most recent
     seen_names = set()

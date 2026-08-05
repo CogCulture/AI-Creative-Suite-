@@ -17,6 +17,7 @@ Usage in main.py:
 import os
 import re
 import io
+import time
 import uuid
 import asyncio
 import logging
@@ -211,7 +212,12 @@ class RAGEngine:
         """
         Fetch distinct `client` metadata values from Pinecone by iterating
         over indexed vector IDs and fetching metadata in batches.
+        Cached in-memory for 10 minutes to ensure instant response times.
         """
+        now = time.time()
+        if hasattr(self, "_clients_cache") and self._clients_cache and (now - getattr(self, "_clients_cache_time", 0) < 600):
+            return self._clients_cache
+
         if not self._ensure_index():
             return []
         try:
@@ -223,12 +229,12 @@ class RAGEngine:
                 for item in page:
                     item_id = item.id if hasattr(item, "id") else str(item)
                     vector_ids.append(item_id)
-                if len(vector_ids) >= 1000:
+                if len(vector_ids) >= 200:
                     break
 
             # Fetch metadata in batches of 50
             batch_size = 50
-            for i in range(0, min(len(vector_ids), 1000), batch_size):
+            for i in range(0, min(len(vector_ids), 200), batch_size):
                 batch_ids = vector_ids[i : i + batch_size]
                 try:
                     fetched = self._index.fetch(ids=batch_ids, namespace=PINECONE_NAMESPACE)
@@ -238,10 +244,15 @@ class RAGEngine:
                 except Exception as b_err:
                     log.warning(f"[RAG] Batch fetch error: {b_err}")
 
-            return sorted([c for c in clients if c])
+            result = sorted([c for c in clients if c])
+            if result:
+                self._clients_cache = result
+                self._clients_cache_time = now
+            return result
         except Exception as exc:
             log.error(f"[RAG] get_known_clients error: {exc}")
-            return []
+            return getattr(self, "_clients_cache", [])
+
 
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
