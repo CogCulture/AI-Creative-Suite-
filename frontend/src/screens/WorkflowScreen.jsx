@@ -537,11 +537,51 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const aiReasoning = activeProject?.workflowConfig?.reasoning;
   const aiInferred = activeProject?.workflowConfig?.inferred;
 
-  const [nodeStatus, setNodeStatus] = useState({});   // nodeId → 'idle'|'active'|'done'|'error'
-  const [nodeInputs, setNodeInputs] = useState({});   // nodeId → data
-  const [nodeOutputs, setNodeOutputs] = useState({});  // nodeId → data
-  const [masterState, setMasterState] = useState("idle"); // 'idle'|'supervising'|'approved'|'rejected'
-  const [masterFeedback, setMasterFeedback] = useState("");
+  // Storage keys per active project so outputs survive page reloads and screen switches
+  const stateStorageKey = activeProject?.id
+    ? `studio-wf-state-${activeProject.id}`
+    : "studio-wf-state-default";
+
+  const [nodeStatus, setNodeStatus] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`${stateStorageKey}-status`);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return {};
+  });
+
+  const [nodeInputs, setNodeInputs] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`${stateStorageKey}-inputs`);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return {};
+  });
+
+  const [nodeOutputs, setNodeOutputs] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`${stateStorageKey}-outputs`);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return {};
+  });
+
+  const [masterState, setMasterState] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`${stateStorageKey}-masterState`);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return "idle";
+  });
+
+  const [masterFeedback, setMasterFeedback] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`${stateStorageKey}-masterFeedback`);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return "";
+  });
+
   const [selectedNodeId, setSelectedNodeId] = useState("brief");
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -549,15 +589,58 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const genfyPollRef = useRef(null);
   const logsBottomRef = useRef(null);
 
-  // Sync project brief if activeProject changes
+  // Restore stored pipeline state whenever activeProject changes
   useEffect(() => {
-    if (activeProject?.brief) {
-      setConfigs(prev => ({
-        ...prev,
-        brief: { ...prev.brief, brief: activeProject.brief, assetType: activeProject.assetType || prev.brief.assetType },
-      }));
+    if (activeProject?.id) {
+      try {
+        const sStatus   = localStorage.getItem(`studio-wf-state-${activeProject.id}-status`);
+        const sInputs   = localStorage.getItem(`studio-wf-state-${activeProject.id}-inputs`);
+        const sOutputs  = localStorage.getItem(`studio-wf-state-${activeProject.id}-outputs`);
+        const sMaster   = localStorage.getItem(`studio-wf-state-${activeProject.id}-masterState`);
+        const sFeedback = localStorage.getItem(`studio-wf-state-${activeProject.id}-masterFeedback`);
+
+        if (sStatus)   setNodeStatus(JSON.parse(sStatus));   else setNodeStatus({});
+        if (sInputs)   setNodeInputs(JSON.parse(sInputs));   else setNodeInputs({});
+        if (sOutputs)  setNodeOutputs(JSON.parse(sOutputs));  else setNodeOutputs({});
+        if (sMaster)   setMasterState(JSON.parse(sMaster));  else setMasterState("idle");
+        if (sFeedback) setMasterFeedback(JSON.parse(sFeedback)); else setMasterFeedback("");
+      } catch (_) {}
     }
   }, [activeProject?.id]);
+
+  // Helper wrappers that update React state AND save to localStorage
+  const setStatus = (id, s) => {
+    setNodeStatus(prev => {
+      const next = { ...prev, [id]: s };
+      try { localStorage.setItem(`${stateStorageKey}-status`, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+  };
+
+  const setInput = (id, d) => {
+    setNodeInputs(prev => {
+      const next = { ...prev, [id]: d };
+      try { localStorage.setItem(`${stateStorageKey}-inputs`, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+  };
+
+  const setOutput = (id, d) => {
+    setNodeOutputs(prev => {
+      const next = { ...prev, [id]: d };
+      try { localStorage.setItem(`${stateStorageKey}-outputs`, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+  };
+
+  const updateMasterState = (state, feedback) => {
+    setMasterState(state);
+    setMasterFeedback(feedback);
+    try {
+      localStorage.setItem(`${stateStorageKey}-masterState`, JSON.stringify(state));
+      localStorage.setItem(`${stateStorageKey}-masterFeedback`, JSON.stringify(feedback));
+    } catch (_) {}
+  };
 
   useEffect(() => {
     return () => { if (genfyPollRef.current) clearInterval(genfyPollRef.current); };
@@ -875,8 +958,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         auditFeedback = auditData.supervisor_feedback || auditFeedback;
       } catch (_) {}
 
-      setMasterState("approved");
-      setMasterFeedback(auditFeedback);
+      updateMasterState("approved", auditFeedback);
       log("👑 Master Supervisor: CAMPAIGN APPROVED ✓", "success");
       showToast("🎉 Multi-Agent Workflow complete!");
 
@@ -887,7 +969,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
     } catch (err) {
       log(`Pipeline error: ${err.message}`, "error");
-      setMasterState("idle");
+      updateMasterState("idle", "");
       showToast("Workflow encountered an error — check logs.");
     } finally {
       setIsRunning(false);
@@ -897,11 +979,19 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const handleReset = () => {
     if (genfyPollRef.current) clearInterval(genfyPollRef.current);
     setNodeStatus({});
+    setNodeInputs({});
     setNodeOutputs({});
-    setMasterState("idle");
-    setMasterFeedback("");
+    updateMasterState("idle", "");
+    setPendingApproval(null);
     setLogs([]);
     setIsRunning(false);
+    try {
+      localStorage.removeItem(`${stateStorageKey}-status`);
+      localStorage.removeItem(`${stateStorageKey}-inputs`);
+      localStorage.removeItem(`${stateStorageKey}-outputs`);
+      localStorage.removeItem(`${stateStorageKey}-masterState`);
+      localStorage.removeItem(`${stateStorageKey}-masterFeedback`);
+    } catch (_) {}
   };
 
   // Poll Genfy session for image
