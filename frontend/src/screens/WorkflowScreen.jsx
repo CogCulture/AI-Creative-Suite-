@@ -299,8 +299,8 @@ function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
             </div>
           ) : (
             <>
-              {output.headline && <div style={{ fontWeight: 700, color: t.text, fontSize: 13, marginBottom: 4 }}>{output.headline}</div>}
-              <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{output.bodyText}</div>
+              {output.headline && <div style={{ fontWeight: 700, color: t.text, fontSize: 13, marginBottom: 4 }}>{cleanRawJson(output.headline)}</div>}
+              <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{cleanRawJson(output.bodyText)}</div>
               {output.cta && <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: "#8B5CF6" }}>CTA: {output.cta}</div>}
             </>
           )}
@@ -1503,16 +1503,20 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function cleanRawJson(text) {
-  if (!text || typeof text !== "string") return "";
+  if (!text || typeof text !== "string") return text || "";
   let str = text.trim();
   str = str.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-  if (str.startsWith("{") && str.endsWith("}")) {
+  // Handle case where text contains raw JSON object syntax anywhere in the string
+  if (str.includes("{") && str.includes("}")) {
     try {
-      const parsed = JSON.parse(str);
-      if (parsed.bodyText) return parsed.bodyText;
+      const jsonStart = str.indexOf("{");
+      const jsonEnd = str.lastIndexOf("}") + 1;
+      const jsonSub = str.slice(jsonStart, jsonEnd);
+      const parsed = JSON.parse(jsonSub);
+      if (parsed.bodyText) return cleanRawJson(parsed.bodyText);
+      if (parsed.content) return cleanRawJson(parsed.content);
       if (parsed.headline && parsed.bodyText) return `${parsed.headline}\n\n${parsed.bodyText}`;
-      if (parsed.content) return parsed.content;
     } catch (_) {}
   }
   return str;
