@@ -1034,8 +1034,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // ── STEP 4: Art Director Agent ─────────────────────────────────────────
-      let artDirData = nodeOutputs.agent_artdir || null;
-      if (startIndex <= 3) {
+      let artDirData = (startIndex > 3 ? nodeOutputs.agent_artdir : null);
+      if (startIndex <= 3 || !artDirData) {
         setStatus("agent_artdir", "active");
         setSelectedNodeId("agent_artdir");
         log("⬡ Art Director Agent: mapping copy to Genfy visual parameters...", "agent");
