@@ -41,32 +41,27 @@ function useTheme() {
 
 /* ── App root ──────────────────────────────────────────── */
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    try {
-      return localStorage.getItem("studio-logged-in") === "true";
-    } catch {
-      return true;
-    }
-  });
+  // null = still checking with server, false = not logged in, true = confirmed by server
+  const [isLoggedIn, setIsLoggedIn] = useState(null);
 
   useEffect(() => {
-    // Validate session with server in background
+    // Validate session with the server on every load.
+    // localStorage flag is intentionally removed — server cookie is the only source of truth.
     fetch("/bff/auth/me", { credentials: "include" })
       .then((res) => {
         if (res.ok) {
           return res.json().then((user) => {
-            try {
-              localStorage.setItem("studio-user-info", JSON.stringify(user));
-              localStorage.setItem("studio-logged-in", "true");
-            } catch (_) {}
+            try { localStorage.setItem("studio-user-info", JSON.stringify(user)); } catch (_) {}
             setIsLoggedIn(true);
           });
         }
+        // Cookie missing or expired — force login screen
         try { localStorage.removeItem("studio-logged-in"); } catch (_) {}
         setIsLoggedIn(false);
       })
       .catch(() => {
-        // Keep offline / optimistic login if user was previously authenticated
+        // Network error — fail closed (show login, not app)
+        setIsLoggedIn(false);
       });
   }, []);
   const { t, mode, toggle } = useTheme();
