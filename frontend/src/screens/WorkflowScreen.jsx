@@ -1082,11 +1082,11 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // ── STEP 5: Genfy Image Engine ─────────────────────────────────────────
-      let genfyResult = nodeOutputs.genfy || null;
-      if (startIndex <= 4) {
+      let genfyResult = (startIndex > 4 ? nodeOutputs.genfy : null);
+      if (startIndex <= 4 || !genfyResult) {
         setStatus("genfy", "active");
         setSelectedNodeId("genfy");
-        log("Node 5: Genfy Image Engine — requesting generation...", "info");
+        log("Node 5: Image Engine — requesting generation via DALL-E 3...", "info");
         setMasterFeedback("Supervising image rendering process...");
 
         const imgPrompt = artDirData?.image_prompt || brief;
