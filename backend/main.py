@@ -2340,21 +2340,17 @@ async def workflow_step_bridge(
                         print(f"[ArtDirector RAG Warning]: {exc}", flush=True)
 
         prompt_text = (
-            f"SYSTEM ROLE: You are a World-Class Executive Art Director & Visual Design System Lead.\n"
-            f"YOUR TASK: Create an extremely precise, high-fidelity AI Image Generation Prompt for Genfy.\n"
-            f"DO NOT include generic meta-directives like '[CRITICAL DIRECTIVE...]' or raw prompt headers in the image prompt.\n\n"
+            f"SYSTEM ROLE: You are an Award-Winning Executive Art Director & Visual Design System Lead.\n"
+            f"YOUR TASK: Read the provided advertising copy and campaign brief, then craft a visual concept & AI image prompt.\n\n"
             f"CAMPAIGN BRIEF: {req.brief}\n"
-            f"APPROVED COPY: {req.copy_output}\n"
-            f"ASSET FORMAT: {req.asset_type}\n\n"
-            f"BRAND IDENTITY:\n{brand_details_str if brand_details_str else 'Brand: Emaar India'}\n\n"
-            f"RETRIEVED BRAND DESIGN SYSTEM & RAG GUIDELINES:\n{rag_context_text if rag_context_text else 'Emaar brand aesthetic: High-end architectural photography, warm golden sunlight, sleek metallic silver/gold accents, clean minimal layout, iconic skyline, luxury real estate feel.'}\n\n"
-            "Instruct the image model on exact visual composition:\n"
-            "1. SUBJECT & SCENE: Specific luxury architectural structure, environment, lighting, framing, and mood.\n"
-            "2. BRANDING & LOGO PLACEMENT: Precise guidelines for subtle, premium brand logo placement (e.g. minimalist Emaar crest embedded in architectural signage or corner watermark).\n"
-            "3. DESIGN SYSTEM & COLOR PALETTE: Color grade, lighting contrast, materials (glass, steel, warm marble, golden hour sky).\n\n"
-            "Return ONLY a JSON object formatted as follows:\n"
+            f"GENERATED COPY / AD HEADLINE: {req.copy_output}\n"
+            f"ASSET FORMAT: {req.asset_type}\n"
+            f"BRAND IDENTITY:\n{brand_details_str if brand_details_str else 'Brand: Emaar India'}\n"
+            f"BRAND DESIGN SYSTEM & RAG GUIDELINES:\n{rag_context_text if rag_context_text else 'High-end architectural photography, warm golden sunlight, sleek metallic silver/gold accents, clean minimal layout, iconic skyline, luxury real estate feel.'}\n\n"
+            "REQUIREMENT: Synthesize the copy concepts into a vivid image prompt.\n"
+            "Respond strictly in JSON format:\n"
             "{\n"
-            '  "image_prompt": "<clean, detailed, production-ready image generation prompt>",\n'
+            '  "image_prompt": "Ultra-realistic advertising visual depicting [insert specific visual scene representing the copy], golden hour lighting, cinematic 85mm lens, 4k ultra detailed, featuring subtle Emaar India branding",\n'
             '  "ratio": "1:1",\n'
             '  "quality": "High",\n'
             '  "models": ["Nanobanana 2"],\n'
@@ -2363,11 +2359,11 @@ async def workflow_step_bridge(
             '    "medium": "photography",\n'
             '    "lighting": "golden",\n'
             '    "camera": "low-angle",\n'
-            '    "lens": "50mm",\n'
+            '    "lens": "85mm",\n'
             '    "mood": "epic",\n'
             '    "color": "warm"\n'
             '  },\n'
-            '  "art_director_notes": "<strategic summary of visual composition & branding rules>"\n'
+            '  "art_director_notes": "Visual concept directly reflects the generated ad copy and Emaar India brand guidelines."\n'
             "}"
         )
 
@@ -2380,31 +2376,30 @@ async def workflow_step_bridge(
                 )
                 if resp.is_success:
                     raw_content = resp.json().get("assistant_message") or resp.json().get("content") or ""
+                    print(f"[ArtDirector Response]: {raw_content[:200]}...", flush=True)
                     if "{" in raw_content and "}" in raw_content:
                         try:
                             json_str = raw_content[raw_content.find("{"):raw_content.rfind("}")+1]
                             parsed = json.loads(json_str)
                             clean_img_prompt = parsed.get("image_prompt", "")
-                            if "[CRITICAL DIRECTIVE" in clean_img_prompt:
-                                clean_img_prompt = clean_img_prompt.split("]", 1)[-1].strip()
-
-                            return {
-                                "bridge_type": "copy_to_genfy",
-                                "image_prompt": clean_img_prompt or f"Ultra-realistic architectural photography of luxury commercial glass tower EBD-85 by Emaar India, golden hour sunlight reflecting off curtain wall glass, premium minimalist Emaar emblem in corner, 8k resolution, architectural digest style.",
-                                "ratio": parsed.get("ratio", "1:1"),
-                                "quality": parsed.get("quality", "High"),
-                                "models": parsed.get("models", ["Nanobanana 2"]),
-                                "categories": parsed.get("categories", {
-                                    "style": "photorealistic",
-                                    "medium": "photography",
-                                    "lighting": "golden",
-                                    "camera": "low-angle",
-                                    "lens": "50mm",
-                                    "mood": "epic",
-                                    "color": "warm"
-                                }),
-                                "art_director_notes": parsed.get("art_director_notes", "Visual composition incorporates Emaar India architectural standards and RAG design guidelines.")
-                            }
+                            if clean_img_prompt:
+                                return {
+                                    "bridge_type": "copy_to_genfy",
+                                    "image_prompt": clean_img_prompt,
+                                    "ratio": parsed.get("ratio", "1:1"),
+                                    "quality": parsed.get("quality", "High"),
+                                    "models": parsed.get("models", ["Nanobanana 2"]),
+                                    "categories": parsed.get("categories", {
+                                        "style": "photorealistic",
+                                        "medium": "photography",
+                                        "lighting": "golden",
+                                        "camera": "low-angle",
+                                        "lens": "85mm",
+                                        "mood": "epic",
+                                        "color": "warm"
+                                    }),
+                                    "art_director_notes": parsed.get("art_director_notes", "Visual composition incorporates Emaar India architectural standards and RAG design guidelines.")
+                                }
                         except Exception as parse_err:
                             print(f"[ArtDirector Parse Error]: {parse_err}", flush=True)
         except Exception as err:
