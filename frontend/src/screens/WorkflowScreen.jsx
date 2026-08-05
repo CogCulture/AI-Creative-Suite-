@@ -213,20 +213,39 @@ function NodeOutputPreview({ node, output, onUpdateOutput, t }) {
     if (!aiPrompt.trim() || isTweaking) return;
     setIsTweaking(true);
     try {
-      const promptToAgent = `ORIGINAL OUTPUT:\n${JSON.stringify(output, null, 2)}\n\nUSER TWEAK REQUEST:\n${aiPrompt}\n\nRewrite and return the improved JSON output structure.`;
+      const promptToAgent = `ORIGINAL OUTPUT:\n${output.bodyText || output.image_prompt || JSON.stringify(output)}\n\nUSER TWEAK REQUEST:\n${aiPrompt}\n\nPlease rewrite the text directly incorporating the user tweak request. Return ONLY the refined copy content directly without markdown codeblocks or raw JSON wrappers.`;
       const r = await fetch("/bff/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_message: promptToAgent, llm_model: "claude-4-sonnet", temperature: 0.7, stream: false }),
       });
       const raw = await r.json();
-      const text = raw.assistant_message || raw.content || raw.text || "";
+      let text = raw.assistant_message || raw.content || raw.text || "";
+      text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+      // Try parsing if model returned JSON structure
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch (_) {}
+
       if (node.id === "copy") {
-        onUpdateOutput(node.id, { ...output, bodyText: text });
+        if (parsed && (parsed.bodyText || parsed.headline)) {
+          onUpdateOutput(node.id, {
+            ...output,
+            headline: parsed.headline || extractHeadline(parsed.bodyText || text, "Copy"),
+            bodyText: parsed.bodyText || text,
+            cta: parsed.cta || output.cta || "Shop Now",
+          });
+        } else {
+          onUpdateOutput(node.id, {
+            ...output,
+            headline: extractHeadline(text, "Copy"),
+            bodyText: text,
+          });
+        }
       } else if (node.id === "agent_artdir") {
-        onUpdateOutput(node.id, { ...output, image_prompt: text });
+        onUpdateOutput(node.id, { ...output, image_prompt: parsed?.image_prompt || text });
       } else if (node.id === "agent_strategy") {
-        onUpdateOutput(node.id, { ...output, copy_specs: text });
+        onUpdateOutput(node.id, { ...output, target_audience: parsed?.target_audience || output.target_audience, copy_specs: text });
       }
       setAiPrompt("");
     } catch (e) {
