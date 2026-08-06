@@ -40,7 +40,7 @@ from fastapi import UploadFile, File, Form
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks, Cookie, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -2109,46 +2109,85 @@ async def proxy_genfy(path: str, request: Request):
             body_json = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
             prompt = body_json.get("prompt", "")
 
-            # Check if OpenAI API key is available for DALL-E 3 generation
             openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-            if openai_key:
-                print(f"[Image Engine] Generating image via OpenAI DALL-E (prompt len={len(prompt)})...", flush=True)
+            if openai_key and prompt:
+                print(f"[Image Engine] Attempting OpenAI image generation (prompt len={len(prompt)})...", flush=True)
                 async with httpx.AsyncClient(timeout=120.0) as client:
-                    # Try dall-e-3 first, then fallback to dall-e-2
-                    for model_name in ["dall-e-3", "dall-e-2"]:
+                    # Try newest model first, then fall back
+                    for model_name in ["gpt-image-1.5", "gpt-image-1", "dall-e-3", "dall-e-2"]:
+                        req_body: dict = {
+                            "model": model_name,
+                            "prompt": prompt[:4000],
+                            "n": 1,
+                            "size": "1024x1024",
+                        }
+                        # gpt-image-1.5 and gpt-image-1 use output_format for file type (not url)
+                        # dall-e-3 / dall-e-2 don't need extra format params with this key type
+                        if model_name in ("gpt-image-1.5", "gpt-image-1"):
+                            req_body["output_format"] = "png"
+
                         resp = await client.post(
                             "https://api.openai.com/v1/images/generations",
                             headers={
                                 "Authorization": f"Bearer {openai_key}",
                                 "Content-Type": "application/json"
                             },
-                            json={
-                                "model": model_name,
-                                "prompt": prompt[:1000],  # cap length for safety
-                                "n": 1,
-                                "size": "1024x1024" if model_name == "dall-e-3" else "1024x1024",
-                            }
+                            json=req_body
                         )
                         if resp.status_code == 200:
                             data = resp.json()
-                            img_url = data["data"][0]["url"]
-                            revised_prompt = data["data"][0].get("revised_prompt", prompt)
-                            print(f"[Image Engine] OpenAI {model_name} image generated successfully!", flush=True)
+                            img_data = data["data"][0]
+                            img_url = img_data.get("url") or ""
+                            if not img_url and img_data.get("b64_json"):
+                                img_url = f"data:image/png;base64,{img_data['b64_json']}"
+                            revised_prompt = img_data.get("revised_prompt", prompt)
+                            print(f"[Image Engine] OpenAI {model_name} success!", flush=True)
                             return JSONResponse({
                                 "session_id": f"dalle-{int(time.time())}",
                                 "status": "completed",
-                                "results": [{
-                                    "image_url": img_url,
-                                    "url": img_url,
-                                    "model": f"OpenAI {model_name.upper()}",
-                                    "revised_prompt": revised_prompt
-                                }],
-                                "images": [{ "url": img_url }]
+                                "results": [{"image_url": img_url, "url": img_url,
+                                             "model": f"OpenAI {model_name.upper()}",
+                                             "revised_prompt": revised_prompt}],
+                                "images": [{"url": img_url}]
                             })
                         else:
-                            print(f"[Image Engine] OpenAI {model_name} returned error {resp.status_code}: {resp.text}", flush=True)
+                            print(f"[Image Engine] OpenAI {model_name} error {resp.status_code}: {resp.text[:200]}", flush=True)
+
+                    # All DALL-E models unavailable — use GPT-4o-mini for Unsplash keyword search
+                    print("[Image Engine] All DALL-E models failed — using GPT-4o-mini + Unsplash fallback...", flush=True)
+                    kw_resp = await client.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": "gpt-4o-mini",
+                            "messages": [
+                                {"role": "system", "content": (
+                                    "You are a stock photography search expert. Given an ad image prompt, "
+                                    "output 3-5 concise English keywords for Unsplash that return a highly relevant "
+                                    "professional photo. Output ONLY keywords separated by commas, nothing else."
+                                )},
+                                {"role": "user", "content": f"Ad image prompt: {prompt[:600]}"}
+                            ],
+                            "max_tokens": 30, "temperature": 0.2
+                        }
+                    )
+                    if kw_resp.status_code == 200:
+                        keywords = kw_resp.json()["choices"][0]["message"]["content"].strip()
+                        keywords_url = keywords.replace(", ", ",").replace(" ", ",")
+                        print(f"[Image Engine] Unsplash keywords from GPT-4o-mini: {keywords}", flush=True)
+                        img_url = f"https://source.unsplash.com/1024x1024/?{keywords_url}&sig={int(time.time())}"
+                        return JSONResponse({
+                            "session_id": f"fallback-{int(time.time())}",
+                            "status": "completed",
+                            "results": [{"image_url": img_url, "url": img_url,
+                                         "model": "GPT-4o-mini + Unsplash",
+                                         "revised_prompt": keywords}],
+                            "images": [{"url": img_url}]
+                        })
+                    else:
+                        print(f"[Image Engine] GPT-4o-mini fallback failed: {kw_resp.status_code}", flush=True)
         except Exception as exc:
-            print(f"[Image Engine DALL-E Error]: {exc}", flush=True)
+            print(f"[Image Engine Error]: {exc}", flush=True)
 
     token = await _get_genfy_token()
 

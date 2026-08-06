@@ -1112,12 +1112,29 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             }),
           });
           const genfySessionData = await r.json();
-          if (genfySessionData?.session_id) {
-            log(`Genfy: session ${genfySessionData.session_id.slice(0, 8)}... opened — rendering image...`, "info");
-            genfyResult = await pollGenfySession(genfySessionData.session_id, log);
-          } else if (genfySessionData?.images && genfySessionData.images[0]?.url) {
+          const sessionId = genfySessionData?.session_id || "";
+
+          // Detect our DALL-E / GPT-4o-mini fallback responses — use URL directly, no polling
+          if (
+            sessionId.startsWith("dalle-") ||
+            sessionId.startsWith("fallback-") ||
+            genfySessionData?.status === "completed"
+          ) {
+            const imgUrl =
+              genfySessionData?.results?.[0]?.image_url ||
+              genfySessionData?.results?.[0]?.url ||
+              genfySessionData?.images?.[0]?.url ||
+              null;
+            if (imgUrl) {
+              genfyResult = { url: imgUrl, status: "completed", model_id: genfySessionData?.results?.[0]?.model || "OpenAI" };
+              log(`Image Engine: ✓ Image ready from ${genfySessionData?.results?.[0]?.model || "OpenAI"}`, "success");
+            }
+          } else if (sessionId) {
+            log(`Genfy: session ${sessionId.slice(0, 8)}... opened — rendering image...`, "info");
+            genfyResult = await pollGenfySession(sessionId, log);
+          } else if (genfySessionData?.images?.[0]?.url) {
             genfyResult = { url: genfySessionData.images[0].url, status: "completed" };
-          } else if (genfySessionData?.results && genfySessionData.results[0]?.url) {
+          } else if (genfySessionData?.results?.[0]?.url) {
             genfyResult = { url: genfySessionData.results[0].url, status: "completed" };
           }
         } catch (e) {
