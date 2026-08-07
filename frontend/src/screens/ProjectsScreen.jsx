@@ -325,7 +325,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
   const openProject = (project) => {
     setActiveProject(project);
-    nav("workflow", project);
+    nav("storyboard", project);
   };
 
   return (
@@ -464,13 +464,32 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                     style={{
                       display: "flex", alignItems: "center", gap: 6,
                       padding: "6px 12px", borderRadius: R.md,
-                      border: `1px solid ${t.borderStrong}`, background: t.surface2,
-                      color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                      border: `1px solid ${t.brain}55`, background: t.brainSoft,
+                      color: t.brainText, fontFamily: FONT, fontSize: 12, fontWeight: 700,
                       cursor: "pointer", transition: "all .15s"
                     }}
                   >
                     <Sparkles size={13} style={{ color: t.brain }} />
                     <span>Storyboard</span>
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveProject(p);
+                      nav("workflow", p);
+                    }}
+                    title="Open node-based agent workflow canvas"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "6px 12px", borderRadius: R.md,
+                      border: `1px solid ${t.borderStrong}`, background: t.surface2,
+                      color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                      cursor: "pointer", transition: "all .15s"
+                    }}
+                  >
+                    <Zap size={13} style={{ color: t.accent }} />
+                    <span>Workflow Canvas</span>
                   </button>
 
                   <button
