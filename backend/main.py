@@ -2737,6 +2737,8 @@ async def generate_storyboard(
             except Exception as exc:
                 print(f"[Storyboard RAG Warning]: {exc}", flush=True)
 
+    rag_section = f"RETRIEVED RAG BRAND GUIDELINES:\n{rag_context_text}" if rag_context_text else ""
+
     prompt = f"""
 You are an expert Chief Brand Officer & AI Marketing Campaign Strategist.
 STRICT DIRECTIVE: Every single tagline, campaign goal, creative hook, copy angle, and visual direction MUST be strictly aligned with the Brand Kit DNA and RAG Brand System of Record provided below.
@@ -2747,7 +2749,7 @@ CAMPAIGN DETAILS:
 
 BRAND KIT DNA (ARC GRAPH SYSTEM OF RECORD):
 {brand_dna_str}
-{f'RETRIEVED RAG BRAND GUIDELINES:\n{rag_context_text}' if rag_context_text else ''}
+{rag_section}
 
 Generate a multi-channel Campaign Storyboard strictly in {target_brand_name}'s voice and visual identity.
 Output ONLY valid JSON with this exact schema:
