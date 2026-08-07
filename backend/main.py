@@ -2766,9 +2766,9 @@ Output ONLY valid JSON with this exact schema:
         {{
           "id": "card-ig-1",
           "format": "Carousel Post",
-          "hook": "Specific opening creative hook or problem statement",
-          "copy_angle": "The narrative or copywriting angle to take",
-          "visual_direction": "Detailed visual style, photography mood, lighting, and layout direction",
+          "hook": "Write a unique, highly compelling creative hook specifically tailored for {target_brand_name} and {body.campaign_name}",
+          "copy_angle": "Write a strategic copywriting angle highlighting {target_brand_name}'s unique selling points",
+          "visual_direction": "Describe specific visual art direction, lighting, palette, and composition aligned with {target_brand_name}",
           "tool_sequence": ["strategy", "copy", "genfy"],
           "priority": "hero",
           "status": "not_started"
@@ -2776,9 +2776,9 @@ Output ONLY valid JSON with this exact schema:
         {{
           "id": "card-ig-2",
           "format": "Story Ad (9:16)",
-          "hook": "Direct product claim with high visual contrast",
-          "copy_angle": "Short-form punchy stat",
-          "visual_direction": "Clean studio backdrop, product focus",
+          "hook": "Write a high-converting 9:16 direct product or location claim for {target_brand_name}",
+          "copy_angle": "Punchy stat or ROI benefit statement",
+          "visual_direction": "Sleek studio rendering or high-contrast product photography in {target_brand_name}'s style",
           "tool_sequence": ["copy", "genfy", "edit"],
           "priority": "supporting",
           "status": "not_started"
@@ -2792,9 +2792,9 @@ Output ONLY valid JSON with this exact schema:
         {{
           "id": "card-em-1",
           "format": "Launch Announce",
-          "hook": "Subject line hook creating urgency or curiosity gap",
-          "copy_angle": "Story → Proof → Offer → CTA flow",
-          "visual_direction": "Branded header visual with hero product imagery",
+          "hook": "Write an exclusive announcement subject line and hook for {target_brand_name}",
+          "copy_angle": "Executive narrative in {target_brand_name}'s brand voice",
+          "visual_direction": "Email hero header graphic with {target_brand_name} branding and product showcase",
           "tool_sequence": ["copy"],
           "priority": "hero",
           "status": "not_started"

@@ -676,10 +676,11 @@ export default function StoryboardScreen({ t, nav, showToast, activeProject }) {
 function makeStarterStoryboard(project) {
   const name = project?.name || "Campaign";
   const brand = project?.brand_name || project?.brandName || "Brand";
+  const brief = project?.brief || "";
   return {
     campaign_name: name,
-    campaign_goal: `Drive awareness and engagement for ${brand}'s ${name} campaign.`,
-    tagline_suggestion: "",
+    campaign_goal: `Drive high-impact market positioning, investor engagement, and asset awareness for ${brand}'s ${name} initiative.`,
+    tagline_suggestion: `${brand} — Redefining ${name}.`,
     estimated_assets: 6,
     channels: [
       {
@@ -688,9 +689,9 @@ function makeStarterStoryboard(project) {
           {
             id: `card-${Date.now()}-1`,
             format: "Carousel Post",
-            hook: "Lead with the core problem your audience faces, resolve with your product.",
-            copy_angle: "Functional → Emotional arc",
-            visual_direction: "High-contrast photography, brand palette, minimal text overlay.",
+            hook: `Highlight ${brand}'s signature architectural excellence and flagship value proposition in ${name}.`,
+            copy_angle: `Prestige & Investment Growth Narrative for ${brand}`,
+            visual_direction: `Editorial photography, golden hour lighting, signature ${brand} brand tones, high-contrast typography.`,
             tool_sequence: ["strategy", "copy", "genfy"],
             priority: "hero",
             status: "not_started",
@@ -698,9 +699,9 @@ function makeStarterStoryboard(project) {
           {
             id: `card-${Date.now()}-2`,
             format: "Story Ad (9:16)",
-            hook: "Product-first: single striking visual, CTA within 3 seconds.",
-            copy_angle: "Short form, punchy stat or claim",
-            visual_direction: "Clean studio, tight crop, brand color background.",
+            hook: `Direct location & asset growth claim: "Why ${brand}'s ${name} is the premier investment address."`,
+            copy_angle: "Data-backed ROI & Capital Appreciation Claim",
+            visual_direction: `Cinematic low-angle architectural rendering of ${name}, sleek glass facade, minimal metallic text overlay.`,
             tool_sequence: ["copy", "genfy", "edit"],
             priority: "supporting",
             status: "not_started",
@@ -713,9 +714,9 @@ function makeStarterStoryboard(project) {
           {
             id: `card-${Date.now()}-3`,
             format: "Launch Announce",
-            hook: "Subject line: curiosity-gap. Body: story → proof → offer → CTA.",
-            copy_angle: "Narrative-led, brand voice throughout",
-            visual_direction: "Email header image, brand colours, one hero image.",
+            hook: `Exclusive Invitation: Be among the first to explore ${brand}'s landmark ${name} development.`,
+            copy_angle: `Executive VIP Announcement written in ${brand}'s authoritative voice`,
+            visual_direction: `High-res email header with ${brand} emblem, architectural master plan render, clean multi-column layout.`,
             tool_sequence: ["copy"],
             priority: "hero",
             status: "not_started",
