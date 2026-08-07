@@ -1555,7 +1555,50 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           )}
 
           {/* Typeface Agent Builder Draggable Visual Canvas */}
-             {/* Center Canvas Area with Expansive Viewport & Dynamic SVG Bezier Lines */}
+          <div
+            onMouseMove={handleMouseMoveCanvas}
+            onMouseUp={handleMouseUpCanvas}
+            onMouseLeave={handleMouseUpCanvas}
+            style={{ display: "flex", gap: 16, alignItems: "flex-start", position: "relative", userSelect: draggingNodeId ? "none" : "auto" }}
+          >
+            
+            {/* Left COMPONENTS Palette Sidebar */}
+            <div style={{
+              width: 140, flexShrink: 0,
+              background: t.surface2, border: `1px solid ${t.border}`,
+              borderRadius: R.lg, padding: "14px 12px",
+              fontFamily: FONT, position: "sticky", top: 10, zIndex: 10,
+            }}>
+              <div style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: t.text3, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 10 }}>
+                COMPONENTS
+              </div>
+              <button
+                onClick={handleAddStep}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 10px", borderRadius: R.md, background: t.surface,
+                  border: `1px solid ${t.border}`, fontSize: 12, fontWeight: 600,
+                  color: t.text, cursor: "pointer", marginBottom: 8, transition: "all .15s",
+                }}
+              >
+                <Zap size={13} style={{ color: t.brain }} />
+                + Step
+              </button>
+              <button
+                onClick={handleAddLoop}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 10px", borderRadius: R.md, background: t.surface,
+                  border: `1px solid ${t.border}`, fontSize: 12, fontWeight: 600,
+                  color: t.text, cursor: "pointer", transition: "all .15s",
+                }}
+              >
+                <RotateCcw size={13} style={{ color: t.accent }} />
+                ⟳ Loop
+              </button>
+            </div>
+
+            {/* Center Canvas Area with Expansive Viewport & Dynamic SVG Bezier Lines */}
             <div
               ref={canvasContainerRef}
               style={{
@@ -1566,6 +1609,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 backgroundSize: "28px 28px", overflow: "auto",
               }}
             >
+
               
               {/* Typeface Floating Top Bar */}
               <div style={{
