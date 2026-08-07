@@ -11,6 +11,7 @@ const VIEW_LABELS = {
   brain: "Brand Brain",
   assets: "Assets",
   workflow: "Spring Drop Launch",
+  storyboard: "Campaign Storyboard",
   "tool-detail": "Copy Agent",
 };
 

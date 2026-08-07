@@ -18,6 +18,7 @@ import BrainScreen from "./screens/BrainScreen.jsx";
 import WorkspaceScreen from "./screens/WorkspaceScreen.jsx";
 import AssetsScreen from "./screens/AssetsScreen.jsx";
 import GenfyScreen from "./screens/GenfyScreen.jsx";
+import StoryboardScreen from "./screens/StoryboardScreen.jsx";
 
 /* ── useTheme hook ─────────────────────────────────────── */
 function useTheme() {
@@ -270,6 +271,7 @@ export default function App() {
           {view === "brain"       && <BrainScreen {...shared} onAddBrandDNA={() => setShowBrandDNA(true)} />}
           {view === "assets"      && <AssetsScreen {...shared} />}
           {view === "genfy-detail" && <GenfyScreen {...shared} />}
+          {view === "storyboard"   && <StoryboardScreen {...shared} activeProject={activeProject} />}
         </div>
 
         {/* Mobile bottom nav */}

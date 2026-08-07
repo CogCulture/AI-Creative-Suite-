@@ -300,9 +300,9 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
         setNameError(false);
         setBriefError(false);
         setBrandError(false);
-        showToast(`✨ Campaign "${newProject.name}" linked to ${targetBrandName} — opening canvas...`);
+        showToast(`✨ Campaign "${newProject.name}" linked to ${targetBrandName} — opening storyboard...`);
         setActiveProject(newProject);
-        nav("workflow", newProject);
+        nav("storyboard", newProject);
       } else {
         throw new Error("Failed to save campaign project");
       }
@@ -454,6 +454,25 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
                 {/* Team Members Button & Status */}
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveProject(p);
+                      nav("storyboard", p);
+                    }}
+                    title="Open campaign storyboard planner"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "6px 12px", borderRadius: R.md,
+                      border: `1px solid ${t.borderStrong}`, background: t.surface2,
+                      color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                      cursor: "pointer", transition: "all .15s"
+                    }}
+                  >
+                    <Sparkles size={13} style={{ color: t.brain }} />
+                    <span>Storyboard</span>
+                  </button>
+
                   <button
                     onClick={(e) => openTeamModal(e, p)}
                     title="Invite & manage campaign team members"
