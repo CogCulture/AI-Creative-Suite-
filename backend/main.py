@@ -2689,6 +2689,7 @@ class StoryboardGenerateRequest(BaseModel):
     brief: str
     brand_name: Optional[str] = ""
     campaign_name: Optional[str] = ""
+    asset_type: Optional[str] = ""
 
 @app.post("/bff/projects/{project_id}/storyboard/generate")
 async def generate_storyboard(
@@ -2702,6 +2703,7 @@ async def generate_storyboard(
     # 1. Fetch Project & Brand Kit DNA from DB
     proj = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
     target_brand_name = body.brand_name or (proj.brand_name if proj else "") or "Brand"
+    target_asset_type = body.asset_type or (proj.asset_type if proj else "") or "Multi-Channel Campaign"
     
     brand_obj = None
     if proj and proj.brand_id:
@@ -2746,6 +2748,7 @@ STRICT DIRECTIVE: Every single tagline, campaign goal, creative hook, copy angle
 CAMPAIGN DETAILS:
 - Campaign Name: {body.campaign_name}
 - Campaign Brief: {body.brief}
+- Target Asset Type / Channel Scope: {target_asset_type}
 
 BRAND KIT DNA (ARC GRAPH SYSTEM OF RECORD):
 {brand_dna_str}

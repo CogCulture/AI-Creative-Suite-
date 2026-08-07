@@ -563,7 +563,7 @@ export default function StoryboardScreen({ t, nav, showToast, activeProject }) {
         </div>
       )}
 
-      {/* Channel tabs */}
+      {/* Channel tabs — only show active channels that contain cards */}
       <div style={{ display: "flex", alignItems: "center", gap: 0, borderBottom: `1px solid ${t.border}`, marginBottom: 24 }}>
         {CHANNELS.map(ch => {
           const ChIcon = ch.icon;
@@ -571,7 +571,10 @@ export default function StoryboardScreen({ t, nav, showToast, activeProject }) {
           const cardCount = channelData?.cards?.length || 0;
           const isActive = activeChannel === ch.id;
           const hasCards = cardCount > 0;
-          if (!hasCards && !isActive) return null; // hide empty channels unless active
+          
+          // Only show channel tab if it has cards or is currently active
+          if (!hasCards && !isActive) return null;
+
           return (
             <button
               key={ch.id}
@@ -592,24 +595,6 @@ export default function StoryboardScreen({ t, nav, showToast, activeProject }) {
                   {cardCount}
                 </span>
               )}
-            </button>
-          );
-        })}
-        {/* Show hidden empty channels as dimmed */}
-        {CHANNELS.filter(ch => {
-          const cardCount = storyboard?.channels?.find(c => c.id === ch.id)?.cards?.length || 0;
-          return cardCount === 0 && activeChannel !== ch.id;
-        }).map(ch => {
-          const ChIcon = ch.icon;
-          return (
-            <button
-              key={ch.id}
-              onClick={() => setActiveChannel(ch.id)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: FONT, fontSize: 12.5, fontWeight: 400, color: t.text3, background: "none", border: "none", cursor: "pointer", padding: "10px 14px", opacity: 0.5 }}
-            >
-              <ChIcon size={13} />
-              {ch.label}
-              <Plus size={10} />
             </button>
           );
         })}
