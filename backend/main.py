@@ -2270,6 +2270,7 @@ async def workflow_step_bridge(
     user_id = _decode_jwt(suite_session) if suite_session else STATIC_USER_ID
 
     if req.bridge_type == "brief_to_copy":
+        brand_id = req.brand_id
         # 1. Fetch Brand DNA & Competitors
         brand_details_str = ""
         competitor_names = []
