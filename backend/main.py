@@ -2785,21 +2785,25 @@ Output ONLY valid JSON with this exact schema:
                 json={"user_message": prompt, "llm_model": "claude-4-sonnet", "temperature": 0.5, "stream": False}
             )
             if resp.is_success:
-                raw = resp.json().get("content", "")
+                res_data = resp.json()
+                raw = res_data.get("assistant_message") or res_data.get("content") or res_data.get("response") or ""
+                print(f"[Storyboard Response]: {raw[:200]}...", flush=True)
                 if "{" in raw and "}" in raw:
                     json_str = raw[raw.find("{"):raw.rfind("}") + 1]
                     try:
                         sb_data = json.loads(json_str)
-                    except Exception:
-                        pass
+                    except Exception as parse_err:
+                        print(f"[Storyboard Parse Error]: {parse_err}", flush=True)
     except Exception as exc:
-        print(f"[Storyboard] Error calling LLM: {exc}")
+        print(f"[Storyboard Error]: {exc}", flush=True)
 
     if not sb_data or "channels" not in sb_data:
+        brand_name_str = body.brand_name or "Brand"
+        camp_name_str = body.campaign_name or "Launch"
         sb_data = {
-            "campaign_name": body.campaign_name or "Campaign",
-            "campaign_goal": f"Drive awareness and engagement for {body.brand_name or 'the brand'}'s {body.campaign_name or 'new'} launch.",
-            "tagline_suggestion": "Built for what comes next.",
+            "campaign_name": camp_name_str,
+            "campaign_goal": f"Drive high-intent awareness, engagement, and conversion for {brand_name_str}'s {camp_name_str} campaign.",
+            "tagline_suggestion": f"Elevating {camp_name_str} — Powering {brand_name_str}.",
             "estimated_assets": 5,
             "channels": [
                 {
