@@ -1260,33 +1260,47 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   return (
     <div style={{ fontFamily: FONT, minHeight: "100vh" }}>
 
-      {/* ── Storyboard Card Context Header ───────────────────────────────────── */}
-      {activeProject?.storyboard_card && (
-        <div style={{
-          background: `linear-gradient(135deg, ${t.brainSoft}, ${t.accentSoft})`,
-          borderBottom: `1px solid ${t.brain}33`,
-          padding: "10px 24px",
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{
-              fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
-              background: t.brain, color: "#fff", padding: "3px 9px", borderRadius: 20,
-            }}>
-              📌 STORYBOARD CARD
-            </span>
-            <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: t.text }}>
-              {activeProject.storyboard_card.channel} · {activeProject.storyboard_card.format}
-            </span>
-            <span style={{ fontFamily: FONT, fontSize: 12, color: t.text2 }}>
-              — Hook: "{activeProject.storyboard_card.hook}"
-            </span>
-          </div>
+      {/* ── Storyboard Card Context Header & Back Navigation ───────────────────── */}
+      <div style={{
+        background: activeProject?.storyboard_card ? `linear-gradient(135deg, ${t.brainSoft}, ${t.accentSoft})` : t.surface2,
+        borderBottom: `1px solid ${t.border}`,
+        padding: "10px 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => nav(activeProject?.storyboard_card ? "storyboard" : "projects", activeProject)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              fontFamily: FONT, fontSize: 12, fontWeight: 700,
+              color: t.text, background: t.surface, border: `1px solid ${t.borderStrong}`,
+              padding: "4px 10px", borderRadius: R.md, cursor: "pointer",
+            }}
+          >
+            ← {activeProject?.storyboard_card ? "Back to Storyboard" : "Back to Projects"}
+          </button>
+
+          {activeProject?.storyboard_card && (
+            <>
+              <span style={{
+                fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
+                background: t.brain, color: "#fff", padding: "3px 9px", borderRadius: 20,
+              }}>
+                📌 STORYBOARD CARD
+              </span>
+              <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: t.text }}>
+                {activeProject.storyboard_card.channel} · {activeProject.storyboard_card.format}
+              </span>
+            </>
+          )}
+        </div>
+
+        {activeProject?.storyboard_card && (
           <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.brainText, fontWeight: 600 }}>
             Context & Tool Sequence Pre-Loaded ✓
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Master Supervisor Banner ──────────────────────────────────────── */}
       <div style={{
