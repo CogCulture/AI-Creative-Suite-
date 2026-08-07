@@ -749,6 +749,64 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const genfyPollRef = useRef(null);
   const logsBottomRef = useRef(null);
 
+  // ── Typeface Draggable Canvas State ──────────────────────────────────────────
+  const [pipelineNodes, setPipelineNodes] = useState(PIPELINE);
+  const [nodePos, setNodePos] = useState({
+    brief:          { x: 20, y: 40 },
+    agent_strategy: { x: 320, y: 40 },
+    copy:           { x: 620, y: 40 },
+    agent_artdir:   { x: 320, y: 320 },
+    genfy:          { x: 620, y: 320 },
+  });
+  const [draggingNodeId, setDraggingNodeId] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  const handleMouseDownNode = (e, nodeId) => {
+    e.stopPropagation();
+    setDraggingNodeId(nodeId);
+    const current = nodePos[nodeId] || { x: 50, y: 50 };
+    setDragOffset({ x: e.clientX - current.x, y: e.clientY - current.y });
+  };
+
+  const handleMouseMoveCanvas = (e) => {
+    if (!draggingNodeId) return;
+    const newX = Math.max(10, e.clientX - dragOffset.x);
+    const newY = Math.max(10, e.clientY - dragOffset.y);
+    setNodePos(prev => ({ ...prev, [draggingNodeId]: { x: newX, y: newY } }));
+  };
+
+  const handleMouseUpCanvas = () => {
+    setDraggingNodeId(null);
+  };
+
+  const handleAddStep = () => {
+    const newId = `agent_custom_${Date.now()}`;
+    const newNode = {
+      id: newId, type: "agent", step: pipelineNodes.length + 1,
+      label: "Custom Agent Step", subtitle: "User Agent · Dynamic Node",
+      icon: Zap, color: "#EC4899",
+      defaultPrompt: "You are a specialized Custom Marketing Agent. Perform task and refine content.",
+    };
+    setPipelineNodes(prev => [...prev, newNode]);
+    setNodePos(prev => ({ ...prev, [newId]: { x: 320, y: 460 } }));
+    setSelectedNodeId(newId);
+    showToast("Added new Agent Step node to canvas!");
+  };
+
+  const handleAddLoop = () => {
+    const newId = `loop_${Date.now()}`;
+    const newNode = {
+      id: newId, type: "agent", step: pipelineNodes.length + 1,
+      label: "Evaluation Loop", subtitle: "Iterative Feedback · Quality Gate",
+      icon: RotateCcw, color: "#F59E0B",
+      defaultPrompt: "Evaluate output quality. If approved return PASS else refine.",
+    };
+    setPipelineNodes(prev => [...prev, newNode]);
+    setNodePos(prev => ({ ...prev, [newId]: { x: 620, y: 460 } }));
+    setSelectedNodeId(newId);
+    showToast("Added Evaluation Loop node to canvas!");
+  };
+
   // Restore stored pipeline state whenever activeProject changes + handle Storyboard Card context
   useEffect(() => {
     if (activeProject?.id) {
@@ -1464,20 +1522,25 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           )}
 
           {/* Typeface Agent Builder Draggable Visual Canvas */}
-          <div style={{ display: "flex", gap: 16, alignItems: "flex-start", position: "relative" }}>
+          <div
+            onMouseMove={handleMouseMoveCanvas}
+            onMouseUp={handleMouseUpCanvas}
+            onMouseLeave={handleMouseUpCanvas}
+            style={{ display: "flex", gap: 16, alignItems: "flex-start", position: "relative", userSelect: draggingNodeId ? "none" : "auto" }}
+          >
             
             {/* Left COMPONENTS Palette Sidebar */}
             <div style={{
               width: 140, flexShrink: 0,
               background: t.surface2, border: `1px solid ${t.border}`,
               borderRadius: R.lg, padding: "14px 12px",
-              fontFamily: FONT,
+              fontFamily: FONT, position: "sticky", top: 10, zIndex: 10,
             }}>
               <div style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: t.text3, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 10 }}>
                 COMPONENTS
               </div>
               <button
-                onClick={() => showToast("Added new Agent Step node to canvas")}
+                onClick={handleAddStep}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 6,
                   padding: "8px 10px", borderRadius: R.md, background: t.surface,
@@ -1489,7 +1552,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 + Step
               </button>
               <button
-                onClick={() => showToast("Added Evaluation Loop node to canvas")}
+                onClick={handleAddLoop}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 6,
                   padding: "8px 10px", borderRadius: R.md, background: t.surface,
@@ -1502,11 +1565,11 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               </button>
             </div>
 
-            {/* Center Canvas Area with Draggable Nodes & SVG Bezier Lines */}
+            {/* Center Canvas Area with Draggable Nodes & Dynamic SVG Bezier Lines */}
             <div style={{
               flex: 1, minWidth: 0, position: "relative",
               borderRadius: R.xl, border: `1px solid ${t.border}`,
-              background: t.surface, padding: "32px 24px 60px", minHeight: 620,
+              background: t.surface, padding: "24px 20px 80px", minHeight: 680,
               backgroundImage: `radial-gradient(circle, ${t.borderStrong}66 1.2px, transparent 1.2px)`,
               backgroundSize: "28px 28px", overflow: "hidden",
             }}>
@@ -1514,7 +1577,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               {/* Typeface Floating Top Bar */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
-                marginBottom: 20, flexWrap: "wrap",
+                marginBottom: 20, flexWrap: "wrap", position: "relative", zIndex: 10,
               }}>
                 <div style={{
                   background: t.text, color: t.bg, padding: "6px 14px", borderRadius: 999,
@@ -1525,7 +1588,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                     <Zap size={14} /> Typeface Agent Builder Canvas
                   </span>
                   <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>Drag & Move Nodes · Edit Inputs</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>Drag Node Headers to Reposition · Click to Edit Inputs</span>
                 </div>
 
                 <div style={{ display: "flex", gap: 6 }}>
@@ -1538,91 +1601,125 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 </div>
               </div>
 
-              {/* SVG Connecting Lines between Nodes */}
+              {/* Dynamic SVG Connecting Lines between Nodes */}
               <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
-                <path d="M 280 80 Q 280 130 280 180" stroke={t.brain} strokeWidth="2.5" fill="none" strokeDasharray="4 4" />
-                <path d="M 280 230 Q 280 280 280 330" stroke={t.brain} strokeWidth="2.5" fill="none" />
-                <path d="M 280 380 Q 280 430 280 480" stroke={t.accent} strokeWidth="2.5" fill="none" />
-                <path d="M 280 530 Q 280 580 280 630" stroke="#22C55E" strokeWidth="2.5" fill="none" />
+                {pipelineNodes.map((node, idx) => {
+                  if (idx === pipelineNodes.length - 1) return null;
+                  const nextNode = pipelineNodes[idx + 1];
+                  const p1 = nodePos[node.id] || { x: 50, y: 50 + idx * 120 };
+                  const p2 = nodePos[nextNode.id] || { x: 50, y: 50 + (idx + 1) * 120 };
+
+                  const x1 = p1.x + 140;
+                  const y1 = p1.y + 70;
+                  const x2 = p2.x + 140;
+                  const y2 = p2.y;
+
+                  const isConnDone = nodeStatus[node.id] === "done";
+                  const strokeColor = isConnDone ? "#22C55E" : node.color || t.brain;
+
+                  return (
+                    <g key={`conn-${node.id}-${nextNode.id}`}>
+                      <path
+                        d={`M ${x1} ${y1} C ${x1} ${y1 + 50}, ${x2} ${y2 - 50}, ${x2} ${y2}`}
+                        stroke={strokeColor}
+                        strokeWidth="2.5"
+                        fill="none"
+                        strokeDasharray={isConnDone ? "none" : "6 4"}
+                      />
+                      <circle cx={x2} cy={y2} r="4" fill={strokeColor} />
+                    </g>
+                  );
+                })}
               </svg>
 
-              {/* Moveable & Editable Nodes */}
-              <div style={{ maxWidth: 540, margin: "0 auto", position: "relative", zIndex: 2 }}>
-                {PIPELINE.map((node, i) => (
-                  <div key={node.id} style={{ marginBottom: 20 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontFamily: MONO, fontSize: 9.5, color: t.text3, textTransform: "uppercase" }}>
-                        @ {node.type === "agent" ? "Agent Node" : "Tool Node"} #{node.step}
-                      </span>
-                      <span style={{ fontFamily: MONO, fontSize: 9, color: t.brain, cursor: "pointer" }} onClick={() => setSelectedNodeId(node.id)}>
-                        ⚙ View & Edit Input
-                      </span>
-                    </div>
+              {/* Moveable & Editable Draggable Nodes Canvas Grid */}
+              <div style={{ position: "relative", width: "100%", height: 620, zIndex: 2 }}>
+                {pipelineNodes.map((node) => {
+                  const pos = nodePos[node.id] || { x: 50, y: 50 };
+                  const isSelected = selectedNodeId === node.id;
 
-                    <NodeCard
-                      node={node}
-                      status={nodeStatus[node.id] || "idle"}
-                      output={nodeOutputs[node.id] || null}
-                      isSelected={selectedNodeId === node.id}
-                      onSelect={setSelectedNodeId}
-                      onUpdateOutput={setOutput}
-                      onRunFromNode={handleRun}
-                      t={t}
-                    />
-
-                    {/* Inline Input Inspector on Node */}
-                    {selectedNodeId === node.id && (
-                      <div style={{
-                        marginTop: 8, padding: 12, borderRadius: R.md,
-                        background: t.surface2, border: `1.5px solid ${node.color}55`,
-                        fontFamily: FONT, fontSize: 12,
-                      }}>
-                        <div style={{ fontWeight: 700, color: t.text, marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
-                          <span>Edit Node Input & Directives:</span>
-                          <span style={{ fontFamily: MONO, fontSize: 10, color: t.text3 }}>ID: {node.id}</span>
-                        </div>
-                        {node.id === "brief" && (
-                          <textarea
-                            rows={3}
-                            value={configs.brief?.brief || ""}
-                            onChange={(e) => updateConfig("brief", "brief", e.target.value)}
-                            style={{
-                              width: "100%", padding: 8, borderRadius: 6,
-                              background: t.surface, border: `1px solid ${t.border}`,
-                              color: t.text, fontFamily: FONT, fontSize: 12, resize: "vertical",
-                            }}
-                          />
-                        )}
-                        {node.type === "agent" && (
-                          <textarea
-                            rows={3}
-                            value={configs[node.id]?.customPrompt || node.defaultPrompt || ""}
-                            onChange={(e) => updateConfig(node.id, "customPrompt", e.target.value)}
-                            placeholder="Enter agent directives..."
-                            style={{
-                              width: "100%", padding: 8, borderRadius: 6,
-                              background: t.surface, border: `1px solid ${t.border}`,
-                              color: t.text, fontFamily: FONT, fontSize: 12, resize: "vertical",
-                            }}
-                          />
-                        )}
-                        {node.id === "copy" && (
-                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                            <span style={{ color: t.text2 }}>Model:</span>
-                            <select
-                              value={configs.copy?.model || "claude-4-sonnet"}
-                              onChange={(e) => updateConfig("copy", "model", e.target.value)}
-                              style={{ padding: "4px 8px", borderRadius: 4, background: t.surface, color: t.text, border: `1px solid ${t.border}` }}
-                            >
-                              {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
-                            </select>
-                          </div>
-                        )}
+                  return (
+                    <div
+                      key={node.id}
+                      style={{
+                        position: "absolute",
+                        left: pos.x,
+                        top: pos.y,
+                        width: 280,
+                        zIndex: draggingNodeId === node.id ? 20 : isSelected ? 10 : 3,
+                        transition: draggingNodeId === node.id ? "none" : "box-shadow .2s",
+                      }}
+                    >
+                      {/* Drag Handle Bar */}
+                      <div
+                        onMouseDown={(e) => handleMouseDownNode(e, node.id)}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "3px 8px", background: t.surface2, border: `1px solid ${t.border}`,
+                          borderRadius: "8px 8px 0 0", cursor: "grab", fontFamily: MONO, fontSize: 9.5,
+                          color: t.text3, userSelect: "none",
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: node.color }}>⋮⋮ DRAG NODE #{node.step}</span>
+                        <span style={{ color: t.brain, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}>
+                          ⚙ Edit Input
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      <NodeCard
+                        node={node}
+                        status={nodeStatus[node.id] || "idle"}
+                        output={nodeOutputs[node.id] || null}
+                        isSelected={isSelected}
+                        onSelect={setSelectedNodeId}
+                        onUpdateOutput={setOutput}
+                        onRunFromNode={handleRun}
+                        t={t}
+                      />
+
+                      {/* Inline Input Inspector on Node */}
+                      {isSelected && (
+                        <div style={{
+                          marginTop: 4, padding: 10, borderRadius: "0 0 8px 8px",
+                          background: t.surface2, border: `1.5px solid ${node.color}66`,
+                          fontFamily: FONT, fontSize: 11.5,
+                        }}>
+                          <div style={{ fontWeight: 700, color: t.text, marginBottom: 4, display: "flex", justifyContent: "space-between" }}>
+                            <span>Edit Node Directives:</span>
+                            <span style={{ fontFamily: MONO, fontSize: 9.5, color: t.text3 }}>{node.id}</span>
+                          </div>
+                          {node.id === "brief" && (
+                            <textarea
+                              rows={2}
+                              value={configs.brief?.brief || ""}
+                              onChange={(e) => updateConfig("brief", "brief", e.target.value)}
+                              style={{
+                                width: "100%", padding: 6, borderRadius: 4,
+                                background: t.surface, border: `1px solid ${t.border}`,
+                                color: t.text, fontFamily: FONT, fontSize: 11.5, resize: "vertical",
+                              }}
+                            />
+                          )}
+                          {node.type === "agent" && (
+                            <textarea
+                              rows={2}
+                              value={configs[node.id]?.customPrompt || node.defaultPrompt || ""}
+                              onChange={(e) => updateConfig(node.id, "customPrompt", e.target.value)}
+                              placeholder="Enter agent directives..."
+                              style={{
+                                width: "100%", padding: 6, borderRadius: 4,
+                                background: t.surface, border: `1px solid ${t.border}`,
+                                color: t.text, fontFamily: FONT, fontSize: 11.5, resize: "vertical",
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+
 
               {/* Side-by-Side Visual Canvas Output Renders */}
               {nodeOutputs["copy"] && (
