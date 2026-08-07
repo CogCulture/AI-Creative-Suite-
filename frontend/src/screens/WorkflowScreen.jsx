@@ -761,6 +761,35 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const [draggingNodeId, setDraggingNodeId] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
+  const canvasContainerRef = useRef(null);
+  const portRefs = useRef({});
+  const [portCoords, setPortCoords] = useState({});
+
+  const updatePortCoords = useCallback(() => {
+    if (!canvasContainerRef.current) return;
+    const containerRect = canvasContainerRef.current.getBoundingClientRect();
+    const next = {};
+    pipelineNodes.forEach(node => {
+      const inEl = portRefs.current[`${node.id}-in`];
+      const outEl = portRefs.current[`${node.id}-out`];
+      if (inEl) {
+        const r = inEl.getBoundingClientRect();
+        next[`${node.id}-in`] = { x: r.left - containerRect.left + r.width / 2, y: r.top - containerRect.top + r.height / 2 };
+      }
+      if (outEl) {
+        const r = outEl.getBoundingClientRect();
+        next[`${node.id}-out`] = { x: r.left - containerRect.left + r.width / 2, y: r.top - containerRect.top + r.height / 2 };
+      }
+    });
+    setPortCoords(next);
+  }, [pipelineNodes]);
+
+  useEffect(() => {
+    updatePortCoords();
+    const timer = setTimeout(updatePortCoords, 100);
+    return () => clearTimeout(timer);
+  }, [nodePos, pipelineNodes, selectedNodeId, nodeOutputs, updatePortCoords]);
+
   const handleMouseDownNode = (e, nodeId) => {
     e.stopPropagation();
     setDraggingNodeId(nodeId);
@@ -773,10 +802,12 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     const newX = Math.max(10, e.clientX - dragOffset.x);
     const newY = Math.max(10, e.clientY - dragOffset.y);
     setNodePos(prev => ({ ...prev, [draggingNodeId]: { x: newX, y: newY } }));
+    updatePortCoords();
   };
 
   const handleMouseUpCanvas = () => {
     setDraggingNodeId(null);
+    updatePortCoords();
   };
 
   const handleAddStep = () => {
@@ -1566,13 +1597,16 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             </div>
 
             {/* Center Canvas Area with Draggable Nodes & Dynamic SVG Bezier Lines */}
-            <div style={{
-              flex: 1, minWidth: 0, position: "relative",
-              borderRadius: R.xl, border: `1px solid ${t.border}`,
-              background: t.surface, padding: "24px 20px 80px", minHeight: 680,
-              backgroundImage: `radial-gradient(circle, ${t.borderStrong}66 1.2px, transparent 1.2px)`,
-              backgroundSize: "28px 28px", overflow: "hidden",
-            }}>
+            <div
+              ref={canvasContainerRef}
+              style={{
+                flex: 1, minWidth: 0, position: "relative",
+                borderRadius: R.xl, border: `1px solid ${t.border}`,
+                background: t.surface, padding: "24px 20px 80px", minHeight: 680,
+                backgroundImage: `radial-gradient(circle, ${t.borderStrong}66 1.2px, transparent 1.2px)`,
+                backgroundSize: "28px 28px", overflow: "hidden",
+              }}
+            >
               
               {/* Typeface Floating Top Bar */}
               <div style={{
@@ -1601,42 +1635,44 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 </div>
               </div>
 
-              {/* Dynamic SVG Connecting Lines between Node Ports */}
+              {/* Dynamic SVG Connecting Lines between Measured Node Ports */}
               <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
                 {pipelineNodes.map((node, idx) => {
                   if (idx === pipelineNodes.length - 1) return null;
                   const nextNode = pipelineNodes[idx + 1];
+
                   const p1 = nodePos[node.id] || { x: 30 + idx * 300, y: 80 };
                   const p2 = nodePos[nextNode.id] || { x: 30 + (idx + 1) * 300, y: 80 };
 
-                  // Right Output Port of Node A (x: +280, y: +35)
-                  const x1 = p1.x + 280;
-                  const y1 = p1.y + 35;
+                  // Measure exact handle dot coordinates if available, fallback to estimated pos
+                  const outPort = portCoords[`${node.id}-out`] || { x: p1.x + 280, y: p1.y + 40 };
+                  const inPort = portCoords[`${nextNode.id}-in`] || { x: p2.x, y: p2.y + 40 };
 
-                  // Left Input Port of Node B (x: 0, y: +35)
-                  const x2 = p2.x;
-                  const y2 = p2.y + 35;
+                  const x1 = outPort.x;
+                  const y1 = outPort.y;
+                  const x2 = inPort.x;
+                  const y2 = inPort.y;
 
                   const isConnDone = nodeStatus[node.id] === "done";
                   const strokeColor = isConnDone ? "#22C55E" : node.color || t.brain;
 
-                  // Control points for smooth horizontal S-curve bezier line
+                  // Dynamic horizontal bezier curve
                   const dx = Math.abs(x2 - x1) * 0.5;
-                  const cx1 = x1 + Math.max(60, dx);
+                  const cx1 = x1 + Math.max(50, dx);
                   const cy1 = y1;
-                  const cx2 = x2 - Math.max(60, dx);
+                  const cx2 = x2 - Math.max(50, dx);
                   const cy2 = y2;
 
                   return (
                     <g key={`conn-${node.id}-${nextNode.id}`}>
-                      {/* Outer shadow glow line */}
+                      {/* Outer glow shadow */}
                       <path
                         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
                         stroke={`${strokeColor}33`}
                         strokeWidth="6"
                         fill="none"
                       />
-                      {/* Main connection line */}
+                      {/* Main bezier line */}
                       <path
                         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
                         stroke={strokeColor}
@@ -1644,9 +1680,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                         fill="none"
                         strokeDasharray={isConnDone ? "none" : "6 4"}
                       />
-                      {/* Output and Input Port Dots */}
-                      <circle cx={x1} cy={y1} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2" />
-                      <circle cx={x2} cy={y2} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2" />
+                      {/* Port dots */}
+                      <circle cx={x1} cy={y1} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2.5" />
+                      <circle cx={x2} cy={y2} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2.5" />
                     </g>
                   );
                 })}
@@ -1686,17 +1722,26 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                         </span>
                       </div>
 
-                      {/* Connection Handle Dots on Node Borders */}
-                      <div style={{
-                        position: "absolute", left: -6, top: 32, width: 12, height: 12,
-                        borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
-                        boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
-                      }} />
-                      <div style={{
-                        position: "absolute", right: -6, top: 32, width: 12, height: 12,
-                        borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
-                        boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
-                      }} />
+                      {/* Input Port Handle Dot (Left) */}
+                      <div
+                        ref={(el) => (portRefs.current[`${node.id}-in`] = el)}
+                        style={{
+                          position: "absolute", left: -6, top: 40, width: 12, height: 12,
+                          borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
+                          boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
+                        }}
+                      />
+
+                      {/* Output Port Handle Dot (Right) */}
+                      <div
+                        ref={(el) => (portRefs.current[`${node.id}-out`] = el)}
+                        style={{
+                          position: "absolute", right: -6, top: 40, width: 12, height: 12,
+                          borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
+                          boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
+                        }}
+                      />
+
 
                       <NodeCard
                         node={node}
