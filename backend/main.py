@@ -2699,19 +2699,62 @@ async def generate_storyboard(
 ):
     user_id = _decode_jwt(request.cookies.get("suite_session") or "") or STATIC_USER_ID
 
+    # 1. Fetch Project & Brand Kit DNA from DB
+    proj = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
+    target_brand_name = body.brand_name or (proj.brand_name if proj else "") or "Brand"
+    
+    brand_obj = None
+    if proj and proj.brand_id:
+        brand_obj = db.query(SuiteBrand).filter(SuiteBrand.id == proj.brand_id).first()
+    if not brand_obj and target_brand_name:
+        brand_obj = db.query(SuiteBrand).filter(func.lower(SuiteBrand.brand_name) == target_brand_name.lower()).first()
+
+    brand_dna_str = f"Brand Name: {target_brand_name}\n"
+    rag_context_text = ""
+
+    if brand_obj:
+        brand_dna_str += (
+            f"Industry: {brand_obj.industry or 'N/A'}\n"
+            f"Voice/Tone: {brand_obj.voice or 'N/A'}\n"
+            f"Archetype: {brand_obj.archetype or 'N/A'}\n"
+            f"USP: {brand_obj.usp or 'N/A'}\n"
+            f"Target Audience: {brand_obj.audience or 'N/A'}\n"
+            f"Product Description: {brand_obj.product_desc or 'N/A'}\n"
+            f"Words to Use: {brand_obj.words_to_use or 'N/A'}\n"
+            f"Words to Avoid: {brand_obj.words_to_avoid or 'N/A'}\n"
+        )
+        # Query Arc Graph (Pinecone RAG) if linked
+        if _RAG_AVAILABLE and rag_engine and brand_obj.rag_linked and brand_obj.pinecone_client_key:
+            try:
+                rag_docs = await rag_engine.retrieve_brand_context(
+                    brand_obj.pinecone_client_key,
+                    f"brand positioning campaign strategy guidelines {body.brief}",
+                    top_k=4,
+                )
+                if rag_docs:
+                    rag_context_text = rag_docs
+                    print(f"[Storyboard RAG] Injected {len(rag_docs)} chars of brand guidelines for '{target_brand_name}'", flush=True)
+            except Exception as exc:
+                print(f"[Storyboard RAG Warning]: {exc}", flush=True)
+
     prompt = f"""
-You are an expert AI Marketing Campaign Strategist.
-Given the following campaign details:
+You are an expert Chief Brand Officer & AI Marketing Campaign Strategist.
+STRICT DIRECTIVE: Every single tagline, campaign goal, creative hook, copy angle, and visual direction MUST be strictly aligned with the Brand Kit DNA and RAG Brand System of Record provided below.
+
+CAMPAIGN DETAILS:
 - Campaign Name: {body.campaign_name}
-- Brand Name: {body.brand_name}
 - Campaign Brief: {body.brief}
 
-Generate a comprehensive Campaign Storyboard across multiple marketing channels.
+BRAND KIT DNA (ARC GRAPH SYSTEM OF RECORD):
+{brand_dna_str}
+{f'RETRIEVED RAG BRAND GUIDELINES:\n{rag_context_text}' if rag_context_text else ''}
+
+Generate a multi-channel Campaign Storyboard strictly in {target_brand_name}'s voice and visual identity.
 Output ONLY valid JSON with this exact schema:
 {{
   "campaign_name": "{body.campaign_name}",
-  "campaign_goal": "A concise 1-2 sentence goal summarizing the objective of this campaign.",
-  "tagline_suggestion": "A high-impact 3-7 word campaign tagline.",
+  "campaign_goal": "A concise 1-2 sentence goal summarizing the strategic objective for {target_brand_name}.",
+  "tagline_suggestion": "A high-impact 3-7 word campaign tagline written strictly in {target_brand_name}'s voice.",
   "estimated_assets": 6,
   "channels": [
     {{
