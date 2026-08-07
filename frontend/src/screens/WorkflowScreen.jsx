@@ -760,6 +760,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   });
   const [draggingNodeId, setDraggingNodeId] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [zoomScale, setZoomScale] = useState(1.0);
+  const [showRightConfig, setShowRightConfig] = useState(false);
 
   const canvasContainerRef = useRef(null);
   const portRefs = useRef({});
@@ -1553,58 +1555,15 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           )}
 
           {/* Typeface Agent Builder Draggable Visual Canvas */}
-          <div
-            onMouseMove={handleMouseMoveCanvas}
-            onMouseUp={handleMouseUpCanvas}
-            onMouseLeave={handleMouseUpCanvas}
-            style={{ display: "flex", gap: 16, alignItems: "flex-start", position: "relative", userSelect: draggingNodeId ? "none" : "auto" }}
-          >
-            
-            {/* Left COMPONENTS Palette Sidebar */}
-            <div style={{
-              width: 140, flexShrink: 0,
-              background: t.surface2, border: `1px solid ${t.border}`,
-              borderRadius: R.lg, padding: "14px 12px",
-              fontFamily: FONT, position: "sticky", top: 10, zIndex: 10,
-            }}>
-              <div style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: t.text3, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 10 }}>
-                COMPONENTS
-              </div>
-              <button
-                onClick={handleAddStep}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 10px", borderRadius: R.md, background: t.surface,
-                  border: `1px solid ${t.border}`, fontSize: 12, fontWeight: 600,
-                  color: t.text, cursor: "pointer", marginBottom: 8, transition: "all .15s",
-                }}
-              >
-                <Zap size={13} style={{ color: t.brain }} />
-                + Step
-              </button>
-              <button
-                onClick={handleAddLoop}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 10px", borderRadius: R.md, background: t.surface,
-                  border: `1px solid ${t.border}`, fontSize: 12, fontWeight: 600,
-                  color: t.text, cursor: "pointer", transition: "all .15s",
-                }}
-              >
-                <RotateCcw size={13} style={{ color: t.accent }} />
-                ⟳ Loop
-              </button>
-            </div>
-
-            {/* Center Canvas Area with Draggable Nodes & Dynamic SVG Bezier Lines */}
+             {/* Center Canvas Area with Expansive Viewport & Dynamic SVG Bezier Lines */}
             <div
               ref={canvasContainerRef}
               style={{
                 flex: 1, minWidth: 0, position: "relative",
                 borderRadius: R.xl, border: `1px solid ${t.border}`,
-                background: t.surface, padding: "24px 20px 80px", minHeight: 680,
+                background: t.surface, padding: "24px 20px 80px", minHeight: 850,
                 backgroundImage: `radial-gradient(circle, ${t.borderStrong}66 1.2px, transparent 1.2px)`,
-                backgroundSize: "28px 28px", overflow: "hidden",
+                backgroundSize: "28px 28px", overflow: "auto",
               }}
             >
               
@@ -1622,242 +1581,262 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                     <Zap size={14} /> Typeface Agent Builder Canvas
                   </span>
                   <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>Drag Node Headers to Reposition · Click to Edit Inputs</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>Drag Node Headers to Reposition · Zoom: {Math.round(zoomScale * 100)}%</span>
                 </div>
 
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => showToast("Workflow layout saved!")} style={{ background: t.surface2, border: `1px solid ${t.border}`, padding: "4px 10px", borderRadius: R.md, fontSize: 11, fontWeight: 600, color: t.text2, cursor: "pointer" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button
+                    onClick={() => setShowRightConfig(s => !s)}
+                    style={{
+                      background: showRightConfig ? t.brain : t.surface2,
+                      color: showRightConfig ? "#fff" : t.text2,
+                      border: `1px solid ${t.border}`, padding: "5px 12px",
+                      borderRadius: R.md, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 5,
+                    }}
+                  >
+                    <Settings size={12} />
+                    {showRightConfig ? "Hide Config Panel" : "⚙ Node Config"}
+                  </button>
+
+                  <button onClick={() => showToast("Workflow layout saved!")} style={{ background: t.surface2, border: `1px solid ${t.border}`, padding: "5px 12px", borderRadius: R.md, fontSize: 11.5, fontWeight: 600, color: t.text2, cursor: "pointer" }}>
                     Save Workflow
                   </button>
-                  <button onClick={() => showToast("Debug logs active")} style={{ background: t.surface2, border: `1px solid ${t.border}`, padding: "4px 10px", borderRadius: R.md, fontSize: 11, fontWeight: 600, color: t.text2, cursor: "pointer" }}>
-                    Debug
-                  </button>
                 </div>
               </div>
 
-              {/* Dynamic SVG Connecting Lines between Measured Node Ports */}
-              <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
-                {pipelineNodes.map((node, idx) => {
-                  if (idx === pipelineNodes.length - 1) return null;
-                  const nextNode = pipelineNodes[idx + 1];
+              {/* Scalable Canvas Viewport Container */}
+              <div style={{
+                transform: `scale(${zoomScale})`,
+                transformOrigin: "top left",
+                transition: "transform .2s ease-out",
+                minWidth: 1200, minHeight: 800, position: "relative",
+              }}>
 
-                  const p1 = nodePos[node.id] || { x: 30 + idx * 300, y: 80 };
-                  const p2 = nodePos[nextNode.id] || { x: 30 + (idx + 1) * 300, y: 80 };
+                {/* Dynamic SVG Connecting Lines between Measured Node Ports */}
+                <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
+                  {pipelineNodes.map((node, idx) => {
+                    if (idx === pipelineNodes.length - 1) return null;
+                    const nextNode = pipelineNodes[idx + 1];
 
-                  // Measure exact handle dot coordinates if available, fallback to estimated pos
-                  const outPort = portCoords[`${node.id}-out`] || { x: p1.x + 280, y: p1.y + 40 };
-                  const inPort = portCoords[`${nextNode.id}-in`] || { x: p2.x, y: p2.y + 40 };
+                    const p1 = nodePos[node.id] || { x: 30 + idx * 300, y: 80 };
+                    const p2 = nodePos[nextNode.id] || { x: 30 + (idx + 1) * 300, y: 80 };
 
-                  const x1 = outPort.x;
-                  const y1 = outPort.y;
-                  const x2 = inPort.x;
-                  const y2 = inPort.y;
+                    // Measure exact handle dot coordinates if available, fallback to estimated pos
+                    const outPort = portCoords[`${node.id}-out`] || { x: p1.x + 280, y: p1.y + 40 };
+                    const inPort = portCoords[`${nextNode.id}-in`] || { x: p2.x, y: p2.y + 40 };
 
-                  const isConnDone = nodeStatus[node.id] === "done";
-                  const strokeColor = isConnDone ? "#22C55E" : node.color || t.brain;
+                    const x1 = outPort.x / zoomScale;
+                    const y1 = outPort.y / zoomScale;
+                    const x2 = inPort.x / zoomScale;
+                    const y2 = inPort.y / zoomScale;
 
-                  // Dynamic horizontal bezier curve
-                  const dx = Math.abs(x2 - x1) * 0.5;
-                  const cx1 = x1 + Math.max(50, dx);
-                  const cy1 = y1;
-                  const cx2 = x2 - Math.max(50, dx);
-                  const cy2 = y2;
+                    const isConnDone = nodeStatus[node.id] === "done";
+                    const strokeColor = isConnDone ? "#22C55E" : node.color || t.brain;
 
-                  return (
-                    <g key={`conn-${node.id}-${nextNode.id}`}>
-                      {/* Outer glow shadow */}
-                      <path
-                        d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
-                        stroke={`${strokeColor}33`}
-                        strokeWidth="6"
-                        fill="none"
-                      />
-                      {/* Main bezier line */}
-                      <path
-                        d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
-                        stroke={strokeColor}
-                        strokeWidth="2.5"
-                        fill="none"
-                        strokeDasharray={isConnDone ? "none" : "6 4"}
-                      />
-                      {/* Port dots */}
-                      <circle cx={x1} cy={y1} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2.5" />
-                      <circle cx={x2} cy={y2} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2.5" />
-                    </g>
-                  );
-                })}
-              </svg>
+                    // Dynamic horizontal bezier curve
+                    const dx = Math.abs(x2 - x1) * 0.5;
+                    const cx1 = x1 + Math.max(50, dx);
+                    const cy1 = y1;
+                    const cx2 = x2 - Math.max(50, dx);
+                    const cy2 = y2;
 
-              {/* Moveable & Editable Draggable Nodes Canvas Grid */}
-              <div style={{ position: "relative", width: "100%", height: 620, zIndex: 2 }}>
-                {pipelineNodes.map((node, idx) => {
-                  const pos = nodePos[node.id] || { x: 30 + idx * 300, y: 80 };
-                  const isSelected = selectedNodeId === node.id;
+                    return (
+                      <g key={`conn-${node.id}-${nextNode.id}`}>
+                        {/* Outer glow shadow */}
+                        <path
+                          d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
+                          stroke={`${strokeColor}33`}
+                          strokeWidth="6"
+                          fill="none"
+                        />
+                        {/* Main bezier line */}
+                        <path
+                          d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
+                          stroke={strokeColor}
+                          strokeWidth="2.5"
+                          fill="none"
+                          strokeDasharray={isConnDone ? "none" : "6 4"}
+                        />
+                        {/* Port dots */}
+                        <circle cx={x1} cy={y1} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2.5" />
+                        <circle cx={x2} cy={y2} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2.5" />
+                      </g>
+                    );
+                  })}
+                </svg>
 
-                  return (
-                    <div
-                      key={node.id}
-                      style={{
-                        position: "absolute",
-                        left: pos.x,
-                        top: pos.y,
-                        width: 280,
-                        zIndex: draggingNodeId === node.id ? 20 : isSelected ? 10 : 3,
-                        transition: draggingNodeId === node.id ? "none" : "box-shadow .2s",
-                      }}
-                    >
-                      {/* Drag Handle Bar & Node Header */}
+                {/* Moveable & Editable Draggable Nodes Canvas Grid */}
+                <div style={{ position: "relative", width: "100%", height: 750, zIndex: 2 }}>
+                  {pipelineNodes.map((node, idx) => {
+                    const pos = nodePos[node.id] || { x: 30 + idx * 300, y: 80 };
+                    const isSelected = selectedNodeId === node.id;
+
+                    return (
                       <div
-                        onMouseDown={(e) => handleMouseDownNode(e, node.id)}
+                        key={node.id}
                         style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "4px 10px", background: t.surface2, border: `1px solid ${t.border}`,
-                          borderRadius: "8px 8px 0 0", cursor: "grab", fontFamily: MONO, fontSize: 9.5,
-                          color: t.text3, userSelect: "none",
+                          position: "absolute",
+                          left: pos.x,
+                          top: pos.y,
+                          width: 280,
+                          zIndex: draggingNodeId === node.id ? 20 : isSelected ? 10 : 3,
+                          transition: draggingNodeId === node.id ? "none" : "box-shadow .2s",
                         }}
                       >
-                        <span style={{ fontWeight: 700, color: node.color }}>⋮⋮ DRAG NODE #{node.step}</span>
-                        <span style={{ color: t.brain, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}>
-                          ⚙ Edit Input
-                        </span>
+                        {/* Drag Handle Bar & Node Header */}
+                        <div
+                          onMouseDown={(e) => handleMouseDownNode(e, node.id)}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "4px 10px", background: t.surface2, border: `1px solid ${t.border}`,
+                            borderRadius: "8px 8px 0 0", cursor: "grab", fontFamily: MONO, fontSize: 9.5,
+                            color: t.text3, userSelect: "none",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, color: node.color }}>⋮⋮ DRAG NODE #{node.step}</span>
+                          <span style={{ color: t.brain, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}>
+                            ⚙ Edit Input
+                          </span>
+                        </div>
+
+                        {/* Input Port Handle Dot (Left) */}
+                        <div
+                          ref={(el) => (portRefs.current[`${node.id}-in`] = el)}
+                          style={{
+                            position: "absolute", left: -6, top: 40, width: 12, height: 12,
+                            borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
+                            boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
+                          }}
+                        />
+
+                        {/* Output Port Handle Dot (Right) */}
+                        <div
+                          ref={(el) => (portRefs.current[`${node.id}-out`] = el)}
+                          style={{
+                            position: "absolute", right: -6, top: 40, width: 12, height: 12,
+                            borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
+                            boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
+                          }}
+                        />
+
+                        <NodeCard
+                          node={node}
+                          status={nodeStatus[node.id] || "idle"}
+                          output={nodeOutputs[node.id] || null}
+                          isSelected={isSelected}
+                          onSelect={setSelectedNodeId}
+                          onUpdateOutput={setOutput}
+                          onRunFromNode={handleRun}
+                          t={t}
+                        />
+
+                        {/* Inline Input Inspector on Node */}
+                        {isSelected && (
+                          <div style={{
+                            marginTop: 4, padding: 10, borderRadius: "0 0 8px 8px",
+                            background: t.surface2, border: `1.5px solid ${node.color}66`,
+                            fontFamily: FONT, fontSize: 11.5,
+                          }}>
+                            <div style={{ fontWeight: 700, color: t.text, marginBottom: 4, display: "flex", justifyContent: "space-between" }}>
+                              <span>Edit Node Directives:</span>
+                              <span style={{ fontFamily: MONO, fontSize: 9.5, color: t.text3 }}>{node.id}</span>
+                            </div>
+                            {node.id === "brief" && (
+                              <textarea
+                                rows={2}
+                                value={configs.brief?.brief || ""}
+                                onChange={(e) => updateConfig("brief", "brief", e.target.value)}
+                                style={{
+                                  width: "100%", padding: 6, borderRadius: 4,
+                                  background: t.surface, border: `1px solid ${t.border}`,
+                                  color: t.text, fontFamily: FONT, fontSize: 11.5, resize: "vertical",
+                                }}
+                              />
+                            )}
+                            {node.type === "agent" && (
+                              <textarea
+                                rows={2}
+                                value={configs[node.id]?.customPrompt || node.defaultPrompt || ""}
+                                onChange={(e) => updateConfig(node.id, "customPrompt", e.target.value)}
+                                placeholder="Enter agent directives..."
+                                style={{
+                                  width: "100%", padding: 6, borderRadius: 4,
+                                  background: t.surface, border: `1px solid ${t.border}`,
+                                  color: t.text, fontFamily: FONT, fontSize: 11.5, resize: "vertical",
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Side-by-Side Visual Canvas Output Renders */}
+                {nodeOutputs["copy"] && (
+                  <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px dashed ${t.border}`, position: "relative", zIndex: 2 }}>
+                    <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.brain, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 14, textAlign: "center" }}>
+                      Live Canvas Asset Renders (Typeface Arc Spaces)
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                      
+                      {/* Card 1: Feed Asset (1:1) */}
+                      <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                          <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3 }}>1:1 FEED AD · INSTAGRAM</span>
+                          <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 7px", border: `1px solid ${t.border}` }}>Ready</span>
+                        </div>
+                        {nodeOutputs["genfy"]?.url ? (
+                          <img src={nodeOutputs["genfy"].url} alt="Feed Asset" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                        ) : (
+                          <div style={{ height: 130, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
+                            Visual rendering...
+                          </div>
+                        )}
+                        <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
+                        <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 120)}...</div>
                       </div>
 
-                      {/* Input Port Handle Dot (Left) */}
-                      <div
-                        ref={(el) => (portRefs.current[`${node.id}-in`] = el)}
-                        style={{
-                          position: "absolute", left: -6, top: 40, width: 12, height: 12,
-                          borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
-                          boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
-                        }}
-                      />
-
-                      {/* Output Port Handle Dot (Right) */}
-                      <div
-                        ref={(el) => (portRefs.current[`${node.id}-out`] = el)}
-                        style={{
-                          position: "absolute", right: -6, top: 40, width: 12, height: 12,
-                          borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
-                          boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
-                        }}
-                      />
-
-
-                      <NodeCard
-                        node={node}
-                        status={nodeStatus[node.id] || "idle"}
-                        output={nodeOutputs[node.id] || null}
-                        isSelected={isSelected}
-                        onSelect={setSelectedNodeId}
-                        onUpdateOutput={setOutput}
-                        onRunFromNode={handleRun}
-                        t={t}
-                      />
-
-
-                      {/* Inline Input Inspector on Node */}
-                      {isSelected && (
-                        <div style={{
-                          marginTop: 4, padding: 10, borderRadius: "0 0 8px 8px",
-                          background: t.surface2, border: `1.5px solid ${node.color}66`,
-                          fontFamily: FONT, fontSize: 11.5,
-                        }}>
-                          <div style={{ fontWeight: 700, color: t.text, marginBottom: 4, display: "flex", justifyContent: "space-between" }}>
-                            <span>Edit Node Directives:</span>
-                            <span style={{ fontFamily: MONO, fontSize: 9.5, color: t.text3 }}>{node.id}</span>
-                          </div>
-                          {node.id === "brief" && (
-                            <textarea
-                              rows={2}
-                              value={configs.brief?.brief || ""}
-                              onChange={(e) => updateConfig("brief", "brief", e.target.value)}
-                              style={{
-                                width: "100%", padding: 6, borderRadius: 4,
-                                background: t.surface, border: `1px solid ${t.border}`,
-                                color: t.text, fontFamily: FONT, fontSize: 11.5, resize: "vertical",
-                              }}
-                            />
-                          )}
-                          {node.type === "agent" && (
-                            <textarea
-                              rows={2}
-                              value={configs[node.id]?.customPrompt || node.defaultPrompt || ""}
-                              onChange={(e) => updateConfig(node.id, "customPrompt", e.target.value)}
-                              placeholder="Enter agent directives..."
-                              style={{
-                                width: "100%", padding: 6, borderRadius: 4,
-                                background: t.surface, border: `1px solid ${t.border}`,
-                                color: t.text, fontFamily: FONT, fontSize: 11.5, resize: "vertical",
-                              }}
-                            />
-                          )}
+                      {/* Card 2: Story Asset (9:16) */}
+                      <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                          <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain }}>9:16 STORY AD · INSTAGRAM</span>
+                          <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.brainSoft, color: t.brainText, padding: "2px 7px" }}>Auto-Scaled</span>
                         </div>
-                      )}
+                        {nodeOutputs["genfy"]?.url ? (
+                          <img src={nodeOutputs["genfy"].url} alt="Story Asset" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                        ) : (
+                          <div style={{ height: 130, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
+                            9:16 layout scaling...
+                          </div>
+                        )}
+                        <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
+                        <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 100)}...</div>
+                      </div>
+
                     </div>
-                  );
-                })}
+                  </div>
+                )}
               </div>
 
-
-              {/* Side-by-Side Visual Canvas Output Renders */}
-              {nodeOutputs["copy"] && (
-                <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px dashed ${t.border}`, position: "relative", zIndex: 2 }}>
-                  <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.brain, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 14, textAlign: "center" }}>
-                    Live Canvas Asset Renders (Typeface Arc Spaces)
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                    
-                    {/* Card 1: Feed Asset (1:1) */}
-                    <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3 }}>1:1 FEED AD · INSTAGRAM</span>
-                        <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 7px", border: `1px solid ${t.border}` }}>Ready</span>
-                      </div>
-                      {nodeOutputs["genfy"]?.url ? (
-                        <img src={nodeOutputs["genfy"].url} alt="Feed Asset" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
-                      ) : (
-                        <div style={{ height: 130, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
-                          Visual rendering...
-                        </div>
-                      )}
-                      <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
-                      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 120)}...</div>
-                    </div>
-
-                    {/* Card 2: Story Asset (9:16) */}
-                    <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain }}>9:16 STORY AD · INSTAGRAM</span>
-                        <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.brainSoft, color: t.brainText, padding: "2px 7px" }}>Auto-Scaled</span>
-                      </div>
-                      {nodeOutputs["genfy"]?.url ? (
-                        <img src={nodeOutputs["genfy"].url} alt="Story Asset" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
-                      ) : (
-                        <div style={{ height: 130, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
-                          9:16 layout scaling...
-                        </div>
-                      )}
-                      <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
-                      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 100)}...</div>
-                    </div>
-
-                  </div>
-                </div>
-              )}
-
-              {/* Typeface Bottom-Right Canvas Controls */}
+              {/* Typeface Bottom-Right Working Zoom Controls */}
               <div style={{
                 position: "absolute", right: 16, bottom: 16, zIndex: 20,
                 background: t.surface, border: `1px solid ${t.border}`,
-                borderRadius: 999, padding: "4px 10px",
-                display: "flex", alignItems: "center", gap: 8,
-                boxShadow: t.shadow, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                borderRadius: 999, padding: "6px 14px",
+                display: "flex", alignItems: "center", gap: 10,
+                boxShadow: t.shadowLg, fontFamily: FONT, fontSize: 12, fontWeight: 600,
               }}>
                 <button title="Pointer" onClick={() => showToast("Pointer tool active")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>↖</button>
                 <button title="Pan Hand" onClick={() => showToast("Pan Hand tool active")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>✋</button>
                 <span style={{ color: t.border }}>|</span>
-                <button title="Zoom In" onClick={() => showToast("Zoom In +")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>+</button>
-                <button title="Zoom Out" onClick={() => showToast("Zoom Out -")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>-</button>
+                <button title="Zoom In" onClick={() => setZoomScale(z => Math.min(1.5, z + 0.1))} style={{ background: "none", border: "none", cursor: "pointer", color: t.text, fontWeight: 700 }}>+</button>
+                <button title="Zoom Out" onClick={() => setZoomScale(z => Math.max(0.6, z - 0.1))} style={{ background: "none", border: "none", cursor: "pointer", color: t.text, fontWeight: 700 }}>-</button>
+                <button title="Reset 100%" onClick={() => setZoomScale(1.0)} style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 12, padding: "2px 8px", fontSize: 10.5, cursor: "pointer", color: t.text }}>
+                  100%
+                </button>
               </div>
 
             </div>
@@ -1865,35 +1844,41 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
         </div>
 
-        {/* ── RIGHT: Config Panel (sticky) ──────────────────────────────────── */}
-        <div style={{
-          width: 290, flexShrink: 0,
-          borderLeft: `1px solid ${t.border}`,
-          position: "sticky", top: 0, alignSelf: "flex-start",
-          maxHeight: "calc(100vh - 56px)", overflowY: "auto",
-          background: t.surface2,
-        }}>
+        {/* ── RIGHT: Config Panel (collapsible) ──────────────────────────────────── */}
+        {showRightConfig && (
           <div style={{
-            padding: "12px 18px 10px",
-            borderBottom: `1px solid ${t.border}`,
-            display: "flex", alignItems: "center", gap: 6,
+            width: 290, flexShrink: 0,
+            borderLeft: `1px solid ${t.border}`,
+            position: "sticky", top: 0, alignSelf: "flex-start",
+            maxHeight: "calc(100vh - 56px)", overflowY: "auto",
+            background: t.surface2,
           }}>
-            <Settings size={13} style={{ color: t.text3 }} />
-            <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Node Config
-            </span>
+            <div style={{
+              padding: "12px 18px 10px",
+              borderBottom: `1px solid ${t.border}`,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Settings size={13} style={{ color: t.text3 }} />
+                <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  Node Config
+                </span>
+              </div>
+              <X size={14} style={{ cursor: "pointer", color: t.text3 }} onClick={() => setShowRightConfig(false)} />
+            </div>
+            <ConfigPanel
+              node={selectedNode}
+              config={configs[selectedNodeId] || {}}
+              onChange={(field, value) => updateConfig(selectedNodeId, field, value)}
+              t={t}
+              inputs={nodeInputs}
+              outputs={nodeOutputs}
+              status={nodeStatus[selectedNodeId]}
+            />
           </div>
-          <ConfigPanel
-            node={selectedNode}
-            config={configs[selectedNodeId] || {}}
-            onChange={(field, value) => updateConfig(selectedNodeId, field, value)}
-            t={t}
-            inputs={nodeInputs}
-            outputs={nodeOutputs}
-            status={nodeStatus[selectedNodeId]}
-          />
-        </div>
+        )}
       </div>
+
 
       {/* ── Log Feed (collapsible) ────────────────────────────────────────────── */}
       <div style={{
