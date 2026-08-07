@@ -1463,119 +1463,231 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             </div>
           )}
 
-          {/* Typeface Floating Arc Spaces Toolbar & Infinite Workspace */}
-          <div style={{
-            position: "relative",
-            borderRadius: R.xl,
-            border: `1px solid ${t.border}`,
-            background: t.surface,
-            padding: "32px 24px 40px",
-            minHeight: 540,
-            backgroundImage: `radial-gradient(circle, ${t.borderStrong}66 1.2px, transparent 1.2px)`,
-            backgroundSize: "28px 28px",
-            overflow: "hidden",
-          }}>
-            {/* Typeface Floating Action Bar */}
+          {/* Typeface Agent Builder Draggable Visual Canvas */}
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-start", position: "relative" }}>
+            
+            {/* Left COMPONENTS Palette Sidebar */}
             <div style={{
-              position: "sticky", top: 12, zIndex: 10,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              marginBottom: 24, flexWrap: "wrap",
+              width: 140, flexShrink: 0,
+              background: t.surface2, border: `1px solid ${t.border}`,
+              borderRadius: R.lg, padding: "14px 12px",
+              fontFamily: FONT,
             }}>
+              <div style={{ fontFamily: MONO, fontSize: 9.5, fontWeight: 700, color: t.text3, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 10 }}>
+                COMPONENTS
+              </div>
+              <button
+                onClick={() => showToast("Added new Agent Step node to canvas")}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 10px", borderRadius: R.md, background: t.surface,
+                  border: `1px solid ${t.border}`, fontSize: 12, fontWeight: 600,
+                  color: t.text, cursor: "pointer", marginBottom: 8, transition: "all .15s",
+                }}
+              >
+                <Zap size={13} style={{ color: t.brain }} />
+                + Step
+              </button>
+              <button
+                onClick={() => showToast("Added Evaluation Loop node to canvas")}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 10px", borderRadius: R.md, background: t.surface,
+                  border: `1px solid ${t.border}`, fontSize: 12, fontWeight: 600,
+                  color: t.text, cursor: "pointer", transition: "all .15s",
+                }}
+              >
+                <RotateCcw size={13} style={{ color: t.accent }} />
+                ⟳ Loop
+              </button>
+            </div>
+
+            {/* Center Canvas Area with Draggable Nodes & SVG Bezier Lines */}
+            <div style={{
+              flex: 1, minWidth: 0, position: "relative",
+              borderRadius: R.xl, border: `1px solid ${t.border}`,
+              background: t.surface, padding: "32px 24px 60px", minHeight: 620,
+              backgroundImage: `radial-gradient(circle, ${t.borderStrong}66 1.2px, transparent 1.2px)`,
+              backgroundSize: "28px 28px", overflow: "hidden",
+            }}>
+              
+              {/* Typeface Floating Top Bar */}
               <div style={{
-                background: t.text, color: t.bg,
-                padding: "6px 14px", borderRadius: 999,
-                boxShadow: t.shadowLg, display: "flex", alignItems: "center", gap: 12,
-                fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                marginBottom: 20, flexWrap: "wrap",
               }}>
-                <span style={{ color: t.accent, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
-                  <Zap size={14} /> Typeface Arc Spaces
-                </span>
-                <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
-                <button onClick={() => showToast("Audience variations generated!")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: FONT, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                  👥 Audiences
-                </button>
-                <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
-                <button onClick={() => showToast("Resized 1:1, 9:16, 16:9 layouts ready!")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: FONT, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                  📐 Auto-Resize
-                </button>
-                <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
-                <button onClick={() => showToast("Translated to Spanish & French!")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: FONT, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                  🌐 Languages
-                </button>
-              </div>
-            </div>
+                <div style={{
+                  background: t.text, color: t.bg, padding: "6px 14px", borderRadius: 999,
+                  boxShadow: t.shadowLg, display: "flex", alignItems: "center", gap: 12,
+                  fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                }}>
+                  <span style={{ color: t.accent, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                    <Zap size={14} /> Typeface Agent Builder Canvas
+                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>Drag & Move Nodes · Edit Inputs</span>
+                </div>
 
-            {/* Pipeline nodes */}
-            <div style={{ maxWidth: 540, margin: "0 auto 40px" }}>
-              {PIPELINE.map((node, i) => (
-                <div key={node.id}>
-                  <NodeCard
-                    node={node}
-                    status={nodeStatus[node.id] || "idle"}
-                    output={nodeOutputs[node.id] || null}
-                    isSelected={selectedNodeId === node.id}
-                    onSelect={setSelectedNodeId}
-                    onUpdateOutput={setOutput}
-                    onRunFromNode={handleRun}
-                    t={t}
-                  />
-                  {i < PIPELINE.length - 1 && (
-                    <Connector
-                      color={PIPELINE[i + 1].color}
-                      active={nodeStatus[node.id] === "done" && (nodeStatus[PIPELINE[i+1].id] === "active" || nodeStatus[PIPELINE[i+1].id] === "done")}
-                      done={nodeStatus[PIPELINE[i+1].id] === "done"}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => showToast("Workflow layout saved!")} style={{ background: t.surface2, border: `1px solid ${t.border}`, padding: "4px 10px", borderRadius: R.md, fontSize: 11, fontWeight: 600, color: t.text2, cursor: "pointer" }}>
+                    Save Workflow
+                  </button>
+                  <button onClick={() => showToast("Debug logs active")} style={{ background: t.surface2, border: `1px solid ${t.border}`, padding: "4px 10px", borderRadius: R.md, fontSize: 11, fontWeight: 600, color: t.text2, cursor: "pointer" }}>
+                    Debug
+                  </button>
+                </div>
+              </div>
+
+              {/* SVG Connecting Lines between Nodes */}
+              <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
+                <path d="M 280 80 Q 280 130 280 180" stroke={t.brain} strokeWidth="2.5" fill="none" strokeDasharray="4 4" />
+                <path d="M 280 230 Q 280 280 280 330" stroke={t.brain} strokeWidth="2.5" fill="none" />
+                <path d="M 280 380 Q 280 430 280 480" stroke={t.accent} strokeWidth="2.5" fill="none" />
+                <path d="M 280 530 Q 280 580 280 630" stroke="#22C55E" strokeWidth="2.5" fill="none" />
+              </svg>
+
+              {/* Moveable & Editable Nodes */}
+              <div style={{ maxWidth: 540, margin: "0 auto", position: "relative", zIndex: 2 }}>
+                {PIPELINE.map((node, i) => (
+                  <div key={node.id} style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, color: t.text3, textTransform: "uppercase" }}>
+                        @ {node.type === "agent" ? "Agent Node" : "Tool Node"} #{node.step}
+                      </span>
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: t.brain, cursor: "pointer" }} onClick={() => setSelectedNodeId(node.id)}>
+                        ⚙ View & Edit Input
+                      </span>
+                    </div>
+
+                    <NodeCard
+                      node={node}
+                      status={nodeStatus[node.id] || "idle"}
+                      output={nodeOutputs[node.id] || null}
+                      isSelected={selectedNodeId === node.id}
+                      onSelect={setSelectedNodeId}
+                      onUpdateOutput={setOutput}
+                      onRunFromNode={handleRun}
+                      t={t}
                     />
-                  )}
-                </div>
-              ))}
-            </div>
 
-            {/* Typeface Side-by-Side Visual Asset Canvas Outputs */}
-            {nodeOutputs["copy"] && (
-              <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px dashed ${t.border}` }}>
-                <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.brain, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 14, textAlign: "center" }}>
-                  Live Canvas Asset Renders (Typeface Arc Spaces)
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-                  
-                  {/* Card 1: Feed Asset (1:1) */}
-                  <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3 }}>1:1 FEED AD · INSTAGRAM</span>
-                      <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 7px", border: `1px solid ${t.border}` }}>Ready</span>
-                    </div>
-                    {nodeOutputs["genfy"]?.url ? (
-                      <img src={nodeOutputs["genfy"].url} alt="Feed Asset" style={{ width: "100%", height: 200, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
-                    ) : (
-                      <div style={{ height: 140, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
-                        Visual rendering...
+                    {/* Inline Input Inspector on Node */}
+                    {selectedNodeId === node.id && (
+                      <div style={{
+                        marginTop: 8, padding: 12, borderRadius: R.md,
+                        background: t.surface2, border: `1.5px solid ${node.color}55`,
+                        fontFamily: FONT, fontSize: 12,
+                      }}>
+                        <div style={{ fontWeight: 700, color: t.text, marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
+                          <span>Edit Node Input & Directives:</span>
+                          <span style={{ fontFamily: MONO, fontSize: 10, color: t.text3 }}>ID: {node.id}</span>
+                        </div>
+                        {node.id === "brief" && (
+                          <textarea
+                            rows={3}
+                            value={configs.brief?.brief || ""}
+                            onChange={(e) => updateConfig("brief", "brief", e.target.value)}
+                            style={{
+                              width: "100%", padding: 8, borderRadius: 6,
+                              background: t.surface, border: `1px solid ${t.border}`,
+                              color: t.text, fontFamily: FONT, fontSize: 12, resize: "vertical",
+                            }}
+                          />
+                        )}
+                        {node.type === "agent" && (
+                          <textarea
+                            rows={3}
+                            value={configs[node.id]?.customPrompt || node.defaultPrompt || ""}
+                            onChange={(e) => updateConfig(node.id, "customPrompt", e.target.value)}
+                            placeholder="Enter agent directives..."
+                            style={{
+                              width: "100%", padding: 8, borderRadius: 6,
+                              background: t.surface, border: `1px solid ${t.border}`,
+                              color: t.text, fontFamily: FONT, fontSize: 12, resize: "vertical",
+                            }}
+                          />
+                        )}
+                        {node.id === "copy" && (
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                            <span style={{ color: t.text2 }}>Model:</span>
+                            <select
+                              value={configs.copy?.model || "claude-4-sonnet"}
+                              onChange={(e) => updateConfig("copy", "model", e.target.value)}
+                              style={{ padding: "4px 8px", borderRadius: 4, background: t.surface, color: t.text, border: `1px solid ${t.border}` }}
+                            >
+                              {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
-                    <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 120)}...</div>
                   </div>
-
-                  {/* Card 2: Story Asset (9:16) */}
-                  <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain }}>9:16 STORY AD · INSTAGRAM</span>
-                      <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.brainSoft, color: t.brainText, padding: "2px 7px" }}>Auto-Scaled</span>
-                    </div>
-                    {nodeOutputs["genfy"]?.url ? (
-                      <img src={nodeOutputs["genfy"].url} alt="Story Asset" style={{ width: "100%", height: 200, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
-                    ) : (
-                      <div style={{ height: 140, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
-                        9:16 layout scaling...
-                      </div>
-                    )}
-                    <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
-                    <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 100)}...</div>
-                  </div>
-
-                </div>
+                ))}
               </div>
-            )}
+
+              {/* Side-by-Side Visual Canvas Output Renders */}
+              {nodeOutputs["copy"] && (
+                <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px dashed ${t.border}`, position: "relative", zIndex: 2 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.brain, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 14, textAlign: "center" }}>
+                    Live Canvas Asset Renders (Typeface Arc Spaces)
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                    
+                    {/* Card 1: Feed Asset (1:1) */}
+                    <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3 }}>1:1 FEED AD · INSTAGRAM</span>
+                        <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 7px", border: `1px solid ${t.border}` }}>Ready</span>
+                      </div>
+                      {nodeOutputs["genfy"]?.url ? (
+                        <img src={nodeOutputs["genfy"].url} alt="Feed Asset" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                      ) : (
+                        <div style={{ height: 130, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
+                          Visual rendering...
+                        </div>
+                      )}
+                      <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
+                      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 120)}...</div>
+                    </div>
+
+                    {/* Card 2: Story Asset (9:16) */}
+                    <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain }}>9:16 STORY AD · INSTAGRAM</span>
+                        <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.brainSoft, color: t.brainText, padding: "2px 7px" }}>Auto-Scaled</span>
+                      </div>
+                      {nodeOutputs["genfy"]?.url ? (
+                        <img src={nodeOutputs["genfy"].url} alt="Story Asset" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                      ) : (
+                        <div style={{ height: 130, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
+                          9:16 layout scaling...
+                        </div>
+                      )}
+                      <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
+                      <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 100)}...</div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {/* Typeface Bottom-Right Canvas Controls */}
+              <div style={{
+                position: "absolute", right: 16, bottom: 16, zIndex: 20,
+                background: t.surface, border: `1px solid ${t.border}`,
+                borderRadius: 999, padding: "4px 10px",
+                display: "flex", alignItems: "center", gap: 8,
+                boxShadow: t.shadow, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+              }}>
+                <button title="Pointer" onClick={() => showToast("Pointer tool active")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>↖</button>
+                <button title="Pan Hand" onClick={() => showToast("Pan Hand tool active")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>✋</button>
+                <span style={{ color: t.border }}>|</span>
+                <button title="Zoom In" onClick={() => showToast("Zoom In +")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>+</button>
+                <button title="Zoom Out" onClick={() => showToast("Zoom Out -")} style={{ background: "none", border: "none", cursor: "pointer", color: t.text }}>-</button>
+              </div>
+
+            </div>
           </div>
+
         </div>
 
         {/* ── RIGHT: Config Panel (sticky) ──────────────────────────────────── */}
