@@ -1348,32 +1348,21 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         {/* ── LEFT: Canvas ──────────────────────────────────────────────────── */}
         <div style={{ flex: 1, minWidth: 0, padding: "24px 28px 40px" }}>
 
-          {/* Canvas header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+          {/* Canvas header with Typeface Canvas controls */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
             <div>
-              <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.text3, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                Autonomous Workflow Canvas
+              <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.brain, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                Typeface Arc Spaces · Visual Canvas
               </div>
-              <div style={{ fontWeight: 800, fontSize: 20, color: t.text, marginTop: 3 }}>
+              <div style={{ fontWeight: 800, fontSize: 22, color: t.text, marginTop: 2, letterSpacing: "-.02em" }}>
                 {activeProject ? activeProject.name : "Multi-Agent Campaign Pipeline"}
               </div>
-              {aiDesigned && aiWorkflowName && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
-                  <span style={{
-                    fontFamily: MONO, fontSize: 9.5, fontWeight: 700, padding: "2px 9px", borderRadius: 20,
-                    background: `${t.brain}18`, color: t.brain, border: `1px solid ${t.brain}30`,
-                  }}>
-                    🧠 AI CONFIGURED
-                  </span>
-                  <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3 }}>{aiWorkflowName}</span>
-                </div>
-              )}
             </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <label style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                fontSize: 12, fontWeight: 600, color: t.text2, cursor: "pointer",
-                background: t.surface2, padding: "6px 12px", borderRadius: 8,
+                display: "inline-flex", alignItems: "center", gap: 6,
+                fontSize: 11.5, fontWeight: 600, color: t.text2, cursor: "pointer",
+                background: t.surface2, padding: "6px 12px", borderRadius: R.md,
                 border: `1px solid ${t.border}`, fontFamily: FONT,
               }}>
                 <input
@@ -1396,12 +1385,24 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 <button
                   onClick={handleApproveStep}
                   style={{
-                    padding: "9px 20px", borderRadius: 10, border: "none",
+                    padding: "8px 18px", borderRadius: 999, border: "none",
                     background: "linear-gradient(135deg, #22C55E, #16A34A)",
-                    color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 8, fontFamily: FONT,
+                    color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 6, fontFamily: FONT,
                     boxShadow: "0 4px 14px rgba(34,197,94,0.35)",
                   }}
+                >
+                  <CheckCircle size={15} />
+                  Approve Node & Proceed ▶
+                </button>
+              ) : (
+                <Btn t={t} kind="dark" icon={isRunning ? Loader2 : Play} onClick={handleRun} disabled={isRunning}
+                  style={{ minWidth: 150, justifyContent: "center", borderRadius: R.pill }}>
+                  {isRunning ? "Running Pipeline..." : "▶  Launch Canvas"}
+                </Btn>
+              )}
+            </div>
+          </div>
                 >
                   <CheckCircle size={16} />
                   Approve Node Output & Proceed ▶
@@ -1474,28 +1475,50 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             </div>
           )}
 
-          {/* Canvas dot-grid background + pipeline nodes */}
+          {/* Typeface Floating Arc Spaces Toolbar & Infinite Workspace */}
           <div style={{
+            position: "relative",
             borderRadius: R.xl,
             border: `1px solid ${t.border}`,
             background: t.surface,
-            padding: "28px 24px",
-            position: "relative",
-            backgroundImage: `radial-gradient(circle, ${t.borderStrong}55 1px, transparent 1px)`,
-            backgroundSize: "24px 24px",
+            padding: "32px 24px 40px",
+            minHeight: 540,
+            backgroundImage: `radial-gradient(circle, ${t.borderStrong}66 1.2px, transparent 1.2px)`,
+            backgroundSize: "28px 28px",
+            overflow: "hidden",
           }}>
-            {/* Pipeline label */}
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <span style={{
-                fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain, letterSpacing: "0.1em",
-                background: `${t.brain}12`, padding: "4px 14px", borderRadius: 20, border: `1px solid ${t.brain}30`,
+            {/* Typeface Floating Action Bar */}
+            <div style={{
+              position: "sticky", top: 12, zIndex: 10,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+              marginBottom: 24, flexWrap: "wrap",
+            }}>
+              <div style={{
+                background: t.text, color: t.bg,
+                padding: "6px 14px", borderRadius: 999,
+                boxShadow: t.shadowLg, display: "flex", alignItems: "center", gap: 12,
+                fontFamily: FONT, fontSize: 12, fontWeight: 600,
               }}>
-                AGENT PIPELINE · {PIPELINE.length} NODES
-              </span>
+                <span style={{ color: t.accent, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                  <Zap size={14} /> Typeface Arc Spaces
+                </span>
+                <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
+                <button onClick={() => showToast("Audience variations generated!")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: FONT, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  👥 Audiences
+                </button>
+                <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
+                <button onClick={() => showToast("Resized 1:1, 9:16, 16:9 layouts ready!")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: FONT, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  📐 Auto-Resize
+                </button>
+                <span style={{ color: "rgba(255,255,255,0.2)" }}>|</span>
+                <button onClick={() => showToast("Translated to Spanish & French!")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: FONT, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  🌐 Languages
+                </button>
+              </div>
             </div>
 
-            {/* Nodes + connectors */}
-            <div style={{ maxWidth: 540, margin: "0 auto" }}>
+            {/* Pipeline nodes */}
+            <div style={{ maxWidth: 540, margin: "0 auto 40px" }}>
               {PIPELINE.map((node, i) => (
                 <div key={node.id}>
                   <NodeCard
@@ -1519,18 +1542,48 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               ))}
             </div>
 
-            {/* Final output card */}
-            {nodeOutputs["genfy"] && (
-              <div style={{
-                marginTop: 28, padding: "16px 18px", borderRadius: R.lg,
-                background: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))",
-                border: "1px solid rgba(34,197,94,0.3)",
-                textAlign: "center",
-              }}>
-                <CheckCircle size={22} color="#22C55E" style={{ margin: "0 auto 8px" }} />
-                <div style={{ fontWeight: 700, fontSize: 14, color: t.text }}>Pipeline Complete</div>
-                <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, marginTop: 4 }}>
-                  All 5 nodes executed successfully · Master Supervisor approved
+            {/* Typeface Side-by-Side Visual Asset Canvas Outputs */}
+            {nodeOutputs["copy"] && (
+              <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px dashed ${t.border}` }}>
+                <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.brain, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 14, textAlign: "center" }}>
+                  Live Canvas Asset Renders (Typeface Arc Spaces)
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+                  
+                  {/* Card 1: Feed Asset (1:1) */}
+                  <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3 }}>1:1 FEED AD · INSTAGRAM</span>
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 7px", border: `1px solid ${t.border}` }}>Ready</span>
+                    </div>
+                    {nodeOutputs["genfy"]?.url ? (
+                      <img src={nodeOutputs["genfy"].url} alt="Feed Asset" style={{ width: "100%", height: 200, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                    ) : (
+                      <div style={{ height: 140, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
+                        Visual rendering...
+                      </div>
+                    )}
+                    <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
+                    <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 120)}...</div>
+                  </div>
+
+                  {/* Card 2: Story Asset (9:16) */}
+                  <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: R.lg, padding: 16, position: "relative" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain }}>9:16 STORY AD · INSTAGRAM</span>
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, background: t.brainSoft, color: t.brainText, padding: "2px 7px" }}>Auto-Scaled</span>
+                    </div>
+                    {nodeOutputs["genfy"]?.url ? (
+                      <img src={nodeOutputs["genfy"].url} alt="Story Asset" style={{ width: "100%", height: 200, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                    ) : (
+                      <div style={{ height: 140, background: t.surface, borderRadius: 8, display: "grid", placeItems: "center", color: t.text3, marginBottom: 10, fontFamily: MONO, fontSize: 11 }}>
+                        9:16 layout scaling...
+                      </div>
+                    )}
+                    <div style={{ fontWeight: 700, fontSize: 13, color: t.text, marginBottom: 4 }}>{cleanRawJson(nodeOutputs["copy"].headline)}</div>
+                    <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.4 }}>{cleanRawJson(nodeOutputs["copy"].bodyText)?.slice(0, 100)}...</div>
+                  </div>
+
                 </div>
               </div>
             )}
