@@ -1601,32 +1601,52 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 </div>
               </div>
 
-              {/* Dynamic SVG Connecting Lines between Nodes */}
+              {/* Dynamic SVG Connecting Lines between Node Ports */}
               <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
                 {pipelineNodes.map((node, idx) => {
                   if (idx === pipelineNodes.length - 1) return null;
                   const nextNode = pipelineNodes[idx + 1];
-                  const p1 = nodePos[node.id] || { x: 50, y: 50 + idx * 120 };
-                  const p2 = nodePos[nextNode.id] || { x: 50, y: 50 + (idx + 1) * 120 };
+                  const p1 = nodePos[node.id] || { x: 30 + idx * 300, y: 80 };
+                  const p2 = nodePos[nextNode.id] || { x: 30 + (idx + 1) * 300, y: 80 };
 
-                  const x1 = p1.x + 140;
-                  const y1 = p1.y + 70;
-                  const x2 = p2.x + 140;
-                  const y2 = p2.y;
+                  // Right Output Port of Node A (x: +280, y: +35)
+                  const x1 = p1.x + 280;
+                  const y1 = p1.y + 35;
+
+                  // Left Input Port of Node B (x: 0, y: +35)
+                  const x2 = p2.x;
+                  const y2 = p2.y + 35;
 
                   const isConnDone = nodeStatus[node.id] === "done";
                   const strokeColor = isConnDone ? "#22C55E" : node.color || t.brain;
 
+                  // Control points for smooth horizontal S-curve bezier line
+                  const dx = Math.abs(x2 - x1) * 0.5;
+                  const cx1 = x1 + Math.max(60, dx);
+                  const cy1 = y1;
+                  const cx2 = x2 - Math.max(60, dx);
+                  const cy2 = y2;
+
                   return (
                     <g key={`conn-${node.id}-${nextNode.id}`}>
+                      {/* Outer shadow glow line */}
                       <path
-                        d={`M ${x1} ${y1} C ${x1} ${y1 + 50}, ${x2} ${y2 - 50}, ${x2} ${y2}`}
+                        d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
+                        stroke={`${strokeColor}33`}
+                        strokeWidth="6"
+                        fill="none"
+                      />
+                      {/* Main connection line */}
+                      <path
+                        d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
                         stroke={strokeColor}
                         strokeWidth="2.5"
                         fill="none"
                         strokeDasharray={isConnDone ? "none" : "6 4"}
                       />
-                      <circle cx={x2} cy={y2} r="4" fill={strokeColor} />
+                      {/* Output and Input Port Dots */}
+                      <circle cx={x1} cy={y1} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2" />
+                      <circle cx={x2} cy={y2} r="5" fill="#fff" stroke={strokeColor} strokeWidth="2" />
                     </g>
                   );
                 })}
@@ -1634,8 +1654,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
               {/* Moveable & Editable Draggable Nodes Canvas Grid */}
               <div style={{ position: "relative", width: "100%", height: 620, zIndex: 2 }}>
-                {pipelineNodes.map((node) => {
-                  const pos = nodePos[node.id] || { x: 50, y: 50 };
+                {pipelineNodes.map((node, idx) => {
+                  const pos = nodePos[node.id] || { x: 30 + idx * 300, y: 80 };
                   const isSelected = selectedNodeId === node.id;
 
                   return (
@@ -1650,12 +1670,12 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                         transition: draggingNodeId === node.id ? "none" : "box-shadow .2s",
                       }}
                     >
-                      {/* Drag Handle Bar */}
+                      {/* Drag Handle Bar & Node Header */}
                       <div
                         onMouseDown={(e) => handleMouseDownNode(e, node.id)}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "3px 8px", background: t.surface2, border: `1px solid ${t.border}`,
+                          padding: "4px 10px", background: t.surface2, border: `1px solid ${t.border}`,
                           borderRadius: "8px 8px 0 0", cursor: "grab", fontFamily: MONO, fontSize: 9.5,
                           color: t.text3, userSelect: "none",
                         }}
@@ -1665,6 +1685,18 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                           ⚙ Edit Input
                         </span>
                       </div>
+
+                      {/* Connection Handle Dots on Node Borders */}
+                      <div style={{
+                        position: "absolute", left: -6, top: 32, width: 12, height: 12,
+                        borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
+                        boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
+                      }} />
+                      <div style={{
+                        position: "absolute", right: -6, top: 32, width: 12, height: 12,
+                        borderRadius: "50%", background: "#fff", border: `2px solid ${node.color}`,
+                        boxShadow: `0 0 6px ${node.color}66`, zIndex: 5, pointerEvents: "none",
+                      }} />
 
                       <NodeCard
                         node={node}
@@ -1676,6 +1708,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                         onRunFromNode={handleRun}
                         t={t}
                       />
+
 
                       {/* Inline Input Inspector on Node */}
                       {isSelected && (
