@@ -1398,6 +1398,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               ) : (
                 <Btn t={t} kind="dark" icon={isRunning ? Loader2 : Play} onClick={handleRun} disabled={isRunning}
                   style={{ minWidth: 150, justifyContent: "center", borderRadius: R.pill }}>
+                  {isRunning ? "Running Pipeline..." : "▶  Launch Canvas"}
+                </Btn>
               )}
             </div>
           </div>
