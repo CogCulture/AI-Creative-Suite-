@@ -609,13 +609,22 @@ class LoginRequest(BaseModel):
 class GoogleAuthRequest(BaseModel):
     credential: str
 
+class FileAttachment(BaseModel):
+    name: str
+    type: str
+    data: str  # base64 encoded data
+
 class ChatRequest(BaseModel):
     user_message: str
+    promptTitle: Optional[str] = None
     llm_model: Optional[str] = "claude-4-sonnet"
     temperature: Optional[float] = 0.7
     stream: Optional[bool] = False
     conversation_id: Optional[str] = None
     external_project_data: Optional[dict] = None
+    attached_files: Optional[List[FileAttachment]] = []
+    external_research_context: Optional[str] = None
+    messages: Optional[List[dict]] = []
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -1039,6 +1048,28 @@ async def list_brands(
     ]
 
 
+async def _sync_brand_to_copyagent(brand: SuiteBrand, user_id: str):
+    """Sync the brand to CopyAgent backend via integration endpoint."""
+    try:
+        url = f"{COPYAGENT_BASE_URL}/api/integration/v1/brands"
+        headers = _upstream_headers(user_id)
+        payload = {
+            "id": brand.id,
+            "brand_name": brand.brand_name,
+            "company_website": brand.website,
+            "industry": brand.industry,
+            "product_service": brand.product_desc,
+            "brand_voice": brand.voice,
+            "competitors": brand.competitors,
+            "unique_selling_points": brand.usp
+        }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            if not resp.is_success:
+                print(f"[Sync] Failed to sync brand {brand.id} to CopyAgent. Status: {resp.status_code}")
+    except Exception as e:
+        print(f"[Sync] Error syncing brand to CopyAgent: {e}")
+
 @app.post("/bff/brands")
 async def create_brand(
     body: BrandCreateRequest,
@@ -1071,6 +1102,9 @@ async def create_brand(
         existing.words_to_avoid = body.wordsToAvoid
         db.commit()
         db.refresh(existing)
+        # Background sync to copyagent
+        bg_tasks = BackgroundTasks() # Not passed directly, so we just await inline for simplicity, or we can use asyncio.create_task
+        asyncio.create_task(_sync_brand_to_copyagent(existing, user_id))
         return {
             "id": existing.id,
             "brandName": existing.brand_name,
@@ -1102,6 +1136,7 @@ async def create_brand(
     db.add(brand)
     db.commit()
     db.refresh(brand)
+    asyncio.create_task(_sync_brand_to_copyagent(brand, user_id))
     return {
         "id": brand.id,
         "brandName": brand.brand_name,
@@ -1700,11 +1735,12 @@ async def _stream_from_upstream(payload: dict, user_id: Optional[str]) -> AsyncG
             headers=_upstream_headers(user_id),
             json=payload,
         ) as upstream:
-            if upstream.status_code == 404 and user_id:
-                # Read error body to check if it's the missing user detail
+            if upstream.status_code == 404:
+                # Read error body to check if it's the missing user detail or thread issue
                 error_body = await upstream.aread()
                 error_text = error_body.decode("utf-8", errors="replace")
-                if "User specified in X-User-Id does not exist" in error_text:
+                
+                if user_id and "User specified in X-User-Id does not exist" in error_text:
                     print(f"[Self-Healing Stream] User {user_id} missing from CopyAgent. Force syncing and retrying...", flush=True)
                     db_local = SuiteSessionLocal()
                     try:
@@ -1713,6 +1749,26 @@ async def _stream_from_upstream(payload: dict, user_id: Optional[str]) -> AsyncG
                         db_local.close()
                     
                     # Retry the connection once with fresh headers
+                    async with client.stream(
+                        "POST",
+                        COPYAGENT_URL,
+                        headers=_upstream_headers(user_id),
+                        json=payload,
+                    ) as retry_upstream:
+                        if retry_upstream.status_code != 200:
+                            retry_err_body = await retry_upstream.aread()
+                            retry_err_text = retry_err_body.decode("utf-8", errors="replace")
+                            err_payload = json.dumps({"error": f"Upstream retry error {retry_upstream.status_code}: {retry_err_text[:300]}"})
+                            yield f"data: {err_payload}\n\n"
+                            return
+                        async for line in retry_upstream.aiter_lines():
+                            if line:
+                                yield f"{line}\n\n"
+                        return
+
+                elif "Conversation thread not found" in error_text:
+                    print(f"[Self-Healing Stream] Thread {payload.get('conversation_id')} not found. Retrying with new thread...", flush=True)
+                    payload.pop("conversation_id", None)
                     async with client.stream(
                         "POST",
                         COPYAGENT_URL,
@@ -1807,8 +1863,10 @@ async def chat_completions(
                     )
                     if rag_context:
                         effective_message = (
-                            f"{rag_context}\n\n"
-                            f"Using the brand knowledge above, answer the following:\n{body.user_message}"
+                            f"[Brand Reference Context]\n"
+                            f"{rag_context}\n"
+                            f"[End of Brand Reference Context]\n\n"
+                            f"{body.user_message}"
                         )
                         print(f"[RAG] Injected {len(rag_context)} chars of brand context for brand_id={brand_id}", flush=True)
                 except Exception as rag_exc:
@@ -1820,6 +1878,10 @@ async def chat_completions(
         "temperature":     body.temperature if body.temperature is not None else 0.7,
         "stream":          body.stream or False,
         "conversation_id": body.conversation_id,
+        "attached_files":  [f.dict() for f in body.attached_files] if body.attached_files else [],
+        "promptTitle":     body.promptTitle,
+        "external_research_context": body.external_research_context,
+        "messages":        body.messages or []
     }
     if body.external_project_data:
         upstream_payload["external_project_data"] = body.external_project_data
@@ -1840,10 +1902,20 @@ async def chat_completions(
         )
 
         # Self-healing retry on 404
-        if upstream.status_code == 404 and "User specified in X-User-Id does not exist" in upstream.text:
-            if user_id:
-                print(f"[Self-Healing Chat] User {user_id} missing from CopyAgent. Force syncing and retrying...")
-                await _sync_user_forced(user_id, db)
+        if upstream.status_code == 404:
+            if "User specified in X-User-Id does not exist" in upstream.text:
+                if user_id:
+                    print(f"[Self-Healing Chat] User {user_id} missing from CopyAgent. Force syncing and retrying...")
+                    await _sync_user_forced(user_id, db)
+                    async with httpx.AsyncClient(timeout=120.0) as client:
+                        upstream = await client.post(
+                            COPYAGENT_URL,
+                            headers=_upstream_headers(user_id),
+                            json=upstream_payload,
+                        )
+            elif "Conversation thread not found" in upstream.text:
+                print(f"[Self-Healing Chat] Thread {upstream_payload.get('conversation_id')} not found. Retrying with new thread...")
+                upstream_payload.pop("conversation_id", None)
                 async with httpx.AsyncClient(timeout=120.0) as client:
                     upstream = await client.post(
                         COPYAGENT_URL,
@@ -1865,6 +1937,184 @@ async def chat_completions(
         raise HTTPException(status_code=504, detail="Upstream Copy Agent timed out.")
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail=f"Failed to reach Copy Agent: {exc}")
+
+@app.get("/bff/chat/conversations")
+async def bff_list_conversations(
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    if not user_id:
+        user_id = STATIC_USER_ID
+
+    effective_user_id = user_id
+    if user_id:
+        user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+        if user and user.copyagent_user_id:
+            effective_user_id = user.copyagent_user_id
+
+    url = f"{COPYAGENT_BASE_URL}/api/conversations/"
+    params = {"user_id": effective_user_id}
+    print(f"[Conversations] Querying url={url} with params={params}", flush=True)
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(url, params=params)
+        print(f"[Conversations] Status={resp.status_code}, Body={resp.text[:300]}", flush=True)
+        if resp.status_code == 200:
+            return resp.json()
+        return []
+    except Exception as e:
+        print(f"[Conversations] Error fetching: {e}", flush=True)
+        return []
+
+@app.get("/bff/chat/conversations/{conversation_id}")
+async def bff_get_conversation_details(
+    conversation_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    url = f"{COPYAGENT_BASE_URL}/api/conversations/{conversation_id}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(url)
+        if resp.status_code == 200:
+            data = resp.json()
+            if "messages" in data:
+                for m in data["messages"]:
+                    if "content" in m and not m.get("text"):
+                        m["text"] = m["content"]
+            return data
+        return {"messages": []}
+    except Exception as e:
+        print(f"[Conversation Details] Error fetching {conversation_id}: {e}")
+        return {"messages": []}
+
+@app.delete("/bff/chat/conversations/{conversation_id}")
+async def bff_delete_conversation(
+    conversation_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    url = f"{COPYAGENT_BASE_URL}/api/conversations/{conversation_id}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.delete(url)
+        if resp.status_code in {200, 204}:
+            return {"status": "success"}
+        return {"status": "error", "message": resp.text[:200]}
+    except Exception as e:
+        print(f"[Conversation Delete] Error: {e}")
+        return {"status": "error"}
+
+class TitleUpdatePayload(BaseModel):
+    title: str
+
+@app.patch("/bff/chat/conversations/{conversation_id}")
+async def bff_update_conversation_title(
+    conversation_id: str,
+    payload: TitleUpdatePayload,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    url = f"{COPYAGENT_BASE_URL}/api/conversations/{conversation_id}/title"
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.patch(url, json={"title": payload.title})
+        if resp.is_success:
+            return resp.json()
+        raise HTTPException(status_code=resp.status_code, detail=f"Failed to update title: {resp.text[:200]}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Conversation Rename] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ConversationCreatePayload(BaseModel):
+    title: str
+    user_id: Optional[str] = None
+    team_id: Optional[str] = None
+    brand_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    incognito: Optional[bool] = False
+
+@app.post("/bff/chat/conversations")
+async def bff_create_conversation(
+    payload: ConversationCreatePayload,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    url = f"{COPYAGENT_BASE_URL}/api/conversations/"
+    user_id = _get_current_user_id(suite_session)
+    if not user_id:
+        user_id = STATIC_USER_ID
+        
+    effective_user_id = user_id
+    if user_id:
+        user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+        if user and user.copyagent_user_id:
+            effective_user_id = user.copyagent_user_id
+            
+    upstream_payload = payload.dict()
+    upstream_payload["user_id"] = effective_user_id
+    
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.post(url, json=upstream_payload)
+        if resp.is_success:
+            return resp.json()
+        raise HTTPException(status_code=resp.status_code, detail=f"Failed to create conversation: {resp.text[:200]}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Conversation Create] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/bff/chat/variants/compare")
+async def bff_variants_compare(request: Request, suite_session: Optional[str] = Cookie(None)):
+    user_id = _get_current_user_id(suite_session)
+    payload = await request.json()
+    target_url = f"{COPYAGENT_BASE_URL}/api/variants/generate"
+    headers = {"Content-Type": "application/json", "X-User-Id": user_id}
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(target_url, json=payload, headers=headers)
+        if not resp.is_success:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
+
+@app.get("/bff/chat/variants/{session_id}")
+async def bff_variants_poll(session_id: str, suite_session: Optional[str] = Cookie(None)):
+    user_id = _get_current_user_id(suite_session)
+    target_url = f"{COPYAGENT_BASE_URL}/api/variants/session/{session_id}"
+    headers = {"X-User-Id": user_id}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(target_url, headers=headers)
+        if not resp.is_success:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
+
+@app.post("/bff/chat/variants/session/{session_id}/refine")
+async def bff_variants_refine(session_id: str, request: Request, suite_session: Optional[str] = Cookie(None)):
+    user_id = _get_current_user_id(suite_session)
+    payload = await request.json()
+    target_url = f"{COPYAGENT_BASE_URL}/api/variants/session/{session_id}/refine"
+    headers = {"Content-Type": "application/json", "X-User-Id": user_id}
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(target_url, json=payload, headers=headers)
+        if not resp.is_success:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
+
+@app.post("/bff/chat/variants/session/{session_id}/select")
+async def bff_variants_select(session_id: str, request: Request, suite_session: Optional[str] = Cookie(None)):
+    user_id = _get_current_user_id(suite_session)
+    payload = await request.json()
+    target_url = f"{COPYAGENT_BASE_URL}/api/variants/session/{session_id}/select"
+    headers = {"Content-Type": "application/json", "X-User-Id": user_id}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(target_url, json=payload, headers=headers)
+        if not resp.is_success:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
 
 
 # ── Genfy Integration ──────────────────────────────────────────────────────────

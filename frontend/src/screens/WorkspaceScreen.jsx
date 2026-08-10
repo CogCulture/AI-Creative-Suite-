@@ -52,7 +52,7 @@ export default function WorkspaceScreen({
               </h2>
             </div>
             {activeWorkspace && (
-              <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.accent, background: t.accentSoft, padding: "4px 8px", borderRadius: 999 }}>
+              <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text, background: t.surface3, padding: "4px 8px", borderRadius: 999 }}>
                 Active
               </span>
             )}
@@ -108,8 +108,8 @@ export default function WorkspaceScreen({
                     gap: 12,
                     padding: 14,
                     borderRadius: R.md,
-                    border: `1px solid ${active ? t.accent : t.border}`,
-                    background: active ? t.accentSoft : t.surface2,
+                    border: `1px solid ${active ? t.text : t.border}`,
+                    background: active ? t.surface3 : t.surface2,
                     cursor: "pointer",
                     textAlign: "left",
                   }}
@@ -119,10 +119,12 @@ export default function WorkspaceScreen({
                       {workspace.name}
                     </div>
                     <div className="text-muted" style={{ fontFamily: MONO, fontSize: 10.5, marginTop: 3 }}>
-                      {workspace.members?.length ? `${workspace.members.length} members` : "No members yet"}
+                      {workspace.type === "personal"
+                        ? "Personal workspace"
+                        : (workspace.members?.length ? `${workspace.members.length} members` : "Client workspace")}
                     </div>
                   </div>
-                  {active && <Check size={16} color={t.accent} />}
+                  {active && <Check size={16} color={t.text} />}
                 </button>
               );
             }) : (

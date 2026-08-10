@@ -105,7 +105,7 @@ export default function LoginSignup({ onLogin, onNavigate }) {
 
   const triggerLoginTransition = () => {
     if (window.location.hash === "#login" || window.location.hash === "#signup") {
-      window.history.replaceState(null, "", window.location.pathname);
+      window.history.replaceState(null, "", window.location.pathname.replace(/^\/+/, "/"));
     }
     setShowLoader(true);
   };

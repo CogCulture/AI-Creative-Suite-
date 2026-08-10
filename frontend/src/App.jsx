@@ -43,6 +43,7 @@ function useTheme() {
 export default function App() {
   // null = still checking with server, false = not logged in, true = confirmed by server
   const [isLoggedIn, setIsLoggedIn] = useState(null);
+  const [goToLibrarySignal, setGoToLibrarySignal] = useState(0);
 
   useEffect(() => {
     // Validate session with the server on every load.
@@ -53,7 +54,7 @@ export default function App() {
           return res.json().then((user) => {
             try { localStorage.setItem("studio-user-info", JSON.stringify(user)); } catch (_) {}
             if (window.location.hash === "#login" || window.location.hash === "#signup") {
-              window.history.replaceState(null, "", window.location.pathname);
+              window.history.replaceState(null, "", window.location.pathname.replace(/^\/+/, "/"));
             }
             setIsLoggedIn(true);
           });
@@ -79,11 +80,45 @@ export default function App() {
   });
   const [workspaceList, setWorkspaceList] = useState(() => {
     try {
-      const list = JSON.parse(localStorage.getItem("studio-workspaces") || "[]");
-      return Array.isArray(list) ? list : [];
-    } catch (_) {
-      return [];
-    }
+      let list = JSON.parse(localStorage.getItem("studio-workspaces") || "[]");
+      if (Array.isArray(list) && list.length > 0) {
+        if (!list.some(w => w.id === "personal-workspace")) {
+          list.unshift({
+            id: "personal-workspace",
+            name: "Personal Workspace",
+            type: "personal",
+            members: [],
+            sharedProjects: []
+          });
+        }
+        if (!list.some(w => w.id === "offgrid-workspace")) {
+          list.push({
+            id: "offgrid-workspace",
+            name: "OFFGRID",
+            type: "client",
+            members: [],
+            sharedProjects: []
+          });
+        }
+        return list;
+      }
+    } catch (_) {}
+    return [
+      {
+        id: "personal-workspace",
+        name: "Personal Workspace",
+        type: "personal",
+        members: [],
+        sharedProjects: []
+      },
+      {
+        id: "offgrid-workspace",
+        name: "OFFGRID",
+        type: "client",
+        members: [],
+        sharedProjects: []
+      }
+    ];
   });
   const [toast, setToast] = useState(null);
   const [showBrandDNA, setShowBrandDNA] = useState(false);
@@ -111,7 +146,8 @@ export default function App() {
       })();
     style.textContent = `::selection { background: ${t.accentSoft}; }`;
     document.body.style.background = t.bg;
-  }, [t]);
+    document.body.className = mode === "dark" ? "dark" : "light";
+  }, [t, mode]);
 
   /* Custom scrollbar color tracking */
   useEffect(() => {
@@ -125,7 +161,6 @@ export default function App() {
     style.textContent = `
       .studio-scroll::-webkit-scrollbar-thumb {
         background: ${t.borderStrong};
-        border-color: ${t.bg};
       }
     `; 
   }, [t]);
@@ -197,6 +232,16 @@ export default function App() {
     });
   };
 
+  const handleDeleteWorkspace = (workspaceId) => {
+    setWorkspaceList((prev) => {
+      const next = prev.filter((w) => w.id !== workspaceId);
+      return next;
+    });
+    if (activeWorkspace?.id === workspaceId) {
+      setActiveWorkspace(null);
+    }
+  };
+
   const compact = w < 1080;
   const shared = { t, nav, showToast, activeWorkspace, workspaceList };
 
@@ -239,11 +284,15 @@ export default function App() {
           compact={compact}
           activeWorkspace={activeWorkspace}
           onOpenWorkspace={() => nav("workspace")}
+          workspaces={workspaceList}
+          onSelectWorkspace={handleWorkspaceSaved}
+          onAddWorkspace={openCreateWorkspace}
+          onDeleteWorkspace={handleDeleteWorkspace}
         />
       )}
 
       {/* Main area */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <TopBar
           t={t}
           mode={mode}
@@ -254,6 +303,7 @@ export default function App() {
           workspaces={workspaceList}
           onSelectWorkspace={(workspace) => handleWorkspaceSaved(workspace)}
           onAddWorkspace={openCreateWorkspace}
+          onNavigateToLibrary={() => setGoToLibrarySignal(s => s + 1)}
         />
 
         <div
@@ -263,7 +313,7 @@ export default function App() {
         >
           {view === "home"        && <HomeScreen {...shared} />}
           {view === "tools"       && <ToolsScreen {...shared} />}
-          {view === "tool-detail" && <ToolDetail {...shared} />}
+          {view === "tool-detail" && <ToolDetail {...shared} goToLibrarySignal={goToLibrarySignal} />}
           {view === "workflow"    && <WorkflowScreen {...shared} activeProject={activeProject} setActiveProject={setActiveProject} />}
           {view === "projects"    && <ProjectsScreen {...shared} setActiveProject={setActiveProject} />}
           {view === "workspace"   && <WorkspaceScreen {...shared} onSelectWorkspace={handleWorkspaceSaved} onInviteFriend={openInviteWorkspace} onAddWorkspace={openCreateWorkspace} />}

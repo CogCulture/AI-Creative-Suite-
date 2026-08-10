@@ -403,7 +403,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                 ? "Create your first campaign project to launch a multi-agent workflow — Strategy → Copy Agent → Image Engine."
                 : "No campaigns created for this brand yet."}
             </div>
-            <Btn t={t} kind="accent" icon={Sparkles} onClick={() => setShowModal(true)}
+            <Btn t={t} kind="dark" icon={Sparkles} onClick={() => setShowModal(true)}
               style={{ marginTop: 20, display: "inline-flex" }}>
               Create New Campaign
             </Btn>
@@ -660,14 +660,15 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            className="studio-scroll"
             style={{
-              width: "100%", maxWidth: 520, background: t.surface, borderRadius: R.xl,
-              border: `1px solid ${t.border}`, boxShadow: t.shadowLg, padding: 28, fontFamily: FONT,
-              position: "relative", overflow: "hidden",
+              width: "100%", maxWidth: 500, background: t.surface, borderRadius: R.xl,
+              border: `1px solid ${t.border}`, boxShadow: t.shadowLg, padding: "22px 24px", fontFamily: FONT,
+              position: "relative", overflowY: "auto", maxHeight: "calc(100vh - 60px)",
             }}
           >
             {/* Modal header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 22 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                   <div style={{
@@ -692,7 +693,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
             </div>
 
             {/* Form fields */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               
               {/* Brand Selector */}
               <div>
@@ -747,7 +748,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                   value={form.brief}
                   onChange={(e) => { setForm((f) => ({ ...f, brief: e.target.value })); setBriefError(false); }}
                   placeholder="Describe your campaign — product, target audience, key message, visual goals..."
-                  rows={4}
+                  rows={3}
                   style={{
                     width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
                     border: `1px solid ${briefError ? "#EF4444" : t.border}`,
@@ -842,11 +843,11 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
             </div>
 
             {/* Modal actions */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 18, borderTop: `1px solid ${t.border}` }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
               <Btn t={t} kind="ghost" onClick={() => { setShowModal(false); setAiPhase(null); setAiResult(null); }} disabled={!!aiPhase}>
                 Cancel
               </Btn>
-              <Btn t={t} kind="accent" icon={Sparkles} onClick={handleCreate} disabled={!!aiPhase}>
+              <Btn t={t} kind="dark" icon={Sparkles} onClick={handleCreate} disabled={!!aiPhase}>
                 Launch Workflow →
               </Btn>
             </div>

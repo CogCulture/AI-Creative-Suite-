@@ -32,8 +32,8 @@ export default function HomeScreen({ t, nav, showToast }) {
               <div
                 key={tool.id}
                 style={{
-                  width: 24, height: 24, borderRadius: 6, display: "grid", placeItems: "center",
-                  background: tool.id === "copy" ? "transparent" : tool.id === "genfy" ? "rgba(232, 85, 42, 0.12)" : `${tool.hue}1F`,
+                  width: 24, height: 24, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: tool.id === "copy" ? "#000000" : tool.id === "genfy" ? "rgba(232, 85, 42, 0.12)" : `${tool.hue}1F`,
                   color: tool.hue,
                   border: tool.id === "copy" ? "none" : tool.id === "genfy" ? "1px solid rgba(232, 85, 42, 0.35)" : `1px solid ${t.border}`,
                   boxShadow: tool.id === "genfy" ? "0 0 6px rgba(232, 85, 42, 0.25)" : "none",
@@ -41,7 +41,7 @@ export default function HomeScreen({ t, nav, showToast }) {
                 }}
               >
                 {tool.id === "copy" ? (
-                  <img src="/images/copy_agent_logo.png" alt="Copy Agent" style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.25)" }} />
+                  <span style={{ color: "#ffffff", fontWeight: 800, fontSize: 10, fontFamily: "Inter, sans-serif", userSelect: "none" }}>CA</span>
                 ) : tool.id === "genfy" ? (
                   <img src="/images/genfy_logo.png" alt="Genfy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: "drop-shadow(0 0 3px rgba(232, 85, 42, 0.6))" }} />
                 ) : (
@@ -65,20 +65,23 @@ export default function HomeScreen({ t, nav, showToast }) {
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
+            background: t.bg === "#151311" ? "#ffffff" : "#000000",
+            border: t.bg === "#151311" ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(255,255,255,0.15)",
+            "--shine-color": t.bg === "#151311" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.12)",
           }}
         >
           <div>
-            <Mono t={t} style={{ color: "rgba(255,255,255,.55)" }}>Mode 02 · orchestrated</Mono>
-            <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 18, margin: "10px 0 6px", letterSpacing: "-.02em", color: "#ffffff" }}>
+            <Mono t={t} style={{ color: t.bg === "#151311" ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.55)" }}>Mode 02 · orchestrated</Mono>
+            <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 18, margin: "10px 0 6px", letterSpacing: "-.02em", color: t.bg === "#151311" ? "#000000" : "#ffffff" }}>
               Start a workflow
             </h3>
-            <p style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)", lineHeight: 1.5, maxWidth: "34ch" }}>
+            <p style={{ fontSize: 12.5, color: t.bg === "#151311" ? "rgba(0,0,0,.8)" : "rgba(255,255,255,.8)", lineHeight: 1.5, maxWidth: "34ch" }}>
               Chain tools into a campaign. The output of each step becomes context for the next —
               automatically.
             </p>
           </div>
-          <div style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 600, color: "#ffffff" }}>
-            See a live workflow <ArrowRight size={14} />
+          <div style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 600, color: t.bg === "#151311" ? "#000000" : "#ffffff" }}>
+            See a live workflow <ArrowRight size={14} color={t.bg === "#151311" ? "#000000" : "#ffffff"} />
           </div>
         </div>
       </div>

@@ -27,10 +27,11 @@ export default function ToolsScreen({ t, nav, showToast }) {
                 width: 44,
                 height: 44,
                 borderRadius: 12,
-                display: "grid",
-                placeItems: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 marginBottom: 16,
-                background: tool.id === "copy" ? "transparent" : tool.id === "genfy" ? "rgba(232, 85, 42, 0.12)" : `${tool.hue}1F`,
+                background: tool.id === "copy" ? "#000000" : tool.id === "genfy" ? "rgba(232, 85, 42, 0.12)" : `${tool.hue}1F`,
                 color: tool.hue,
                 overflow: "hidden",
                 border: tool.id === "copy" ? "none" : tool.id === "genfy" ? "1px solid rgba(232, 85, 42, 0.35)" : `1px solid ${t.border}`,
@@ -38,7 +39,7 @@ export default function ToolsScreen({ t, nav, showToast }) {
               }}
             >
               {tool.id === "copy" ? (
-                <img src="/images/copy_agent_logo.png" alt="Copy Agent" style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.25)" }} />
+                <span style={{ color: "#ffffff", fontWeight: 800, fontSize: 17, fontFamily: "Inter, sans-serif", userSelect: "none" }}>CA</span>
               ) : tool.id === "genfy" ? (
                 <img src="/images/genfy_logo.png" alt="Genfy" style={{ width: "100%", height: "100%", objectFit: "cover", filter: "drop-shadow(0 0 4px rgba(232, 85, 42, 0.6))" }} />
               ) : (
@@ -114,64 +115,6 @@ export default function ToolsScreen({ t, nav, showToast }) {
         ))}
       </div>
 
-      {/* Workflow templates */}
-      <SectionH t={t} title="Start from a workflow template" />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
-          gap: 16,
-        }}
-      >
-        {WORKFLOW_TEMPLATES.map((w) => (
-          <Card
-            key={w.name}
-            t={t}
-            hoverable
-            onClick={() => showToast(`Starting "${w.name}" workflow`)}
-            style={{ padding: 18 }}
-          >
-            <div
-              style={{
-                fontFamily: FONT,
-                fontWeight: 700,
-                fontSize: 16,
-                color: t.text,
-                marginBottom: 10,
-              }}
-            >
-              {w.name}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-              {w.flow.map((id, i) => {
-                const tl = toolById(id);
-                return (
-                  <div
-                    key={id}
-                    style={{ display: "flex", alignItems: "center", gap: 5 }}
-                  >
-                    {i > 0 && <ChevronRight size={12} style={{ color: t.text3 }} />}
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 7,
-                        background: `${tl.hue}1F`,
-                        color: tl.hue,
-                        display: "grid",
-                        placeItems: "center",
-                      }}
-                      title={tl.name}
-                    >
-                      <tl.icon size={13} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 }

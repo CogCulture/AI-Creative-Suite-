@@ -1,9 +1,13 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ============================================================
    STUDIO OS — Global CSS
    Warm amber accent · neutral gray base · light + dark tokens
    ============================================================ */
-
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 *,
 *::before,
@@ -656,12 +660,20 @@ button:focus-visible {
 .bg-surface { background-color: #f7f8fa; }
 .border-border { border-color: #e6e8ee; }
 
+body.dark .text-ink {
+  color: #F2EFEA !important;
+}
+body.dark .text-muted {
+  color: #B4ADA2 !important;
+}
+body.dark .text-brand {
+  color: #F2EFEA !important;
+}
+
 /* Premium black card & shine hover effect */
 .workflow-card-premium {
   position: relative;
   overflow: hidden;
-  background: #000000 !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease !important;
 }
 
@@ -675,7 +687,7 @@ button:focus-visible {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.12),
+    var(--shine-color, rgba(255, 255, 255, 0.12)),
     transparent
   );
   transform: skewX(-20deg);
@@ -685,6 +697,22 @@ button:focus-visible {
 
 .workflow-card-premium:hover::before {
   left: 150%;
+}
+
+/* Custom scrollbar utility */
+.studio-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.studio-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.studio-scroll::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 120, 0.3);
+  border-radius: 4px;
+}
+.studio-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 120, 0.5);
 }
 
 /* Slim horizontal scrollbar */
@@ -700,6 +728,348 @@ button:focus-visible {
 }
 .studio-scroll-horizontal-slim::-webkit-scrollbar-thumb:hover {
   background: rgba(120, 120, 120, 0.45);
+}
+
+
+/* ── Chat Messages & Bubble Styles ── */
+.message {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.message.user-message {
+  flex-direction: row-reverse;
+  margin-left: auto;
+  width: fit-content;
+  max-width: 85%;
+  align-items: center;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.avatar.user-avatar {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+body.dark .avatar.user-avatar {
+  background: #374151;
+  color: #ffffff;
+}
+
+.bubble {
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: #111827;
+  background: transparent;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  line-height: 1.5;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.dark .bubble {
+  color: #ffffff;
+}
+
+.bubble.user {
+  background: #e5e7ff;
+  color: #111827;
+  padding: 7px 13px;
+  border-radius: 0px;
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+
+body.dark .bubble.user {
+  background: #2b263d;
+  color: #ffffff;
+}
+
+.bubble p {
+  margin: 0 0 10px 0;
+  line-height: 1.6;
+}
+
+.bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.bubble p+ol,
+.bubble p+ul {
+  margin-top: 12px;
+}
+
+.bubble ul {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 12px 0;
+}
+
+.bubble ul > li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.bubble ul > li::before {
+  content: "•";
+  position: absolute;
+  left: 6px;
+  top: 0;
+  color: #4b5563;
+  font-weight: bold;
+}
+
+body.dark .bubble ul > li::before {
+  color: #9ca3af;
+}
+
+.bubble ol {
+  list-style-type: none;
+  counter-reset: item-counter;
+  padding-left: 0;
+  margin: 12px 0;
+}
+
+.bubble ol > li {
+  counter-increment: item-counter;
+  position: relative;
+  padding-left: 24px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.bubble ol > li::before {
+  content: counter(item-counter) ".";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-weight: 700;
+  color: #111827;
+}
+
+body.dark .bubble ol > li::before {
+  color: #ffffff;
+}
+
+.bubble li:last-child {
+  margin-bottom: 0;
+}
+
+.bubble strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+body.dark .bubble strong {
+  color: #ffffff;
+}
+
+.bubble hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 16px 0;
+}
+
+body.dark .bubble hr {
+  border-top-color: #374151;
+}
+
+.bubble table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+}
+
+.bubble table th,
+.bubble table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+body.dark .bubble table th,
+body.dark .bubble table td {
+  border-color: #374151;
+}
+
+.bubble table th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+body.dark .bubble table th {
+  background: #1e1b18;
+}
+
+.bubble table tr:hover {
+  background: #F5F5F5;
+}
+
+body.dark .bubble table tr:hover {
+  background: #2a2522;
+}
+
+.bubble code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+body.dark .bubble code {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.bubble pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 8px 0;
+}
+
+body.dark .bubble pre {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.bubble h1,
+.bubble h2,
+.bubble h3,
+.bubble h4,
+.bubble h5,
+.bubble h6 {
+  margin: 12px 0 6px 0;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #111827;
+}
+
+body.dark .bubble h1,
+body.dark .bubble h2,
+body.dark .bubble h3,
+body.dark .bubble h4,
+body.dark .bubble h5,
+body.dark .bubble h6 {
+  color: #ffffff;
+}
+
+/* Premium Custom Dropdowns (Select Elements) */
+select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238b857b' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 13px !important;
+  padding-right: 32px !important;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+select:focus {
+  border-color: #000000 !important;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05) !important;
+  outline: none !important;
+}
+
+body.dark select {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23b4ada2' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E") !important;
+}
+
+body.dark select:focus {
+  border-color: #F2EFEA !important;
+  box-shadow: 0 0 0 2px rgba(242, 239, 234, 0.1) !important;
+}
+
+select option {
+  background: #f7f6f4;
+  color: #211e1a;
+  padding: 8px;
+}
+
+body.dark select option {
+  background: #1e1b18;
+  color: #f2efea;
+}
+
+/* Custom Dropdown System */
+.custom-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.custom-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border, #e6e8ee);
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  min-width: 120px;
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 9999;
+  min-width: 140px;
+  background: #ffffff;
+  border: 1.5px solid #000000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+}
+
+.custom-dropdown-item {
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 13px;
+  text-align: left;
+  border: none;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.custom-dropdown-item:hover {
+  background: #000000 !important;
+  color: #ffffff !important;
 }
 
 

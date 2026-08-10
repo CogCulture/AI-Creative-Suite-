@@ -414,13 +414,13 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 16, marginBottom: 28,
-        background: t.brainSoft, border: `1px solid ${t.brain}33`,
+        background: t.surface, border: `1px solid ${t.border}`,
         borderRadius: 14, padding: "22px 28px",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{
             width: 46, height: 46, borderRadius: 12,
-            background: t.brain, display: "flex", alignItems: "center", justifyContent: "center",
+            background: "#000000", display: "flex", alignItems: "center", justifyContent: "center",
           }}>
             <Brain size={24} color="#fff" />
           </div>
@@ -434,10 +434,13 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "10px 22px", borderRadius: 8,
-            background: t.brain, color: "#fff",
+            background: "#000000", color: "#fff",
             border: "none", fontWeight: 700, fontSize: 13,
             cursor: "pointer", fontFamily: FONT,
+            transition: "background 0.2s"
           }}
+          onMouseEnter={e => e.currentTarget.style.background = "#333333"}
+          onMouseLeave={e => e.currentTarget.style.background = "#000000"}
         >
           <Plus size={15} />
           Add Brand DNA
@@ -453,7 +456,7 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
         <Zap size={15} color={t.success} />
         <span style={{ fontSize: 13, color: t.text2, lineHeight: 1.5 }}>
           <strong style={{ color: t.success }}>Knowledge Base (RAG)</strong> — Link each brand to its Pinecone index.
-          Once linked, every copy generation for that brand auto-retrieves relevant brand materials.
+          Once linked, documents in the brain are available across the entire creative workflow to make all generation better.
         </span>
       </div>
 
@@ -467,20 +470,29 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}
       {!loading && brands.length === 0 && (
-        <div style={{ textAlign: "center", padding: "70px 0" }}>
-          <Brain size={52} color={t.brain} style={{ opacity: 0.25, marginBottom: 18 }} />
+        <div style={{ textAlign: "center", padding: "30px 0" }}>
+          <div style={{ display: "flex", justifyContent: "center", width: "100%", marginBottom: 18 }}>
+            <Brain size={104} color={t.brain} style={{ opacity: 0.25 }} />
+          </div>
           <h2 style={{ color: t.text2, fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>No brands yet</h2>
           <p style={{ color: t.text3, fontSize: 14, marginBottom: 28 }}>Add your first brand to start building your AI brand brain.</p>
           <button
             onClick={onAddBrandDNA}
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              whiteSpace: "nowrap",
               padding: "11px 30px", borderRadius: 8,
-              background: t.brain, border: "none",
+              background: "#000000", border: "none",
               color: "#fff", fontWeight: 700, fontSize: 14,
               cursor: "pointer", fontFamily: FONT,
+              transition: "background 0.2s"
             }}
+            onMouseEnter={e => e.currentTarget.style.background = "#333333"}
+            onMouseLeave={e => e.currentTarget.style.background = "#000000"}
           >
-            <Plus size={15} style={{ verticalAlign: "middle", marginRight: 6 }} />
+            <Plus size={15} style={{ marginRight: 6 }} />
             Add Brand DNA
           </button>
         </div>

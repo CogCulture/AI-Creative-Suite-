@@ -217,7 +217,16 @@ function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, t }) {
         ? cleanRawJson(output.bodyText)
         : output.image_prompt || JSON.stringify(output);
 
-      const promptToAgent = `ORIGINAL COPY:\n${currentContent}\n\nUSER TWEAK REQUEST:\n${aiPrompt}\n\n[DIRECTIVE: Write natural, compelling advertising copy for social media. DO NOT output JSON syntax, keys, or curly braces. Output clean, human-readable copy paragraphs directly.]`;
+      // Build refinement history conversation structure for a true iterative feedback loop
+      let conversationHistory = "";
+      const existingRefinements = output.refinements || [];
+      if (existingRefinements.length > 0) {
+        conversationHistory = "Previous refinements history:\n" + existingRefinements.map((ref, idx) => 
+          `Iteration ${idx + 1} Tweak Request: "${ref.request}"\nAI Result: ${ref.response}`
+        ).join("\n\n") + "\n\n";
+      }
+
+      const promptToAgent = `ORIGINAL COPY:\n${output.original_copy || currentContent}\n\n${conversationHistory}NEW USER TWEAK REQUEST:\n${aiPrompt}\n\n[DIRECTIVE: Write natural, compelling advertising copy for social media. DO NOT output JSON syntax, keys, or curly braces. Output clean, human-readable copy paragraphs directly.]`;
       const r = await fetch("/bff/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -230,14 +239,26 @@ function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, t }) {
       if (node.id === "copy") {
         onUpdateOutput(node.id, {
           ...output,
+          original_copy: output.original_copy || currentContent,
+          refinements: [...existingRefinements, { request: aiPrompt, response: text }],
           headline: extractHeadline(text, "Copy"),
           bodyText: text,
           cta: output.cta || "Shop Now",
         });
       } else if (node.id === "agent_artdir") {
-        onUpdateOutput(node.id, { ...output, image_prompt: text });
+        onUpdateOutput(node.id, {
+          ...output,
+          original_copy: output.original_copy || currentContent,
+          refinements: [...existingRefinements, { request: aiPrompt, response: text }],
+          image_prompt: text
+        });
       } else if (node.id === "agent_strategy") {
-        onUpdateOutput(node.id, { ...output, copy_specs: text });
+        onUpdateOutput(node.id, {
+          ...output,
+          original_copy: output.original_copy || currentContent,
+          refinements: [...existingRefinements, { request: aiPrompt, response: text }],
+          copy_specs: text
+        });
       }
       setAiPrompt("");
     } catch (e) {
@@ -317,6 +338,20 @@ function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, t }) {
               {output.headline && <div style={{ fontWeight: 700, color: t.text, fontSize: 13, marginBottom: 4 }}>{cleanRawJson(output.headline)}</div>}
               <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{cleanRawJson(output.bodyText)}</div>
               {output.cta && <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: "#8B5CF6" }}>CTA: {output.cta}</div>}
+              
+              {output.refinements && output.refinements.length > 0 && (
+                <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px dashed ${t.border}` }}>
+                  <div style={{ fontWeight: 700, fontSize: 9.5, color: t.text3, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Refinement History</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {output.refinements.map((ref, rIdx) => (
+                      <div key={rIdx} style={{ fontSize: 11, color: t.text2 }}>
+                        <span style={{ fontWeight: 600, color: "#8B5CF6", marginRight: 4 }}>v{rIdx + 1}:</span>
+                        <span style={{ fontStyle: "italic" }}>"{ref.request}"</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -995,7 +1030,19 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             throw new Error(`BFF server returned status ${r.status}`);
           }
           const raw = await r.json();
+          let extractedFilesText = "";
+          if (raw.files) {
+            for (const cat in raw.files) {
+              if (Array.isArray(raw.files[cat])) {
+                for (const f of raw.files[cat]) {
+                  if (f.content) extractedFilesText += f.content + "\n\n";
+                }
+              }
+            }
+          }
+
           const generatedText =
+            extractedFilesText.trim() ||
             raw.assistant_message ||
             raw.content ||
             raw.response ||
@@ -1295,6 +1342,34 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         <div style={{ flex: 1, minWidth: 0, padding: "24px 28px 40px" }}>
 
           {/* Canvas header */}
+          <button
+            onClick={() => nav("home")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 16,
+              fontFamily: MONO,
+              fontSize: 11,
+              color: t.text2,
+              background: t.surface2,
+              border: `1px solid ${t.border}`,
+              borderRadius: R.pill,
+              padding: "5px 12px",
+              cursor: "pointer",
+              transition: "all 0.15s"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = t.surface3;
+              e.currentTarget.style.borderColor = t.borderStrong;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = t.surface2;
+              e.currentTarget.style.borderColor = t.border;
+            }}
+          >
+            ← Back to home
+          </button>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
             <div>
               <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.text3, letterSpacing: "0.08em", textTransform: "uppercase" }}>

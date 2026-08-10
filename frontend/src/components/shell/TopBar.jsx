@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Moon, Sun, Plus, LogOut, ChevronsUpDown } from "lucide-react";
 import { FONT, MONO, R } from "../../tokens.js";
 import { BRAND } from "../../data.js";
@@ -14,10 +14,11 @@ const VIEW_LABELS = {
   "tool-detail": "Copy Agent",
 };
 
-export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, workspaces = [], onSelectWorkspace, onAddWorkspace }) {
+export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, workspaces = [], onSelectWorkspace, onAddWorkspace, onNavigateToLibrary }) {
   const [userInfo, setUserInfo] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
 
   useEffect(() => {
     try {
@@ -25,6 +26,18 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
       if (data) setUserInfo(JSON.parse(data));
     } catch (_) {}
   }, []);
+
+  // Listen for chat sub-view changes dispatched from ToolDetail
+  useEffect(() => {
+    const onChatViewChange = (e) => setShowNewChat(e.detail?.isChat === true);
+    window.addEventListener("tool-chat-view-change", onChatViewChange);
+    return () => window.removeEventListener("tool-chat-view-change", onChatViewChange);
+  }, []);
+
+  // Reset showNewChat when leaving tool-detail
+  useEffect(() => {
+    if (view !== "tool-detail") setShowNewChat(false);
+  }, [view]);
 
   useEffect(() => {
     if (!showDropdown) return;
@@ -73,16 +86,56 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
       }}
     >
       {/* Breadcrumb */}
-      <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+        {view === "tool-detail" ? (
+          <button
+            onClick={() => {
+              if (onNavigateToLibrary) {
+                onNavigateToLibrary();
+              } else {
+                window.dispatchEvent(new CustomEvent("tool-navigate-library"));
+              }
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              fontSize: 13,
+              fontWeight: 700,
+              color: t.text,
+              letterSpacing: "-.01em",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: FONT,
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = 0.7}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = 1}
+          >
+            <div style={{
+              width: 22, height: 22, borderRadius: 6, background: "#000000",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#ffffff", fontWeight: 800, fontSize: 10, fontFamily: "Inter, sans-serif",
+              userSelect: "none", flexShrink: 0
+            }}>
+              CA
+            </div>
+            <span style={{ color: t.text }}>Copy Agent</span>
+          </button>
+        ) : (
+          <span style={{ fontSize: 13, color: t.text2, fontWeight: 500 }}>{VIEW_LABELS[view] || view}</span>
+        )}
+        <span style={{ color: t.text3, fontSize: 13 }}>/</span>
         <button
-          onClick={() => setShowWorkspaceMenu((v) => !v)}
+          onClick={(e) => { e.stopPropagation(); setShowWorkspaceMenu((v) => !v); }}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            gap: 6,
             fontSize: 13,
-            color: t.text2,
-            fontWeight: 500,
+            color: t.text,
+            fontWeight: 600,
             background: "none",
             border: "none",
             padding: 0,
@@ -90,14 +143,12 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
             fontFamily: FONT,
           }}
         >
-          <b style={{ color: t.text, fontWeight: 600 }}>{activeWorkspace?.name || BRAND.name}</b>
-          <ChevronsUpDown size={14} color={t.text3} />
-          <span style={{ color: t.text3 }}>/</span>
-          <span>{VIEW_LABELS[view] || view}</span>
+          <b style={{ color: t.text, fontWeight: 700 }}>{activeWorkspace?.name || BRAND.name}</b>
         </button>
 
         {showWorkspaceMenu && (
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               position: "absolute",
               left: 0,
@@ -183,6 +234,33 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
           gap: 10,
         }}
       >
+        {/* New Chat button — only shown on chat sub-view */}
+        {showNewChat && (
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("new-chat-session"))}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 14px",
+              borderRadius: 0,
+              background: t.bg === "#151311" ? "#ffffff" : "#000000",
+              color: t.bg === "#151311" ? "#000000" : "#ffffff",
+              border: "none",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: FONT,
+              transition: "opacity 0.2s",
+              letterSpacing: ".01em"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = 0.75}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = 1}
+          >
+            <Plus size={13} />
+            <span>New Chat</span>
+          </button>
+        )}
         {/* Theme toggle */}
         <button
           aria-label="Toggle theme"
@@ -197,6 +275,7 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
             background: t.surface,
             color: t.text2,
             cursor: "pointer",
+            outline: "none"
           }}
         >
           {mode === "light" ? <Moon size={17} /> : <Sun size={17} />}
@@ -218,6 +297,7 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
               cursor: "pointer",
               overflow: "hidden",
               padding: 0,
+              outline: "none"
             }}
           >
             {userInfo?.picture ? (
@@ -240,7 +320,7 @@ export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, wo
                 border: `1px solid ${t.border}`,
                 boxShadow: t.shadowLg,
                 padding: "12px 16px",
-                zIndex: 100,
+                zIndex: 9999,
                 display: "flex",
                 flexDirection: "column",
                 gap: 8,
