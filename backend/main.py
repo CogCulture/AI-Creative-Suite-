@@ -231,6 +231,18 @@ class SuiteDamFile(SuiteBase):
     created_at       = Column(DateTime, default=datetime.utcnow)
 
 
+class SuiteStoryboard(SuiteBase):
+    """Campaign Storyboard persisted server-side."""
+    __tablename__ = "suite_storyboards"
+    id               = Column(String(36), primary_key=True)
+    project_id       = Column(String(36), nullable=False, unique=True, index=True)
+    user_id          = Column(String(36), nullable=False)
+    storyboard_json  = Column(Text, nullable=False)
+    status           = Column(String(50), default="draft")
+    created_at       = Column(DateTime, default=datetime.utcnow)
+    updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # Create tables on first startup
 SuiteBase.metadata.create_all(suite_engine)
 
@@ -2508,6 +2520,7 @@ async def workflow_step_bridge(
     user_id = _decode_jwt(suite_session) if suite_session else STATIC_USER_ID
 
     if req.bridge_type == "brief_to_copy":
+        brand_id = req.brand_id
         # 1. Fetch Brand DNA & Competitors
         brand_details_str = ""
         competitor_names = []
@@ -2919,6 +2932,285 @@ def _build_fallback_workflow(brief: str, asset_type: str) -> dict:
         },
         "ai_designed": False,
     }
+
+
+# ── Storyboarding ─────────────────────────────────────────────────────────────
+
+class StoryboardGenerateRequest(BaseModel):
+    brief: str
+    brand_name: Optional[str] = ""
+    campaign_name: Optional[str] = ""
+    asset_type: Optional[str] = ""
+
+@app.post("/bff/projects/{project_id}/storyboard/generate")
+async def generate_storyboard(
+    project_id: str,
+    body: StoryboardGenerateRequest,
+    request: Request,
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _decode_jwt(request.cookies.get("suite_session") or "") or STATIC_USER_ID
+
+    # 1. Fetch Project & Brand Kit DNA from DB
+    proj = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
+    target_brand_name = body.brand_name or (proj.brand_name if proj else "") or "Brand"
+    target_asset_type = body.asset_type or (proj.asset_type if proj else "") or "Multi-Channel Campaign"
+    
+    brand_obj = None
+    if proj and proj.brand_id:
+        brand_obj = db.query(SuiteBrand).filter(SuiteBrand.id == proj.brand_id).first()
+    if not brand_obj and target_brand_name:
+        brand_obj = db.query(SuiteBrand).filter(func.lower(SuiteBrand.brand_name) == target_brand_name.lower()).first()
+
+    brand_dna_str = f"Brand Name: {target_brand_name}\n"
+    rag_context_text = ""
+
+    if brand_obj:
+        brand_dna_str += (
+            f"Industry: {brand_obj.industry or 'N/A'}\n"
+            f"Voice/Tone: {brand_obj.voice or 'N/A'}\n"
+            f"Archetype: {brand_obj.archetype or 'N/A'}\n"
+            f"USP: {brand_obj.usp or 'N/A'}\n"
+            f"Target Audience: {brand_obj.audience or 'N/A'}\n"
+            f"Product Description: {brand_obj.product_desc or 'N/A'}\n"
+            f"Words to Use: {brand_obj.words_to_use or 'N/A'}\n"
+            f"Words to Avoid: {brand_obj.words_to_avoid or 'N/A'}\n"
+        )
+        # Query Arc Graph (Pinecone RAG) if linked
+        if _RAG_AVAILABLE and rag_engine and brand_obj.rag_linked and brand_obj.pinecone_client_key:
+            try:
+                rag_docs = await rag_engine.retrieve_brand_context(
+                    brand_obj.pinecone_client_key,
+                    f"brand positioning campaign strategy guidelines {body.brief}",
+                    top_k=4,
+                )
+                if rag_docs:
+                    rag_context_text = rag_docs
+                    print(f"[Storyboard RAG] Injected {len(rag_docs)} chars of brand guidelines for '{target_brand_name}'", flush=True)
+            except Exception as exc:
+                print(f"[Storyboard RAG Warning]: {exc}", flush=True)
+
+    rag_section = f"RETRIEVED RAG BRAND GUIDELINES:\n{rag_context_text}" if rag_context_text else ""
+
+    prompt = f"""
+You are an expert Chief Brand Officer & AI Marketing Campaign Strategist.
+STRICT DIRECTIVE: Every single tagline, campaign goal, creative hook, copy angle, and visual direction MUST be strictly aligned with the Brand Kit DNA and RAG Brand System of Record provided below.
+
+CAMPAIGN DETAILS:
+- Campaign Name: {body.campaign_name}
+- Campaign Brief: {body.brief}
+- Target Asset Type / Channel Scope: {target_asset_type}
+
+BRAND KIT DNA (ARC GRAPH SYSTEM OF RECORD):
+{brand_dna_str}
+{rag_section}
+
+Generate a multi-channel Campaign Storyboard strictly in {target_brand_name}'s voice and visual identity.
+Output ONLY valid JSON with this exact schema:
+{{
+  "campaign_name": "{body.campaign_name}",
+  "campaign_goal": "A concise 1-2 sentence goal summarizing the strategic objective for {target_brand_name}.",
+  "tagline_suggestion": "A high-impact 3-7 word campaign tagline written strictly in {target_brand_name}'s voice.",
+  "estimated_assets": 6,
+  "channels": [
+    {{
+      "id": "instagram",
+      "name": "Instagram",
+      "cards": [
+        {{
+          "id": "card-ig-1",
+          "format": "Carousel Post",
+          "hook": "Write a unique, highly compelling creative hook specifically tailored for {target_brand_name} and {body.campaign_name}",
+          "copy_angle": "Write a strategic copywriting angle highlighting {target_brand_name}'s unique selling points",
+          "visual_direction": "Describe specific visual art direction, lighting, palette, and composition aligned with {target_brand_name}",
+          "tool_sequence": ["strategy", "copy", "genfy"],
+          "priority": "hero",
+          "status": "not_started"
+        }},
+        {{
+          "id": "card-ig-2",
+          "format": "Story Ad (9:16)",
+          "hook": "Write a high-converting 9:16 direct product or location claim for {target_brand_name}",
+          "copy_angle": "Punchy stat or ROI benefit statement",
+          "visual_direction": "Sleek studio rendering or high-contrast product photography in {target_brand_name}'s style",
+          "tool_sequence": ["copy", "genfy", "edit"],
+          "priority": "supporting",
+          "status": "not_started"
+        }}
+      ]
+    }},
+    {{
+      "id": "email",
+      "name": "Email",
+      "cards": [
+        {{
+          "id": "card-em-1",
+          "format": "Launch Announce",
+          "hook": "Write an exclusive announcement subject line and hook for {target_brand_name}",
+          "copy_angle": "Executive narrative in {target_brand_name}'s brand voice",
+          "visual_direction": "Email hero header graphic with {target_brand_name} branding and product showcase",
+          "tool_sequence": ["copy"],
+          "priority": "hero",
+          "status": "not_started"
+        }}
+      ]
+    }},
+    {{
+      "id": "linkedin",
+      "name": "LinkedIn",
+      "cards": [
+        {{
+          "id": "card-li-1",
+          "format": "Thought Leadership",
+          "hook": "Industry insight or contrarian perspective",
+          "copy_angle": "Data-backed narrative",
+          "visual_direction": "Editorial graphic with minimal text typography",
+          "tool_sequence": ["copy", "genfy"],
+          "priority": "supporting",
+          "status": "not_started"
+        }}
+      ]
+    }}
+  ]
+}}
+"""
+
+    sb_data = None
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            resp = await client.post(
+                COPYAGENT_URL,
+                headers=_upstream_headers(user_id),
+                json={"user_message": prompt, "llm_model": "claude-4-sonnet", "temperature": 0.5, "stream": False}
+            )
+            if resp.is_success:
+                res_data = resp.json()
+                raw = res_data.get("assistant_message") or res_data.get("content") or res_data.get("response") or ""
+                print(f"[Storyboard Response]: {raw[:200]}...", flush=True)
+                if "{" in raw and "}" in raw:
+                    json_str = raw[raw.find("{"):raw.rfind("}") + 1]
+                    try:
+                        sb_data = json.loads(json_str)
+                    except Exception as parse_err:
+                        print(f"[Storyboard Parse Error]: {parse_err}", flush=True)
+    except Exception as exc:
+        print(f"[Storyboard Error]: {exc}", flush=True)
+
+    if not sb_data or "channels" not in sb_data:
+        brand_name_str = body.brand_name or "Brand"
+        camp_name_str = body.campaign_name or "Launch"
+        sb_data = {
+            "campaign_name": camp_name_str,
+            "campaign_goal": f"Drive high-intent awareness, engagement, and conversion for {brand_name_str}'s {camp_name_str} campaign.",
+            "tagline_suggestion": f"Elevating {camp_name_str} — Powering {brand_name_str}.",
+            "estimated_assets": 5,
+            "channels": [
+                {
+                    "id": "instagram",
+                    "cards": [
+                        {
+                            "id": f"card-{uuid.uuid4().hex[:6]}",
+                            "format": "Carousel Post",
+                            "hook": "Lead with the core customer problem, resolve with your brand solution.",
+                            "copy_angle": "Functional → Emotional benefit transition",
+                            "visual_direction": "High-contrast lifestyle photography in signature brand colors.",
+                            "tool_sequence": ["strategy", "copy", "genfy"],
+                            "priority": "hero",
+                            "status": "not_started"
+                        },
+                        {
+                            "id": f"card-{uuid.uuid4().hex[:6]}",
+                            "format": "Story Ad (9:16)",
+                            "hook": "Product-first: striking single visual with CTA in first 3 seconds.",
+                            "copy_angle": "Short-form punchy stat or claim",
+                            "visual_direction": "Clean studio shot, tight crop, bold typography.",
+                            "tool_sequence": ["copy", "genfy", "edit"],
+                            "priority": "supporting",
+                            "status": "not_started"
+                        }
+                    ]
+                },
+                {
+                    "id": "email",
+                    "cards": [
+                        {
+                            "id": f"card-{uuid.uuid4().hex[:6]}",
+                            "format": "Launch Announce",
+                            "hook": "Subject: Curiosity-gap hook. Body: Story → Proof → Offer → CTA.",
+                            "copy_angle": "Narrative-driven email in brand voice",
+                            "visual_direction": "Hero product header visual, clean typography grid.",
+                            "tool_sequence": ["copy"],
+                            "priority": "hero",
+                            "status": "not_started"
+                        }
+                    ]
+                }
+            ]
+        }
+
+    sb_record = db.query(SuiteStoryboard).filter(SuiteStoryboard.project_id == project_id).first()
+    if sb_record:
+        sb_record.storyboard_json = json.dumps(sb_data)
+        sb_record.updated_at = datetime.utcnow()
+    else:
+        sb_record = SuiteStoryboard(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            user_id=user_id,
+            storyboard_json=json.dumps(sb_data),
+            status="draft",
+        )
+        db.add(sb_record)
+    db.commit()
+
+    return sb_data
+
+
+@app.get("/bff/projects/{project_id}/storyboard")
+async def get_storyboard(project_id: str, db: Session = Depends(get_suite_db)):
+    sb_record = db.query(SuiteStoryboard).filter(SuiteStoryboard.project_id == project_id).first()
+    if not sb_record:
+        raise HTTPException(status_code=404, detail="No storyboard found for this project")
+    return json.loads(sb_record.storyboard_json)
+
+
+@app.patch("/bff/projects/{project_id}/storyboard")
+async def update_storyboard(
+    project_id: str,
+    request: Request,
+    db: Session = Depends(get_suite_db)
+):
+    body = await request.json()
+    sb_record = db.query(SuiteStoryboard).filter(SuiteStoryboard.project_id == project_id).first()
+    user_id = _decode_jwt(request.cookies.get("suite_session") or "") or STATIC_USER_ID
+
+    if sb_record:
+        sb_record.storyboard_json = json.dumps(body)
+        sb_record.updated_at = datetime.utcnow()
+    else:
+        sb_record = SuiteStoryboard(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            user_id=user_id,
+            storyboard_json=json.dumps(body),
+            status="draft",
+        )
+        db.add(sb_record)
+    db.commit()
+    return {"status": "updated"}
+
+
+@app.post("/bff/projects/{project_id}/storyboard/approve")
+async def approve_storyboard(project_id: str, db: Session = Depends(get_suite_db)):
+    sb_record = db.query(SuiteStoryboard).filter(SuiteStoryboard.project_id == project_id).first()
+    if sb_record:
+        sb_record.status = "approved"
+        db.commit()
+    proj = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
+    if proj:
+        proj.status = "running"
+        db.commit()
+    return {"status": "approved"}
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
