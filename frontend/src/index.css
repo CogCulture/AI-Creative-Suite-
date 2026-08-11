@@ -35,9 +35,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Animations ───────────────────────────────────────────── */
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+.spin, .animate-spin {
+  animation: spin 1s linear infinite !important;
 }
 
 @keyframes pulse {

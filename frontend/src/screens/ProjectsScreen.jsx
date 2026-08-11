@@ -4,13 +4,16 @@ import { FONT, MONO, R } from "../tokens.js";
 import { Card, Btn, Eyebrow, H1 } from "../components/primitives/index.jsx";
 
 const ASSET_TYPES = [
-  "Instagram Ad Image",
-  "Story Banner (9:16)",
-  "Hero Banner (16:9)",
-  "Facebook Ad",
-  "LinkedIn Post Visual",
-  "YouTube Thumbnail",
-  "Email Header",
+  "Social Performance Ad (1:1 Square)",
+  "Stories & Reels Creative (9:16 Vertical)",
+  "Landscape Hero Banner (16:9 Website/Display)",
+  "LinkedIn Executive Thought Leadership Graphic",
+  "Google Performance Max Display Asset",
+  "Meta Carousel Ad Card Collection",
+  "Email Marketing Hero & Header Banner",
+  "E-Commerce Product Launch Spotlight Visual",
+  "YouTube Video Thumbnail & Companion Banner",
+  "Print / OOH Billboard Mockup Visual",
 ];
 
 function timeSince(iso) {

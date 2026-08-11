@@ -43,12 +43,17 @@ function useTheme() {
 /* ── App root ──────────────────────────────────────────── */
 export default function App() {
   // null = still checking with server, false = not logged in, true = confirmed by server
-  const [isLoggedIn, setIsLoggedIn] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      return localStorage.getItem("studio-logged-in") === "true" ? true : null;
+    } catch (_) {
+      return null;
+    }
+  });
   const [goToLibrarySignal, setGoToLibrarySignal] = useState(0);
 
   useEffect(() => {
     // Validate session with the server on every load.
-    // localStorage flag is intentionally removed — server cookie is the only source of truth.
     fetch("/bff/auth/me", { credentials: "include" })
       .then((res) => {
         if (res.ok) {
@@ -65,10 +70,11 @@ export default function App() {
         setIsLoggedIn(false);
       })
       .catch(() => {
-        // Network error — fail closed (show login, not app)
-        setIsLoggedIn(false);
+        // Network error — do not log out if we already have a session state from localStorage
+        setIsLoggedIn((prev) => (prev === true ? true : false));
       });
   }, []);
+
   const { t, mode, toggle } = useTheme();
   const [view, setView] = useState("home");
   const [activeProject, setActiveProject] = useState(null);
@@ -206,8 +212,19 @@ export default function App() {
     timerRef.current = setTimeout(() => setToast(null), 3500);
   };
 
-  const nav = (id, projectData) => {
+  const nav = (id, projectData, options) => {
     if (projectData !== undefined) setActiveProject(projectData);
+    if (options?.fresh) {
+      setActiveProject(null);
+      // Clear default workflow state from localStorage
+      try {
+        localStorage.removeItem("studio-wf-state-default-status");
+        localStorage.removeItem("studio-wf-state-default-inputs");
+        localStorage.removeItem("studio-wf-state-default-outputs");
+        localStorage.removeItem("studio-wf-state-default-masterState");
+        localStorage.removeItem("studio-wf-state-default-masterFeedback");
+      } catch (_) {}
+    }
     setView(id);
     const s = document.getElementById("studio-scroll");
     if (s) s.scrollTo({ top: 0, behavior: "smooth" });

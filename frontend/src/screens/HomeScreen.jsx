@@ -57,7 +57,7 @@ export default function HomeScreen({ t, nav, showToast }) {
 
         <div
           className="workflow-card-premium"
-          onClick={() => nav("workflow")}
+          onClick={() => nav("workflow", null, { fresh: true })}
           style={{
             padding: 18,
             borderRadius: R.lg,

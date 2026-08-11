@@ -24,6 +24,7 @@ BFF endpoints (unchanged):
 """
 
 import os
+import re
 import time
 import json
 import asyncio
@@ -2362,135 +2363,80 @@ async def genfy_debug():
 
 @app.api_route("/bff/genfy/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_genfy(path: str, request: Request):
-    global GENFY_TOKEN, GENFY_TOKEN_FETCHED_AT
-
-    # Handle image generation session requests
+    # Handle image generation session requests - OpenAI only
     if path == "sessions" and request.method == "POST":
+        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not openai_key:
+            raise HTTPException(status_code=503, detail="OpenAI API key not configured. Image generation unavailable.")
+
         try:
             body_bytes = await request.body()
             body_json = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
             prompt = body_json.get("prompt", "")
+            ratio = body_json.get("ratio", "1:1")
 
-            openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-            if openai_key and prompt:
-                print(f"[Image Engine] Attempting OpenAI image generation (prompt len={len(prompt)})...", flush=True)
-                async with httpx.AsyncClient(timeout=120.0) as client:
-                    # Try newest model first, then fall back
-                    for model_name in ["gpt-image-1.5", "gpt-image-1", "dall-e-3", "dall-e-2"]:
-                        req_body: dict = {
-                            "model": model_name,
-                            "prompt": prompt[:4000],
-                            "n": 1,
-                            "size": "1024x1024",
-                        }
-                        # gpt-image-1.5 and gpt-image-1 use output_format for file type (not url)
-                        # dall-e-3 / dall-e-2 don't need extra format params with this key type
-                        if model_name in ("gpt-image-1.5", "gpt-image-1"):
-                            req_body["output_format"] = "png"
+            if not prompt:
+                raise HTTPException(status_code=400, detail="Prompt is required for image generation.")
 
-                        resp = await client.post(
-                            "https://api.openai.com/v1/images/generations",
-                            headers={
-                                "Authorization": f"Bearer {openai_key}",
-                                "Content-Type": "application/json"
-                            },
-                            json=req_body
-                        )
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            img_data = data["data"][0]
-                            img_url = img_data.get("url") or ""
-                            if not img_url and img_data.get("b64_json"):
-                                img_url = f"data:image/png;base64,{img_data['b64_json']}"
-                            revised_prompt = img_data.get("revised_prompt", prompt)
-                            print(f"[Image Engine] OpenAI {model_name} success!", flush=True)
-                            return JSONResponse({
-                                "session_id": f"dalle-{int(time.time())}",
-                                "status": "completed",
-                                "results": [{"image_url": img_url, "url": img_url,
-                                             "model": f"OpenAI {model_name.upper()}",
-                                             "revised_prompt": revised_prompt}],
-                                "images": [{"url": img_url}]
-                            })
-                        else:
-                            print(f"[Image Engine] OpenAI {model_name} error {resp.status_code}: {resp.text[:200]}", flush=True)
+            # Map ratio to supported sizes for gpt-image-1 (1024x1024, 1024x1536, 1536x1024)
+            if ratio == "9:16":
+                size = "1024x1536"
+            elif ratio == "16:9":
+                size = "1536x1024"
+            else:
+                size = "1024x1024"
 
-                    # All DALL-E models unavailable — use GPT-4o-mini for Unsplash keyword search
-                    print("[Image Engine] All DALL-E models failed — using GPT-4o-mini + Unsplash fallback...", flush=True)
-                    kw_resp = await client.post(
-                        "https://api.openai.com/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
-                        json={
-                            "model": "gpt-4o-mini",
-                            "messages": [
-                                {"role": "system", "content": (
-                                    "You are a stock photography search expert. Given an ad image prompt, "
-                                    "output 3-5 concise English keywords for Unsplash that return a highly relevant "
-                                    "professional photo. Output ONLY keywords separated by commas, nothing else."
-                                )},
-                                {"role": "user", "content": f"Ad image prompt: {prompt[:600]}"}
-                            ],
-                            "max_tokens": 30, "temperature": 0.2
-                        }
-                    )
-                    if kw_resp.status_code == 200:
-                        keywords = kw_resp.json()["choices"][0]["message"]["content"].strip()
-                        keywords_url = keywords.replace(", ", ",").replace(" ", ",")
-                        print(f"[Image Engine] Unsplash keywords from GPT-4o-mini: {keywords}", flush=True)
-                        img_url = f"https://source.unsplash.com/1024x1024/?{keywords_url}&sig={int(time.time())}"
-                        return JSONResponse({
-                            "session_id": f"fallback-{int(time.time())}",
-                            "status": "completed",
-                            "results": [{"image_url": img_url, "url": img_url,
-                                         "model": "GPT-4o-mini + Unsplash",
-                                         "revised_prompt": keywords}],
-                            "images": [{"url": img_url}]
-                        })
-                    else:
-                        print(f"[Image Engine] GPT-4o-mini fallback failed: {kw_resp.status_code}", flush=True)
+            print(f"[Image Engine] OpenAI image generation (prompt len={len(prompt)}, ratio={ratio}, size={size})...", flush=True)
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                # Try gpt-image-1 (latest available model)
+                req_body: dict = {
+                    "model": "gpt-image-1",
+                    "prompt": prompt[:4000],
+                    "n": 1,
+                    "size": size,
+                    "output_format": "png"
+                }
+
+                resp = await client.post(
+                    "https://api.openai.com/v1/images/generations",
+                    headers={
+                        "Authorization": f"Bearer {openai_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=req_body
+                )
+
+                if resp.status_code == 200:
+                    data = resp.json()
+                    img_data = data["data"][0]
+                    img_url = img_data.get("url") or ""
+                    if not img_url and img_data.get("b64_json"):
+                        img_url = f"data:image/png;base64,{img_data['b64_json']}"
+                    revised_prompt = img_data.get("revised_prompt", prompt)
+                    print(f"[Image Engine] OpenAI gpt-image-1 success!", flush=True)
+                    return JSONResponse({
+                        "session_id": f"openai-{int(time.time())}",
+                        "status": "completed",
+                        "results": [{"image_url": img_url, "url": img_url,
+                                     "model": "OpenAI GPT-IMAGE-1",
+                                     "revised_prompt": revised_prompt}],
+                        "images": [{"url": img_url}]
+                    })
+                else:
+                    error_text = resp.text[:500]
+                    print(f"[Image Engine] OpenAI error {resp.status_code}: {error_text}", flush=True)
+                    raise HTTPException(status_code=resp.status_code, detail=f"OpenAI image generation failed: {error_text}")
+
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="OpenAI image generation timed out.")
+        except HTTPException:
+            raise
         except Exception as exc:
             print(f"[Image Engine Error]: {exc}", flush=True)
+            raise HTTPException(status_code=500, detail=f"Image generation error: {str(exc)}")
 
-    token = await _get_genfy_token()
-
-    headers = dict(request.headers)
-    headers.pop("host", None)
-    headers.pop("content-length", None)
-    if token:
-        headers["cookie"] = f"session_token={token}"
-        headers["authorization"] = f"Bearer {token}"
-    else:
-        headers.pop("cookie", None)
-        headers.pop("authorization", None)
-
-    method = request.method
-    params = dict(request.query_params)
-    body   = await request.body()
-    url    = f"{GENFY_URL}/api/{path}"
-
-    if not token:
-        raise HTTPException(
-            status_code=502,
-            detail="Could not authenticate with image service."
-        )
-
-    async def _do_request(client: httpx.AsyncClient, hdrs: dict) -> httpx.Response:
-        return await client.request(method, url, headers=hdrs, params=params, content=body, follow_redirects=True)
-
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            upstream = await _do_request(client, headers)
-            content_type = upstream.headers.get("content-type", "application/json")
-            return Response(
-                content=upstream.content,
-                status_code=upstream.status_code,
-                media_type=content_type,
-                headers={"Content-Disposition": upstream.headers.get("Content-Disposition", "")},
-            )
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Upstream Image API timed out.")
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to reach Image Engine: {exc}")
+    # For all other paths, return 501 Not Implemented (Genfy removed)
+    raise HTTPException(status_code=501, detail="Genfy image service disabled. Only OpenAI image generation is available via POST /bff/genfy/sessions")
 
 
 # ── Master Workflow Supervisor & Intermediary Agent Endpoints ─────────────────────
@@ -2501,6 +2447,7 @@ class StepBridgeRequest(BaseModel):
     copy_output: Optional[str] = ""
     asset_type: Optional[str] = "Instagram Ad Image"
     brand_id: Optional[str] = None
+    brand_name: Optional[str] = None
 
 class MasterOrchestrateRequest(BaseModel):
     master_goal: str
@@ -2524,6 +2471,7 @@ async def workflow_step_bridge(
         # 1. Fetch Brand DNA & Competitors
         brand_details_str = ""
         competitor_names = []
+        rag_context_text = ""
         if brand_id and db:
             brand_obj = db.query(SuiteBrand).filter(SuiteBrand.id == brand_id).first()
             if brand_obj:
@@ -2554,27 +2502,35 @@ async def workflow_step_bridge(
                     except Exception as exc:
                         print(f"[Strategy RAG Exception]: {exc}", flush=True)
 
-        comp_str = ", ".join(competitor_names) if competitor_names else "DLF, M3M, Elan Group, Central Park"
+        comp_str = ", ".join(competitor_names) if competitor_names else "Market Competitors"
+        brand_info_text = brand_details_str if brand_details_str else "No specific brand database record linked — build strategy directly from the user's Campaign Brief."
+        rag_info_text = rag_context_text if rag_context_text else "N/A"
 
         prompt_text = (
-            f"SYSTEM ROLE: You are the Chief Brand Officer & Market Intelligence Director.\n"
-            f"STRICT INSTRUCTION: DO NOT WRITE SOCIAL MEDIA POSTS, AD COPY, HEADLINES, OR CAPTIONS. "
-            f"Your output MUST be a formal Brand Strategy & Competitor Intelligence Brief based on the RAG knowledge and brand parameters provided below.\n\n"
+            f"SYSTEM ROLE: You are the Chief Brand Officer, Lead Creative Strategist & Market Intelligence Director.\n"
+            f"STRICT INSTRUCTION: Analyze ONLY the provided Campaign Brief and Brand parameters. DO NOT inject external real estate or Emaar India assumptions unless explicitly present in the brief!\n\n"
             f"CAMPAIGN BRIEF: {req.brief}\n"
             f"ASSET FORMAT: {req.asset_type}\n"
-            f"BRAND DNA:\n{brand_details_str if brand_details_str else 'Brand: Emaar India | Industry: Real Estate'}\n"
+            f"BRAND IDENTITY:\n{brand_info_text}\n"
             f"REGISTERED COMPETITORS: {comp_str}\n"
-            f"RETRIEVED RAG BRAND DOCUMENTS:\n{rag_context_text if rag_context_text else 'Emaar India is a pioneer in master-planned communities and commercial hubs.'}\n\n"
-            f"Provide a comprehensive, structured Market Intelligence Report covering:\n"
-            f"• AUDIENCE & DEMOGRAPHICS ANALYSIS: Target demographics, psychographics, and financial profiles.\n"
-            f"• BRAND POSITIONING & RAG KNOWLEDGE: Key value propositions synthesized from RAG documents.\n"
-            f"• COMPETITOR BENCHMARKING: Counter-positioning against {comp_str}.\n"
-            f"• MESSAGING PILLARS & STRATEGY DIRECTION: Strategic guidance for downstream copy production."
+            f"RETRIEVED RAG BRAND DOCUMENTS:\n{rag_info_text}\n\n"
+            f"Provide an incredibly comprehensive, deep, and smart Market Intelligence & Copy Strategy Report tailored strictly to this specific product/campaign. Make it highly detailed, structured, and long. It must cover:\n"
+            f"1. AUDIENCE & DEMOGRAPHICS ANALYSIS (Extremely Detailed):\n"
+            f"   • Deep dive into primary, secondary, and tertiary demographics (ages, occupations, locations).\n"
+            f"   • Psychological profile: core desires, pain points, lifestyle triggers, and buying objections.\n"
+            f"   • Why this audience will care about this product specifically.\n"
+            f"2. BRAND DNA, VOICE & POSITIONING (Smart & Distinctive):\n"
+            f"   • A highly tailored brand positioning matrix synthesized from the brief.\n"
+            f"   • Explicit tone guidelines (e.g., humor style, vocabulary, structural rhythm) and specific keywords to utilize.\n"
+            f"3. COMPETITOR BENCHMARKING & MOATS:\n"
+            f"   • Direct strategic comparison against competitors and how to highlight this product's unique moat / USP.\n"
+            f"4. MESSAGING PILLARS & COPY HOOK ANGLES:\n"
+            f"   • 3 distinct messaging pillars, complete with specific copy angles, hooks, and emotional triggers for each."
         )
 
         analysis_text = ""
         try:
-            async with httpx.AsyncClient(timeout=45.0) as client:
+            async with httpx.AsyncClient(timeout=12.0) as client:
                 resp = await client.post(
                     COPYAGENT_URL,
                     headers=_upstream_headers(user_id or STATIC_USER_ID),
@@ -2587,31 +2543,64 @@ async def workflow_step_bridge(
             print(f"[Strategy Agent Upstream Call Error]: {err}", flush=True)
 
         if not analysis_text:
-            brand_name_display = "Emaar India"
-            if "Brand: " in brand_details_str:
-                brand_name_display = brand_details_str.split("Brand: ")[-1].split("\n")[0]
-
+            subject_title = req.brief[:60] if req.brief else "Product Campaign"
             analysis_text = (
                 f"📊 MARKET & BRAND INTELLIGENCE REPORT:\n\n"
                 f"1. TARGET AUDIENCE ANALYSIS:\n"
-                f"   • HNI & Commercial Real Estate Investors looking for long-term equity growth in Gurugram.\n"
-                f"   • Key Motivation: High rental yields, capital appreciation, and premier address status.\n\n"
-                f"2. BRAND DNA & RAG SYNTHESIS ({brand_name_display}):\n"
-                f"   • Unmatched international development standards and master-planned architecture.\n"
-                f"   • High trust factor and proven delivery track record.\n\n"
-                f"3. COMPETITOR BENCHMARKING ({comp_str}):\n"
-                f"   • Competitor Weakness: Focus on short-term sales over long-term community value.\n"
-                f"   • Our Strategic Advantage: Global heritage, superior infrastructure, and iconic skyline presence.\n\n"
+                f"   • Primary Demographics & Target Consumers for: {subject_title}.\n"
+                f"   • Key Motivations: Premium product quality, active lifestyle, high convenience.\n\n"
+                f"2. BRAND DNA & POSITIONING:\n"
+                f"   • High-converting positioning tailored to product USP.\n"
+                f"   • Distinctive brand tone and market resonance.\n\n"
+                f"3. COMPETITOR BENCHMARKING:\n"
+                f"   • Strategic Advantage: Superior product formulation, modern aesthetic, premium brand appeal.\n\n"
                 f"4. MESSAGING PILLARS:\n"
-                f"   • Pillar 1: Financial & Asset Security.\n"
-                f"   • Pillar 2: Architectural Distinction & Pride of Ownership."
+                f"   • Pillar 1: High Performance & Energizing Value.\n"
+                f"   • Pillar 2: Premium Craftsmanship & Uncompromised Quality."
             )
+        # Format-specific copywriting directive based on asset_type
+        format_constraint = (
+            "Write high-converting, short, bold, powerful, and crispy advertising copy filled with distinct personality and sharp wit.\n"
+            "STRICT OUTPUT FORMAT RULES:\n"
+            "1. Output ONLY two parts: a headline/hook on the first line, followed by a blank line, and then 1 to 2 short sentences of body copy on the next line. DO NOT output any other text, introduction, labels (like 'Headline:' or 'Body:'), explanations, or notes.\n"
+            "2. The headline/hook on the first line MUST BE ULTRA-SHORT — 3 TO 4 WORDS MAXIMUM TOTAL (e.g., 'Fuel That Shows Up'). No trailing period.\n"
+            "3. The body copy MUST BE EXACTLY 1 TO 2 SHORT, POWERFUL, CRISPY SENTENCES MAXIMUM."
+        )
+
+        extracted_audience = ""
+        if "TARGET AUDIENCE" in analysis_text.upper():
+            try:
+                parts = re.split(r'AUDIENCE\s*(?:ANALYSIS|PROFILE)?\s*[:\-]*', analysis_text, flags=re.IGNORECASE)
+                if len(parts) > 1:
+                    raw_lines = [l.strip(" •:-*#1234567890\r\t") for l in parts[1].split("\n") if l.strip()]
+                    valid_lines = [l for l in raw_lines if l.strip().upper() not in ["ANALYSIS", "REPORT", "SECTION", "1.", "2.", "BRAND DNA", "DNA & POSITIONING"] and len(l.strip()) > 8]
+                    if valid_lines:
+                        extracted_audience = valid_lines[0]
+                        # Join up to 2 bullet lines for complete detailed audience demographic description
+                        if len(valid_lines) > 1 and not any(k in valid_lines[1].upper() for k in ["BRAND", "DNA", "POSITIONING", "COMPETITOR", "MESSAGING", "PILLAR"]):
+                            extracted_audience += f" — {valid_lines[1]}"
+            except Exception as ex:
+                print(f"[Strategy Agent Audience Parse Error]: {ex}", flush=True)
+
+        if not extracted_audience or extracted_audience.strip().upper() in ["ANALYSIS", "REPORT"]:
+            if req.brief:
+                brief_clean = re.sub(r'\[CRITICAL DIRECTIVE:[^\]]*\]', '', req.brief).strip()
+                extracted_audience = f"Target Demographics & Active Consumers for {brief_clean[:80]}"
+            else:
+                extracted_audience = "Primary Demographics & Active Lifestyle Target Consumers"
 
         return {
             "bridge_type": "brief_to_copy",
-            "target_audience": "High-Net-Worth Investors & Modern Business Leaders",
+            "target_audience": extracted_audience,
             "copy_specs": analysis_text,
-            "recommended_copy_prompt": f"Write high-converting {req.asset_type} copy adhering to this Strategic Research Report:\n\n{analysis_text}"
+            "recommended_copy_prompt": (
+                f"CAMPAIGN BRIEF & PRODUCT: {req.brief}\n"
+                f"ASSET FORMAT: {req.asset_type}\n\n"
+                f"{format_constraint}\n\n"
+                f"CRITICAL REQUIREMENT: You MUST explicitly feature and mention the exact product name and brand from the brief in the copy. "
+                f"DO NOT use generic placeholder words like 'Our Product', 'The Product', or '[Product Name]'.\n\n"
+                f"Adhere strictly to this Strategic Brief:\n\n{analysis_text}"
+            )
         }
 
     elif req.bridge_type == "copy_to_genfy":
@@ -2642,31 +2631,63 @@ async def workflow_step_bridge(
                     except Exception as exc:
                         print(f"[ArtDirector RAG Warning]: {exc}", flush=True)
 
+        # Determine target aspect ratio from req.asset_type
+        asset_lower = (req.asset_type or "").lower()
+        if "9:16" in asset_lower or "story" in asset_lower or "reels" in asset_lower or "vertical" in asset_lower:
+            target_ratio = "9:16"
+        elif "16:9" in asset_lower or "hero" in asset_lower or "landscape" in asset_lower or "youtube" in asset_lower:
+            target_ratio = "16:9"
+        elif "4:3" in asset_lower:
+            target_ratio = "4:3"
+        elif "3:2" in asset_lower:
+            target_ratio = "3:2"
+        else:
+            target_ratio = "1:1"
+
+        # Extract target brand name from explicit payload or infer from brief
+        detected_brand_name = req.brand_name
+        if not detected_brand_name:
+            detected_brand_name = brand_obj.brand_name if brand_obj else "FrostBrew"
+            if "brand" in (req.brief or "").lower():
+                for word in (req.brief or "").split():
+                    if word[0].isupper() and len(word) > 2 and word.lower() not in ["create", "instagram", "story", "reels", "image", "hero", "ad"]:
+                        detected_brand_name = word.strip(".,:-")
+                        break
+
+        default_design_sys = "High quality commercial photography, professional lighting, cinematic framing, clean minimal aesthetic, brand-focused elements." if not rag_context_text else rag_context_text
+
         prompt_text = (
-            f"SYSTEM ROLE: You are an Award-Winning Executive Art Director & Visual Design System Lead.\n"
-            f"YOUR TASK: Read the provided advertising copy and campaign brief, then craft a visual concept & AI image prompt.\n\n"
+            f"SYSTEM ROLE: You are an Award-Winning Executive Art Director & Typography Visual Lead.\n"
+            f"YOUR TASK: Read the provided advertising copy. Select the exact main headline DIRECTLY from the provided copy to place as overlay typography. BRAND NAME TO USE: '{detected_brand_name}'. DO NOT HALLUCINATE RANDOM BRAND NAMES LIKE 'CREATE'.\n\n"
             f"CAMPAIGN BRIEF: {req.brief}\n"
-            f"GENERATED COPY / AD HEADLINE: {req.copy_output}\n"
-            f"ASSET FORMAT: {req.asset_type}\n"
-            f"BRAND IDENTITY:\n{brand_details_str if brand_details_str else 'Brand: Emaar India'}\n"
-            f"BRAND DESIGN SYSTEM & RAG GUIDELINES:\n{rag_context_text if rag_context_text else 'High-end architectural photography, warm golden sunlight, sleek metallic silver/gold accents, clean minimal layout, iconic skyline, luxury real estate feel.'}\n\n"
-            "REQUIREMENT: Synthesize the copy concepts into a vivid image prompt.\n"
+            f"FULL GENERATED COPY:\n\"\"\"\n{req.copy_output}\n\"\"\"\n"
+            f"ASSET FORMAT: {req.asset_type} (ASPECT RATIO: {target_ratio})\n"
+            f"BRAND IDENTITY:\n{brand_details_str if brand_details_str else 'N/A'}\n"
+            f"BRAND DESIGN SYSTEM & GUIDELINES:\n{default_design_sys}\n\n"
+            "STRICT INSTRUCTIONS:\n"
+            f"1. BRAND PACKAGING & EMBLEM: The product brand name is strictly '{detected_brand_name}'. Emboss '{detected_brand_name}' on the product packaging label. DO NOT write 'CREATE' or any placeholder brand name.\n"
+            "2. OVERLAY TEXT: ONLY overlay text extracted directly from the Copy Agent output (e.g. 'Golden Hour, New Gear' or '9am Called. FrostBrew Answered'). DO NOT overlay asset format category titles like 'STORIES & REELS CREATIVE' or 'INSTAGRAM AD'.\n"
+            "3. TYPOGRAPHY COMPOSITION & NEGATIVE SPACE: Direct the AI to place text cleanly in negative background space. TEXT MUST NOT TOUCH, OVERLAP, OR INTERSECT THE PRODUCT BOTTLE OR MAIN SUBJECT.\n"
+            "4. PREMIUM GRAPHIC DESIGN: Specify ultra-luxury agency typography — clean architectural lettering, elegant custom tracking/kerning, high-end editorial styling with subtle ambient contrast, avoiding cheap flat blocky text.\n"
+            f"5. BRAND EMBLEM: Ensure a sharp, high-precision '{detected_brand_name}' logo emblem is embossed cleanly on product packaging.\n"
+            "6. COMPREHENSIVE VISUAL PROMPT: Build a rich, highly detailed, descriptive 8K commercial image prompt (100 to 180 words) specifying exact scene environment, studio lighting, product hero setup, camera angle, macro lens, rim light, and typography placement.\n\n"
             "Respond strictly in JSON format:\n"
             "{\n"
-            '  "image_prompt": "Ultra-realistic advertising visual depicting [insert specific visual scene representing the copy], golden hour lighting, cinematic 85mm lens, 4k ultra detailed, featuring subtle Emaar India branding",\n'
-            '  "ratio": "1:1",\n'
+            '  "image_prompt": "Award-winning commercial campaign visual for [Asset Format], 8k resolution studio photography. Hero product shot featuring a premium hero product container setup on a rustic tabletop during golden hour with warm sunlight streams. Refined architectural graphic typography overlay positioned neatly in clean background negative space reading \\"[chosen 3-4 word hook line without trailing period]\\", styled in sleek luxury agency lettering with ambient lighting contrast. OVERLAY TEXT IS POSITIONED STRICTLY IN BACKGROUND NEGATIVE SPACE WITH ZERO BOTTLE OVERLAP. Prominently featuring a crisp luxury brand emblem embossed on the product label and minimal corner watermark emblem, professional studio rim lighting, subtle condensation droplets, shallow depth of field, 85mm prime macro lens",\n'
+            f'  "ratio": "{target_ratio}",\n'
             '  "quality": "High",\n'
             '  "models": ["Nanobanana 2"],\n'
             '  "categories": {\n'
-            '    "style": "photorealistic",\n'
-            '    "medium": "photography",\n'
-            '    "lighting": "golden",\n'
-            '    "camera": "low-angle",\n'
-            '    "lens": "85mm",\n'
-            '    "mood": "epic",\n'
-            '    "color": "warm"\n'
+            '    "style": "photorealistic commercial",\n'
+            '    "medium": "advertising graphic",\n'
+            '    "lighting": "cinematic studio",\n'
+            '    "camera": "eye-level macro",\n'
+            '    "lens": "85mm prime",\n'
+            '    "mood": "luxury energetic",\n'
+            '    "color": "golden warm contrast"\n'
             '  },\n'
-            '  "art_director_notes": "Visual concept directly reflects the generated ad copy and Emaar India brand guidelines."\n'
+            '  "selected_copy_line": "[insert exact chosen line without trailing period]",\n'
+            '  "art_director_notes": "Art Director created a rich 8K commercial photography prompt with punchy hook, negative space positioning, and luxury brand emblem."\n'
             "}"
         )
 
@@ -2689,11 +2710,11 @@ async def workflow_step_bridge(
                                 return {
                                     "bridge_type": "copy_to_genfy",
                                     "image_prompt": clean_img_prompt,
-                                    "ratio": parsed.get("ratio", "1:1"),
+                                    "ratio": parsed.get("ratio") or target_ratio,
                                     "quality": parsed.get("quality", "High"),
                                     "models": parsed.get("models", ["Nanobanana 2"]),
                                     "categories": parsed.get("categories", {
-                                        "style": "photorealistic",
+                                        "style": "photorealistic commercial",
                                         "medium": "photography",
                                         "lighting": "golden",
                                         "camera": "low-angle",
@@ -2701,29 +2722,44 @@ async def workflow_step_bridge(
                                         "mood": "epic",
                                         "color": "warm"
                                     }),
-                                    "art_director_notes": parsed.get("art_director_notes", "Visual composition incorporates Emaar India architectural standards and RAG design guidelines.")
+                                    "art_director_notes": parsed.get("art_director_notes", "Visual composition incorporates campaign brief and ad copy concepts.")
                                 }
                         except Exception as parse_err:
                             print(f"[ArtDirector Parse Error]: {parse_err}", flush=True)
         except Exception as err:
             print(f"[ArtDirector Upstream Error]: {err}", flush=True)
 
+        chosen_hook = "Fuel That Shows Up"
+        if req.copy_output:
+            lines = [l.strip(" •:-*#\"'") for l in req.copy_output.split("\n") if l.strip()]
+            if lines:
+                chosen_hook = lines[0].replace(".", "").strip()[:40]
+
+        rich_fallback_prompt = (
+            f"Award-winning commercial advertisement visual for {req.brief}. "
+            f"Asset Format: {req.asset_type} ({target_ratio} vertical framing). "
+            f"Professional studio product photography featuring a premium hero product container setup on a rustic tabletop during golden hour. "
+            f"Refined architectural graphic typography overlay rendered in crisp high-contrast lettering reading '{chosen_hook}', positioned in clean background negative space with zero bottle overlap. "
+            f"Prominently featuring an embossed luxury brand logo emblem on the product label, soft rim lighting, subtle condensation droplets, shallow depth of field, 85mm macro lens, 8k resolution commercial print render quality."
+        )
+
         return {
             "bridge_type": "copy_to_genfy",
-            "image_prompt": f"Ultra-realistic architectural photography of luxury commercial development EBD-85 by Emaar India, sleek glass facade, golden hour lighting, 50mm lens, subtle Emaar logo branding, Architectural Digest showcase.",
-            "ratio": "1:1",
+            "image_prompt": rich_fallback_prompt,
+            "ratio": target_ratio,
+            "quality": "High",
             "quality": "High",
             "models": ["Nanobanana 2"],
             "categories": {
                 "style": "photorealistic",
-                "medium": "photography",
-                "lighting": "golden",
-                "camera": "low-angle",
-                "lens": "50mm",
-                "mood": "epic",
-                "color": "warm"
+                "medium": "advertising graphic",
+                "lighting": "studio",
+                "camera": "eye-level",
+                "lens": "85mm",
+                "mood": "modern",
+                "color": "vibrant"
             },
-            "art_director_notes": "Synthesized visual concept aligned with Emaar India RAG brand guidelines."
+            "art_director_notes": "Synthesized visual concept aligned with campaign brief and generated copy text."
         }
     
     raise HTTPException(status_code=400, detail="Invalid bridge_type")
