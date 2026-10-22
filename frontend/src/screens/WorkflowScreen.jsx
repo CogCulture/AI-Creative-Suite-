@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { marked } from "marked";
 import {
   Play, Loader2, Image as ImageIcon, MessageSquare, ShieldCheck, PenLine,
@@ -345,6 +345,39 @@ function StatusBadge({ status }) {
       {cfg.label}
     </span>
   );
+}
+
+// Safe image downloader that prevents about:blank#blocked on data URIs
+function downloadImageFile(url, filename = "campaign-creative.png") {
+  if (!url) return;
+  if (url.startsWith("data:")) {
+    try {
+      const parts = url.split(",");
+      const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
+      const binStr = atob(parts[1]);
+      const len = binStr.length;
+      const u8arr = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        u8arr[i] = binStr.charCodeAt(i);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      return;
+    } catch (_) {}
+  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // ── Markdown and Copy Text Cleaners (Strip raw MD, human-readable format) ────
@@ -1073,9 +1106,15 @@ function NodeOutputPreview({
           />
           <div style={{ padding: "10px 14px", background: t.surface2, fontSize: 11, color: t.text2, display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${t.border}` }}>
             <span style={{ fontWeight: 700, color: t.text }}>Final Visual Rendered</span>
-            <a href={output.url || `data:image/png;base64,${output.base64}`} download="campaign-creative.png" target="_blank" rel="noreferrer" style={{ color: t.brain, fontWeight: 700, textDecoration: "none" }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                downloadImageFile(output.url || `data:image/png;base64,${output.base64}`);
+              }}
+              style={{ background: "transparent", border: "none", color: t.brain, fontWeight: 700, cursor: "pointer", fontSize: 11, padding: 0 }}
+            >
               Download High-Res ⬇
-            </a>
+            </button>
           </div>
         </div>
       )}
@@ -1111,20 +1150,28 @@ function NodeOutputPreview({
   );
 }
 
-// ── Node Data Box (Supports Structured/Readable and Raw JSON Views) ────────────
-function NodeDataBox({ label, data, t }) {
+// ── Node Data Box (Supports Structured/Readable and Raw JSON Views, with Inline Editing) ────
+function NodeDataBox({ label, data, t, editable = false, onSave = null, nodeId = null }) {
   const [mode, setMode] = useState("readable"); // 'readable' | 'raw'
   const [copied, setCopied] = useState(false);
+  const [savedBadge, setSavedBadge] = useState(false);
+  const [rawText, setRawText] = useState("");
+  const [rawError, setRawError] = useState(null);
 
-  if (!data) {
-    return (
-      <CfgField label={label} t={t}>
-        <div style={dataBoxStyle(t)}>
-          <span style={{ color: t.text3 }}>No data recorded for this node yet.</span>
-        </div>
-      </CfgField>
-    );
-  }
+  // Sync rawText whenever data or mode changes
+  useEffect(() => {
+    if (data !== undefined && data !== null) {
+      setRawText(typeof data === "string" ? data : JSON.stringify(data, null, 2));
+      setRawError(null);
+    } else {
+      setRawText("");
+    }
+  }, [data, mode]);
+
+  const triggerSavedFeedback = () => {
+    setSavedBadge(true);
+    setTimeout(() => setSavedBadge(false), 1800);
+  };
 
   const handleCopy = () => {
     try {
@@ -1135,8 +1182,84 @@ function NodeDataBox({ label, data, t }) {
     } catch (_) {}
   };
 
+  const handleFieldChange = (field, val) => {
+    if (!onSave) return;
+    const current = (typeof data === "object" && data !== null) ? { ...data } : {};
+    current[field] = val;
+    onSave(current);
+    triggerSavedFeedback();
+  };
+
+  const handleStringChange = (val) => {
+    if (!onSave) return;
+    onSave(val);
+    triggerSavedFeedback();
+  };
+
+  const handleRawChange = (e) => {
+    const val = e.target.value;
+    setRawText(val);
+    if (!onSave) return;
+    try {
+      const parsed = JSON.parse(val);
+      setRawError(null);
+      onSave(parsed);
+      triggerSavedFeedback();
+    } catch (err) {
+      setRawError("Invalid JSON (will save when valid)");
+    }
+  };
+
+  const handleFormatRaw = () => {
+    try {
+      const parsed = JSON.parse(rawText);
+      const formatted = JSON.stringify(parsed, null, 2);
+      setRawText(formatted);
+      setRawError(null);
+      if (onSave) onSave(parsed);
+      triggerSavedFeedback();
+    } catch (err) {
+      setRawError("Cannot format: " + err.message);
+    }
+  };
+
   const renderReadableContent = () => {
+    if (!data && !editable) {
+      return <span style={{ color: t.text3 }}>No data recorded for this node yet.</span>;
+    }
+
+    if (!data && editable) {
+      return (
+        <div style={{ textAlign: "center", padding: "8px 0" }}>
+          <button
+            onClick={() => {
+              if (onSave) onSave({ prompt: "", ratio: "1:1", quality: "High" });
+            }}
+            style={{
+              padding: "5px 12px", borderRadius: 6, border: `1px solid ${t.brain}`,
+              background: `${t.brain}15`, color: t.brain, fontSize: 11, fontWeight: 700,
+              cursor: "pointer", fontFamily: FONT
+            }}
+          >
+            + Customize Input for this Node
+          </button>
+        </div>
+      );
+    }
+
+    // String content
     if (typeof data === "string") {
+      if (editable && onSave) {
+        return (
+          <textarea
+            value={data}
+            onChange={(e) => handleStringChange(e.target.value)}
+            rows={5}
+            placeholder="Enter value..."
+            style={{ ...cfgTextarea(t), minHeight: 110 }}
+          />
+        );
+      }
       return (
         <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
           {cleanRawJson(data)}
@@ -1145,6 +1268,220 @@ function NodeDataBox({ label, data, t }) {
     }
 
     if (typeof data === "object" && data !== null) {
+      // Editable Mode for Object Data
+      if (editable && onSave) {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Visual Prompt (Genfy or Art Director) */}
+            {data.prompt !== undefined && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                  <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700 }}>
+                    PROMPT (FROM PRIOR NODE):
+                  </label>
+                  <span style={{ fontSize: 9, fontFamily: MONO, color: t.brain, fontWeight: 600 }}>Editable</span>
+                </div>
+                <textarea
+                  value={data.prompt || ""}
+                  onChange={(e) => handleFieldChange("prompt", e.target.value)}
+                  rows={4}
+                  placeholder="Visual generation prompt..."
+                  style={{ ...cfgTextarea(t), minHeight: 85 }}
+                />
+              </div>
+            )}
+
+            {/* Copy Agent user_message */}
+            {data.user_message !== undefined && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                  <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700 }}>
+                    USER MESSAGE / PROMPT:
+                  </label>
+                  <span style={{ fontSize: 9, fontFamily: MONO, color: t.brain, fontWeight: 600 }}>Editable</span>
+                </div>
+                <textarea
+                  value={data.user_message || ""}
+                  onChange={(e) => handleFieldChange("user_message", e.target.value)}
+                  rows={4}
+                  placeholder="Prompt for copywriter..."
+                  style={{ ...cfgTextarea(t), minHeight: 85 }}
+                />
+              </div>
+            )}
+
+            {/* Brief */}
+            {data.brief !== undefined && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                  <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700 }}>
+                    CAMPAIGN BRIEF:
+                  </label>
+                  <span style={{ fontSize: 9, fontFamily: MONO, color: t.brain, fontWeight: 600 }}>Editable</span>
+                </div>
+                <textarea
+                  value={data.brief || ""}
+                  onChange={(e) => handleFieldChange("brief", e.target.value)}
+                  rows={3}
+                  placeholder="Campaign brief context..."
+                  style={{ ...cfgTextarea(t), minHeight: 70 }}
+                />
+              </div>
+            )}
+
+            {/* Copy Output Reference */}
+            {data.copy_output !== undefined && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                  <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700 }}>
+                    COPY REFERENCE (FROM COPY NODE):
+                  </label>
+                  <span style={{ fontSize: 9, fontFamily: MONO, color: t.brain, fontWeight: 600 }}>Editable</span>
+                </div>
+                <textarea
+                  value={data.copy_output || ""}
+                  onChange={(e) => handleFieldChange("copy_output", e.target.value)}
+                  rows={3}
+                  placeholder="Copy text reference..."
+                  style={{ ...cfgTextarea(t), minHeight: 70 }}
+                />
+              </div>
+            )}
+
+            {/* Ratio & Quality in 2 columns */}
+            {(data.ratio !== undefined || data.quality !== undefined) && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {data.ratio !== undefined && (
+                  <div>
+                    <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700, display: "block", marginBottom: 3 }}>
+                      RATIO:
+                    </label>
+                    <select
+                      value={data.ratio || "1:1"}
+                      onChange={(e) => handleFieldChange("ratio", e.target.value)}
+                      style={cfgSelect(t)}
+                    >
+                      {RATIOS.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {data.quality !== undefined && (
+                  <div>
+                    <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700, display: "block", marginBottom: 3 }}>
+                      QUALITY:
+                    </label>
+                    <select
+                      value={data.quality || "High"}
+                      onChange={(e) => handleFieldChange("quality", e.target.value)}
+                      style={cfgSelect(t)}
+                    >
+                      {QUALITIES.map(q => (
+                        <option key={q} value={q}>{q}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Model IDs */}
+            {data.model_ids !== undefined && (
+              <div>
+                <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700, display: "block", marginBottom: 3 }}>
+                  MODEL IDS:
+                </label>
+                <input
+                  type="text"
+                  value={Array.isArray(data.model_ids) ? data.model_ids.join(", ") : (data.model_ids || "")}
+                  onChange={(e) => handleFieldChange("model_ids", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                  placeholder="e.g. ChatGPT, DALL-E 3"
+                  style={cfgInput(t)}
+                />
+              </div>
+            )}
+
+            {/* LLM Model */}
+            {data.llm_model !== undefined && (
+              <div>
+                <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700, display: "block", marginBottom: 3 }}>
+                  LLM MODEL:
+                </label>
+                <select
+                  value={data.llm_model || "claude-sonnet-5"}
+                  onChange={(e) => handleFieldChange("llm_model", e.target.value)}
+                  style={cfgSelect(t)}
+                >
+                  {MODELS.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Categories / Style object */}
+            {data.categories !== undefined && (
+              <div>
+                <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700, display: "block", marginBottom: 3 }}>
+                  CATEGORIES / STYLE:
+                </label>
+                {typeof data.categories === "object" && data.categories !== null ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, background: t.surface, padding: "8px 10px", borderRadius: 6, border: `1px solid ${t.border}` }}>
+                    {Object.entries(data.categories).map(([ck, cv]) => (
+                      <div key={ck} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, width: 65, textTransform: "uppercase" }}>{ck}:</span>
+                        <input
+                          type="text"
+                          value={String(cv)}
+                          onChange={(e) => {
+                            const nextCats = { ...(data.categories || {}), [ck]: e.target.value };
+                            handleFieldChange("categories", nextCats);
+                          }}
+                          style={{
+                            flex: 1, background: t.bg, border: `1px solid ${t.border}`,
+                            borderRadius: 4, padding: "4px 8px", fontSize: 11, color: t.text, fontFamily: FONT
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={String(data.categories)}
+                    onChange={(e) => handleFieldChange("categories", e.target.value)}
+                    style={cfgInput(t)}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Any other keys */}
+            {Object.entries(data).filter(([k]) => !["prompt", "user_message", "brief", "copy_output", "ratio", "quality", "model_ids", "llm_model", "categories"].includes(k)).map(([k, v]) => (
+              <div key={k}>
+                <label style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, fontWeight: 700, display: "block", marginBottom: 3, textTransform: "uppercase" }}>
+                  {k}:
+                </label>
+                <input
+                  type="text"
+                  value={typeof v === "object" ? JSON.stringify(v) : String(v)}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    try {
+                      if (val.startsWith("{") || val.startsWith("[")) val = JSON.parse(val);
+                    } catch (_) {}
+                    handleFieldChange(k, val);
+                  }}
+                  style={cfgInput(t)}
+                />
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      // Read-Only Mode for Object Data (Outputs or uneditable inputs)
       // 1. CopyAgent / LLM input payload (user_message, llm_model)
       if (data.user_message) {
         return (
@@ -1288,9 +1625,24 @@ function NodeDataBox({ label, data, t }) {
   return (
     <div style={{ marginTop: 2 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <label style={{ fontSize: 10.5, fontWeight: 700, color: t.text2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          {label}
-        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <label style={{ fontSize: 10.5, fontWeight: 700, color: t.text2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {label}
+          </label>
+          {editable && (
+            <span style={{
+              fontSize: 8.5, fontFamily: MONO, fontWeight: 700, padding: "1px 5px",
+              borderRadius: 4, background: "#8B5CF618", color: "#8B5CF6", border: "1px solid #8B5CF633"
+            }}>
+              EDITABLE
+            </span>
+          )}
+          {savedBadge && (
+            <span style={{ fontSize: 9, fontFamily: MONO, color: "#22C55E", fontWeight: 700 }}>
+              ✓ Saved
+            </span>
+          )}
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           {/* Toggle buttons: Readable vs Raw */}
           <div style={{
@@ -1341,9 +1693,41 @@ function NodeDataBox({ label, data, t }) {
 
       <div style={dataBoxStyle(t)}>
         {mode === "raw" ? (
-          <pre style={{ margin: 0, fontFamily: MONO, fontSize: 10, lineHeight: 1.5, overflowX: "auto", whiteSpace: "pre-wrap" }}>
-            {typeof data === "string" ? data : JSON.stringify(data, null, 2)}
-          </pre>
+          editable && onSave ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <textarea
+                value={rawText}
+                onChange={handleRawChange}
+                rows={8}
+                placeholder="Enter valid JSON..."
+                style={{
+                  width: "100%", background: t.bg, border: `1px solid ${rawError ? "#EF4444" : t.borderStrong}`,
+                  borderRadius: 6, padding: "8px 10px", color: t.text, fontFamily: MONO, fontSize: 10.5,
+                  lineHeight: 1.5, resize: "vertical", boxSizing: "border-box"
+                }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                {rawError ? (
+                  <span style={{ fontSize: 10, color: "#EF4444", fontFamily: MONO }}>{rawError}</span>
+                ) : (
+                  <span style={{ fontSize: 10, color: "#22C55E", fontFamily: MONO }}>✓ Valid JSON (Auto-Saved)</span>
+                )}
+                <button
+                  onClick={handleFormatRaw}
+                  style={{
+                    padding: "2px 8px", borderRadius: 4, border: `1px solid ${t.border}`,
+                    background: t.surface, color: t.text2, fontSize: 10, fontFamily: MONO, cursor: "pointer"
+                  }}
+                >
+                  Format JSON
+                </button>
+              </div>
+            </div>
+          ) : (
+            <pre style={{ margin: 0, fontFamily: MONO, fontSize: 10, lineHeight: 1.5, overflowX: "auto", whiteSpace: "pre-wrap" }}>
+              {typeof data === "string" ? data : JSON.stringify(data, null, 2)}
+            </pre>
+          )
         ) : (
           renderReadableContent()
         )}
@@ -1353,7 +1737,10 @@ function NodeDataBox({ label, data, t }) {
 }
 
 // ── Config Panel ──────────────────────────────────────────────────────────────
-function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
+function ConfigPanel({
+  node, config, onChange, onUpdateInput, t, inputs, outputs, status,
+  pendingApproval, onApproveStep
+}) {
   if (!node) return (
     <div style={{ padding: 24, textAlign: "center" }}>
       <Settings size={28} style={{ color: t.text3, margin: "0 auto 10px" }} />
@@ -1362,6 +1749,53 @@ function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
   );
 
   const isAgent = node.type === "agent";
+
+  // Derive effective node input: recorded nodeInputs or default pipeline synthesis
+  const effectiveInput = useMemo(() => {
+    if (inputs?.[node.id] && Object.keys(inputs[node.id]).length > 0) {
+      return inputs[node.id];
+    }
+    if (node.id === "brief") {
+      return {
+        brief: config.brief || "",
+        brandName: config.brandName || "",
+        assetType: config.assetType || "Instagram Ad Image"
+      };
+    }
+    if (node.id === "agent_strategy") {
+      return {
+        brief: outputs?.brief?.brief || config.brief || "",
+        assetType: outputs?.brief?.assetType || config.assetType || "Instagram Ad Image",
+        brandName: config.brandName || ""
+      };
+    }
+    if (node.id === "copy") {
+      const stratPrompt = outputs?.agent_strategy?.recommended_copy_prompt;
+      return {
+        user_message: stratPrompt || `Write high-converting ${config.assetType || "Instagram Ad Image"} copy for: ${outputs?.brief?.brief || config.brief || ""}`,
+        llm_model: config.model || "claude-sonnet-5"
+      };
+    }
+    if (node.id === "agent_artdir") {
+      return {
+        brief: outputs?.brief?.brief || config.brief || "",
+        copy_output: outputs?.copy?.bodyText || outputs?.copy?.headline || "",
+        asset_type: outputs?.brief?.assetType || config.assetType || "Instagram Ad Image"
+      };
+    }
+    if (node.id === "genfy") {
+      const artDirPrompt = outputs?.agent_artdir?.image_prompt;
+      const copyBody = outputs?.copy?.bodyText;
+      return {
+        prompt: artDirPrompt || (copyBody ? `Advertising photography visual representing: ${cleanHeadline(outputs?.copy?.headline || "")}\n\n${copyBody.slice(0, 160)}` : (outputs?.brief?.brief || config.brief || "")),
+        model_ids: ["ChatGPT"],
+        ratio: outputs?.agent_artdir?.ratio || config.ratio || "1:1",
+        quality: outputs?.agent_artdir?.quality || config.quality || "High",
+        categories: outputs?.agent_artdir?.categories || { style: "cinematic", lighting: "golden" }
+      };
+    }
+    return null;
+  }, [inputs, outputs, config, node.id]);
 
   return (
     <div style={{ padding: "16px 18px", fontFamily: FONT }}>
@@ -1465,10 +1899,52 @@ function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
         )}
 
         {/* Node input / output with Structured (Readable) vs Raw Toggle */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 2 }}>
-          <NodeDataBox label="Node Input" data={inputs?.[node.id]} t={t} />
-          <NodeDataBox label="Node Output" data={outputs?.[node.id]} t={t} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 2 }}>
+          <NodeDataBox
+            label="Node Input"
+            data={effectiveInput}
+            t={t}
+            editable={true}
+            onSave={(newInput) => onUpdateInput ? onUpdateInput(node.id, newInput) : null}
+            nodeId={node.id}
+          />
+          <NodeDataBox
+            label="Node Output"
+            data={outputs?.[node.id]}
+            t={t}
+            editable={false}
+            nodeId={node.id}
+          />
         </div>
+
+        {/* Step Approval Box directly in Sidebar */}
+        {pendingApproval && pendingApproval.nodeId === node.id && (
+          <div style={{
+            marginTop: 10, padding: "12px 14px", borderRadius: R.md,
+            background: "rgba(34,197,94,0.08)", border: "1.5px solid rgba(34,197,94,0.35)",
+            display: "flex", flexDirection: "column", gap: 8
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, color: "#16A34A", fontWeight: 700, fontSize: 12 }}>
+              <CheckCircle size={16} />
+              <span>Step Output Ready for Review</span>
+            </div>
+            <div style={{ fontSize: 11, color: t.text2, lineHeight: 1.45 }}>
+              Review the Input and Output above. You can customize the input or proceed:
+            </div>
+            <button
+              onClick={onApproveStep}
+              style={{
+                marginTop: 2, padding: "9px 16px", borderRadius: 8, border: "none",
+                background: "linear-gradient(135deg, #22C55E, #16A34A)",
+                color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                boxShadow: "0 4px 12px rgba(34,197,94,0.3)", fontFamily: FONT
+              }}
+            >
+              <CheckCircle size={15} /> Approve & Proceed ▶
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1616,6 +2092,10 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     } catch (_) {}
     return {};
   });
+  const nodeInputsRef = useRef(nodeInputs);
+  useEffect(() => {
+    nodeInputsRef.current = nodeInputs;
+  }, [nodeInputs]);
 
   const [nodeOutputs, setNodeOutputs] = useState(() => {
     try {
@@ -1624,6 +2104,10 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     } catch (_) {}
     return {};
   });
+  const nodeOutputsRef = useRef(nodeOutputs);
+  useEffect(() => {
+    nodeOutputsRef.current = nodeOutputs;
+  }, [nodeOutputs]);
 
   const [masterState, setMasterState] = useState(() => {
     try {
@@ -1812,7 +2296,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     } catch (_) {}
     return [];
   });
-  const [rightSidebarMode, setRightSidebarMode] = useState("closed");
+  const [rightSidebarMode, setRightSidebarMode] = useState("config");
 
   const updateActiveNodes = (nodes) => {
     setActiveNodes(nodes);
@@ -1930,7 +2414,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
   // Persist pipeline generations & status to database
   const persistProjectToDB = async (outputsToSave, statusToSave, nodesToSave) => {
-    if (!activeProject?.id) return;
+    if (!activeProject?.id || activeProject.id.startsWith("wf-")) return;
     try {
       const payload = {
         outputs: outputsToSave || nodeOutputs,
@@ -1993,7 +2477,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // Query database for this project's outputs to ensure freshness and restore on page reload
-      fetch(`/bff/projects/${activeProject.id}`, { credentials: "include" })
+      if (activeProject.id && !activeProject.id.startsWith("wf-")) {
+        fetch(`/bff/projects/${activeProject.id}`, { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
         .then(serverProj => {
           if (serverProj) {
@@ -2016,6 +2501,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           }
         })
         .catch(() => {});
+      }
     }
 
     // Auto-populate brief from storyboard card if starting from a storyboard card
@@ -2045,7 +2531,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
   const setInput = (id, d) => {
     setNodeInputs(prev => {
-      const next = { ...prev, [id]: d };
+      const resolved = typeof d === "function" ? d(prev[id]) : d;
+      const next = { ...prev, [id]: resolved };
+      nodeInputsRef.current = next;
       try { localStorage.setItem(`${stateStorageKey}-inputs`, JSON.stringify(next)); } catch (_) {}
       return next;
     });
@@ -2053,7 +2541,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
   const setOutput = (id, d) => {
     setNodeOutputs(prev => {
-      const next = { ...prev, [id]: d };
+      const resolved = typeof d === "function" ? d(prev[id]) : d;
+      const next = { ...prev, [id]: resolved };
+      nodeOutputsRef.current = next;
       try { localStorage.setItem(`${stateStorageKey}-outputs`, JSON.stringify(next)); } catch (_) {}
       syncHistoryItem("complete", next);
       persistProjectToDB(next, null, null);
@@ -2116,7 +2606,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const handleRun = async (startFromNodeId = "brief") => {
     if (isRunning) return;
     const brief = configs.brief.brief?.trim();
-    if (!brief) { showToast("Please enter a campaign brief first."); setSelectedNodeId("brief"); return; }
+    if (!brief) { showToast("Please enter a campaign brief first."); setSelectedNodeId("brief"); setRightSidebarMode("config"); return; }
 
     // Read brand context from active project or localStorage
     let brandContext = null;
@@ -2133,11 +2623,11 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
     setIsRunning(true);
     setPendingApproval(null);
+    setRightSidebarMode("config"); // Ensure sidebar is open and actively tracking execution
 
-    // If starting fresh from beginning, reset status and outputs. If continuing from a node, preserve prior completed outputs.
+    // If starting fresh from beginning, reset status and outputs. Preserve user custom inputs.
     if (startFromNodeId === "brief") {
       setNodeStatus({});
-      setNodeInputs({});
       setNodeOutputs({});
     }
 
@@ -2161,45 +2651,73 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
     try {
       // ── STEP 1: Brief node ─────────────────────────────────────────────────
-      let briefOutput = nodeOutputs.brief || { brief, assetType: configs.brief.assetType };
+      let briefOutput = nodeOutputsRef.current.brief || { brief, assetType: configs.brief.assetType };
       if (currentOrder.includes("brief") && startIndex <= currentOrder.indexOf("brief")) {
         setStatus("brief", "active");
         setSelectedNodeId("brief");
+        setRightSidebarMode("config");
         log("Node 1: Campaign Brief — locked and loaded", "info");
         await delay(400);
-        briefOutput = { brief, assetType: configs.brief.assetType };
-        setInput("brief", { brief: configs.brief.brief, assetType: configs.brief.assetType });
+
+        const currentBriefInput = nodeInputsRef.current.brief || {
+          brief: configs.brief.brief,
+          brandName: configs.brief.brandName || inferredBrandName,
+          assetType: configs.brief.assetType
+        };
+        setInput("brief", currentBriefInput);
+
+        briefOutput = {
+          brief: currentBriefInput.brief || brief,
+          assetType: currentBriefInput.assetType || configs.brief.assetType,
+          brandName: currentBriefInput.brandName || inferredBrandName
+        };
         setOutput("brief", briefOutput);
         setStatus("brief", "done");
+
+        // Pre-seed Step 2 (Strategy) input with briefOutput
+        setInput("agent_strategy", prev => ({
+          brief: prev?.brief || briefOutput.brief,
+          assetType: prev?.assetType || briefOutput.assetType,
+          brandName: prev?.brandName || briefOutput.brandName
+        }));
 
         if (approvalMode) {
           log("⏸ Brief Step complete. Waiting for user approval to run Strategy Agent...", "agent");
           setMasterFeedback("Node 1 Complete — Awaiting your approval to proceed to Strategy Agent...");
+          setSelectedNodeId("brief");
+          setRightSidebarMode("config");
           await waitForUserApproval("brief", briefOutput);
           log("✓ Brief approved by user", "success");
         }
       }
 
       // ── STEP 2: Strategy Agent ─────────────────────────────────────────────
-      let strategyData = nodeOutputs.agent_strategy || null;
+      let strategyData = nodeOutputsRef.current.agent_strategy || null;
       if (currentOrder.includes("agent_strategy") && startIndex <= currentOrder.indexOf("agent_strategy")) {
         setStatus("agent_strategy", "active");
         setSelectedNodeId("agent_strategy");
+        setRightSidebarMode("config");
         log("⬡ Strategy Agent: analyzing brief & building copy specs...", "agent");
         setMasterFeedback("Supervising Brief → Copy strategy handoff...");
 
-        setInput("agent_strategy", {
-          brief,
+        const stratInput = nodeInputsRef.current.agent_strategy || {
+          brief: briefOutput?.brief || brief,
           assetType: configs.brief.assetType,
-        });
+          brandName: configs.brief.brandName || inferredBrandName
+        };
+        setInput("agent_strategy", stratInput);
+
+        const stratBrief = stratInput.brief || brief;
+        const stratAssetType = stratInput.assetType || configs.brief.assetType;
+
         try {
           const r = await fetch("/bff/workflow/step-bridge", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               bridge_type: "brief_to_copy",
-              brief: brandPrefix + brief,
-              asset_type: configs.brief.assetType,
+              brief: brandPrefix + stratBrief,
+              asset_type: stratAssetType,
               brand_id: activeProject?.brand_id || activeProject?.brandId || null,
             }),
           });
@@ -2215,6 +2733,15 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           log(`Strategy Agent: audience = "${strategyData.target_audience}"`, "success");
           setOutput("agent_strategy", strategyData);
           setStatus("agent_strategy", "done");
+
+          // Pre-seed Step 3 (Copy Agent) input with Strategy output recommendation
+          const recCopyPrompt = strategyData.recommended_copy_prompt
+            ? (brandPrefix ? brandPrefix + strategyData.recommended_copy_prompt : strategyData.recommended_copy_prompt)
+            : `Write high-converting ${stratAssetType} copy for: ${brandPrefix}${stratBrief}`;
+          setInput("copy", prev => ({
+            user_message: prev?.user_message || recCopyPrompt,
+            llm_model: prev?.llm_model || configs.copy.model || "claude-sonnet-5"
+          }));
         } catch (err) {
           console.error("[Strategy Agent Error]:", err);
           const errMsg = err.message || "Failed to generate strategy";
@@ -2233,6 +2760,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         if (approvalMode) {
           log("⏸ Strategy Step complete. Review Strategy Output and click Approve to run Copy Agent...", "agent");
           setMasterFeedback("Strategy Node Complete — Awaiting your approval to proceed to Copy Agent...");
+          setSelectedNodeId("agent_strategy");
+          setRightSidebarMode("config");
           await waitForUserApproval("agent_strategy", strategyData);
           log("✓ Strategy output approved by user", "success");
         }
@@ -2244,25 +2773,32 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // ── STEP 3: Copy Agent ─────────────────────────────────────────────────
-      let copyData = nodeOutputs.copy || null;
+      let copyData = nodeOutputsRef.current.copy || null;
       if (currentOrder.includes("copy") && startIndex <= currentOrder.indexOf("copy")) {
         setStatus("copy", "active");
         setSelectedNodeId("copy");
+        setRightSidebarMode("config");
         log("Node 3: Copy Agent — generating campaign copy via CopyAgent API...", "info");
         setMasterFeedback("Supervising Copy Agent output quality...");
 
-        const copyPrompt = (strategyData && strategyData.recommended_copy_prompt)
+        const defaultCopyPrompt = (strategyData && strategyData.recommended_copy_prompt)
           ? (brandPrefix ? brandPrefix + strategyData.recommended_copy_prompt : strategyData.recommended_copy_prompt)
           : `Write high-converting ${configs.brief.assetType} copy for: ${brandPrefix}${brief}`;
 
-        setInput("copy", {
-          user_message: copyPrompt,
-          llm_model: configs.copy.model,
-        });
+        // Honor any customized user input from nodeInputsRef
+        const copyInput = nodeInputsRef.current.copy || {
+          user_message: defaultCopyPrompt,
+          llm_model: configs.copy.model || "claude-sonnet-5"
+        };
+        setInput("copy", copyInput);
+
+        const promptToSend = copyInput.user_message || defaultCopyPrompt;
+        const modelToSend = copyInput.llm_model || configs.copy.model || "claude-sonnet-5";
+
         try {
           const payload = {
-            user_message: `${copyPrompt}\n\n[Run Variation Nonce: ${Date.now()}]`,
-            llm_model: configs.copy.model,
+            user_message: `${promptToSend}\n\n[Run Variation Nonce: ${Date.now()}]`,
+            llm_model: modelToSend,
             stream: false,
           };
           if (activeProject && (activeProject.brand_id || activeProject.brandId)) {
@@ -2306,6 +2842,24 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           log("Copy Agent: unique copy generated successfully", "success");
           setOutput("copy", copyData);
           setStatus("copy", "done");
+
+          // Pre-seed Step 4 (Art Director) and Step 5 (Genfy) inputs
+          const copyTextForArtDir = copyData.bodyText || brief;
+          setInput("agent_artdir", prev => ({
+            brief: prev?.brief || brief,
+            copy_output: prev?.copy_output || copyTextForArtDir,
+            asset_type: prev?.asset_type || configs.brief.assetType,
+            brand_name: prev?.brand_name || configs.brief.brandName || inferredBrandName
+          }));
+
+          const defaultGenfyPrompt = `Advertising photography visual representing: ${cleanHeadline(copyData.headline || "")}\n\n${copyData.bodyText ? copyData.bodyText.slice(0, 160) : brief}`;
+          setInput("genfy", prev => ({
+            prompt: prev?.prompt || defaultGenfyPrompt,
+            model_ids: prev?.model_ids || ["ChatGPT"],
+            ratio: prev?.ratio || configs.genfy.ratio || "1:1",
+            quality: prev?.quality || configs.genfy.quality || "High",
+            categories: prev?.categories || { style: "cinematic", lighting: "golden" }
+          }));
         } catch (err) {
           console.error("[Workflow CopyAgent Error]:", err);
           const errMsg = err.message || "Failed to generate copy";
@@ -2320,6 +2874,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         if (approvalMode) {
           log("⏸ Copy Generation complete. Review Copy Output and click Approve to run Art Director...", "agent");
           setMasterFeedback("Copy Agent Node Complete — Awaiting your approval to proceed to Art Director...");
+          setSelectedNodeId("copy");
+          setRightSidebarMode("config");
           await waitForUserApproval("copy", copyData);
           log("✓ Copy output approved by user", "success");
         }
@@ -2331,30 +2887,34 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // ── STEP 4: Art Director Agent ─────────────────────────────────────────
-      let artDirData = (currentOrder.indexOf("agent_artdir") !== -1 && startIndex > currentOrder.indexOf("agent_artdir") ? nodeOutputs.agent_artdir : null);
+      let artDirData = (currentOrder.indexOf("agent_artdir") !== -1 && startIndex > currentOrder.indexOf("agent_artdir") ? nodeOutputsRef.current.agent_artdir : null);
       if (currentOrder.includes("agent_artdir") && (startIndex <= currentOrder.indexOf("agent_artdir") || !artDirData)) {
         setStatus("agent_artdir", "active");
         setSelectedNodeId("agent_artdir");
+        setRightSidebarMode("config");
         log("⬡ Art Director Agent: mapping copy to Genfy visual parameters...", "agent");
         setMasterFeedback("Supervising Art Director visual parameter selection...");
 
         const copyTextForArtDir = (copyData && copyData.bodyText) ? copyData.bodyText : brief;
-        setInput("agent_artdir", {
+        const artDirInput = nodeInputsRef.current.agent_artdir || {
           brief,
           copy_output: copyTextForArtDir,
           asset_type: configs.brief.assetType,
-        });
+          brand_name: configs.brief.brandName || inferredBrandName
+        };
+        setInput("agent_artdir", artDirInput);
+
         try {
           const r = await fetch("/bff/workflow/step-bridge", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               bridge_type: "copy_to_genfy",
-              brief: brandPrefix + brief,
-              copy_output: copyTextForArtDir,
-              asset_type: configs.brief.assetType,
+              brief: brandPrefix + (artDirInput.brief || brief),
+              copy_output: artDirInput.copy_output || copyTextForArtDir,
+              asset_type: artDirInput.asset_type || configs.brief.assetType,
               brand_id: activeProject?.brand_id || activeProject?.brandId || null,
-              brand_name: configs.brief.brandName || inferredBrandName || "",
+              brand_name: artDirInput.brand_name || configs.brief.brandName || inferredBrandName || "",
             }),
           });
           if (!r.ok) {
@@ -2369,6 +2929,15 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           log(`Art Director: image prompt ready — "${artDirData.image_prompt?.slice(0, 50)}..."`, "success");
           setOutput("agent_artdir", artDirData);
           setStatus("agent_artdir", "done");
+
+          // Pre-seed Step 5 (Genfy) with Art Director's prompt & settings (or user's customized overrides)
+          setInput("genfy", prev => ({
+            prompt: prev?.prompt && !prev.prompt.startsWith("Advertising photography visual") ? prev.prompt : (artDirData.image_prompt || prev?.prompt),
+            model_ids: prev?.model_ids || ["ChatGPT"],
+            ratio: prev?.ratio || artDirData.ratio || configs.genfy.ratio || "1:1",
+            quality: prev?.quality || artDirData.quality || configs.genfy.quality || "High",
+            categories: prev?.categories || artDirData.categories || { style: "cinematic", lighting: "golden" }
+          }));
         } catch (err) {
           console.error("[Art Director Error]:", err);
           const errMsg = err.message || "Failed to generate visual prompt";
@@ -2383,37 +2952,48 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         if (approvalMode) {
           log("⏸ Art Director Step complete. Review Visual Prompt and click Approve to render Image...", "agent");
           setMasterFeedback("Art Director Node Complete — Awaiting your approval to render Image...");
+          setSelectedNodeId("agent_artdir");
+          setRightSidebarMode("config");
           await waitForUserApproval("agent_artdir", artDirData);
           log("✓ Art Director output approved by user", "success");
         }
       }
 
       // ── STEP 5: Genfy Image Engine ─────────────────────────────────────────
-      let genfyResult = (currentOrder.indexOf("genfy") !== -1 && startIndex > currentOrder.indexOf("genfy") ? nodeOutputs.genfy : null);
+      let genfyResult = (currentOrder.indexOf("genfy") !== -1 && startIndex > currentOrder.indexOf("genfy") ? nodeOutputsRef.current.genfy : null);
       if (currentOrder.includes("genfy") && (startIndex <= currentOrder.indexOf("genfy") || !genfyResult)) {
         setStatus("genfy", "active");
         setSelectedNodeId("genfy");
+        setRightSidebarMode("config");
         log("Node 5: Image Engine — requesting generation via ChatGPT...", "info");
         setMasterFeedback("Supervising image rendering process...");
 
-        const activeArtDir = artDirData || nodeOutputs.agent_artdir || {};
-        const imgPrompt = activeArtDir.image_prompt || (copyData?.bodyText ? `Advertising photography visual representing: ${copyData.bodyText.slice(0, 150)}` : brief);
+        const activeArtDir = artDirData || nodeOutputsRef.current.agent_artdir || {};
+        const fallbackImgPrompt = activeArtDir.image_prompt || (copyData?.bodyText ? `Advertising photography visual representing: ${cleanHeadline(copyData.headline || "")}\n\n${copyData.bodyText.slice(0, 150)}` : brief);
 
-        setInput("genfy", {
-          prompt: imgPrompt,
+        // Read user-edited Genfy input directly from nodeInputsRef
+        const genfyInput = nodeInputsRef.current.genfy || {
+          prompt: fallbackImgPrompt,
           model_ids: ["ChatGPT"],
-          ratio: activeArtDir.ratio || configs.genfy.ratio,
-          quality: activeArtDir.quality || configs.genfy.quality,
+          ratio: activeArtDir.ratio || configs.genfy.ratio || "1:1",
+          quality: activeArtDir.quality || configs.genfy.quality || "High",
           categories: activeArtDir.categories || { style: "cinematic", lighting: "golden" },
-        });
+        };
+        setInput("genfy", genfyInput);
+
+        const promptToSend = genfyInput.prompt || fallbackImgPrompt;
+        const ratioToSend = genfyInput.ratio || activeArtDir.ratio || configs.genfy.ratio || "1:1";
+        const qualityToSend = genfyInput.quality || activeArtDir.quality || configs.genfy.quality || "High";
+
         try {
           const r = await fetch("/bff/genfy/sessions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              prompt: imgPrompt,
-              ratio: activeArtDir.ratio || configs.genfy.ratio || "1:1",
-              quality: activeArtDir.quality || configs.genfy.quality || "High",
+              prompt: promptToSend,
+              ratio: ratioToSend,
+              quality: qualityToSend,
+              categories: genfyInput.categories || activeArtDir.categories || undefined
             }),
           });
           if (r.ok) {
@@ -2441,6 +3021,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         if (genfyResult) {
           setOutput("genfy", genfyResult);
           setStatus("genfy", "done");
+          setSelectedNodeId("genfy");
+          setRightSidebarMode("config");
           log("✓ Image generation complete", "success");
         } else {
           setStatus("genfy", "error");
@@ -3337,10 +3919,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 node={selectedNode}
                 config={configs[selectedNodeId] || {}}
                 onChange={(field, value) => updateConfig(selectedNodeId, field, value)}
+                onUpdateInput={(nodeId, newInput) => setInput(nodeId, newInput)}
                 t={t}
                 inputs={nodeInputs}
                 outputs={nodeOutputs}
                 status={nodeStatus[selectedNodeId]}
+                pendingApproval={pendingApproval}
+                onApproveStep={handleApproveStep}
               />
             )}
           </aside>
@@ -3384,337 +3969,62 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         }
       `}</style>
 
-      {/* ── Full Resolution Image Modal & Typography Studio Editor ── */}
+      {/* ── Pure Full Resolution Image Preview Lightbox (Image only + Top-Right Cross Button) ── */}
       {imageModalUrl && (
         <div
-          onClick={() => { setImageModalUrl(null); setEditorOpen(false); }}
+          onClick={() => setImageModalUrl(null)}
           style={{
             position: "fixed", inset: 0, zIndex: 99999,
-            background: "rgba(0, 0, 0, 0.90)", backdropFilter: "blur(12px)",
+            background: "rgba(0, 0, 0, 0.94)", backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-            boxSizing: "border-box",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24, cursor: "zoom-out",
           }}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
+          {/* Top-Right Cross Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setImageModalUrl(null);
+            }}
+            title="Close Preview (Esc)"
             style={{
-              width: editorOpen ? "min(1080px, 94vw)" : "auto",
-              maxWidth: "94vw", maxHeight: "92vh", borderRadius: R.xl,
-              overflow: "hidden", background: t.surface, border: `1px solid ${t.border}`,
-              boxShadow: "0 28px 80px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08)",
-              display: "flex", flexDirection: "column",
-              position: "relative", transition: "all 0.25s ease"
+              position: "fixed", top: 20, right: 20,
+              width: 42, height: 42, borderRadius: "50%",
+              border: "1px solid rgba(255, 255, 255, 0.25)",
+              background: "rgba(20, 20, 24, 0.8)", backdropFilter: "blur(8px)",
+              color: "#ffffff", cursor: "pointer", display: "grid", placeItems: "center",
+              zIndex: 100000, boxShadow: "0 4px 20px rgba(0, 0, 0, 0.6)",
+              transition: "all 0.18s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(239, 68, 68, 0.9)";
+              e.currentTarget.style.borderColor = "#ef4444";
+              e.currentTarget.style.transform = "scale(1.08)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(20, 20, 24, 0.8)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.25)";
+              e.currentTarget.style.transform = "scale(1)";
             }}
           >
-            {/* Top Modal Header */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "12px 18px", background: t.surface2, borderBottom: `1px solid ${t.border}`,
-              flexShrink: 0, gap: 12,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
-                  display: "grid", placeItems: "center", color: "#fff",
-                  fontSize: 13, fontWeight: 900, flexShrink: 0,
-                }}>
-                  ✦
-                </div>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 13.5, color: t.text, lineHeight: 1.2 }}>
-                    {editorOpen ? "Visual Typography Studio" : "Full Resolution Preview"}
-                  </div>
-                  <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3, marginTop: 1 }}>
-                    {editorOpen ? "Drag text to reposition · Export layered visual" : "Genfy AI Image Engine · Lossless Creative Render"}
-                  </div>
-                </div>
-              </div>
+            <X size={20} strokeWidth={2.2} />
+          </button>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {!editorOpen && (
-                  <button
-                    onClick={() => setEditorOpen(true)}
-                    style={{
-                      padding: "6px 12px", borderRadius: 8,
-                      background: t.surface, border: `1px solid ${t.border}`,
-                      color: t.text, fontSize: 11.5, fontWeight: 700,
-                      cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
-                      transition: "all 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.brain; e.currentTarget.style.color = t.brain; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text; }}
-                  >
-                    🎨 Overlay Typography
-                  </button>
-                )}
-                <button
-                  onClick={() => { setImageModalUrl(null); setEditorOpen(false); }}
-                  title="Close Preview (Esc)"
-                  style={{
-                    width: 32, height: 32, borderRadius: 8,
-                    border: `1px solid ${t.border}`, background: t.surface,
-                    color: t.text, cursor: "pointer", display: "grid", placeItems: "center",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239, 68, 68, 0.15)"; e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "#ef4444"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = t.surface; e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text; }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            {editorOpen ? (
-              /* ── Interactive Typography Editor Studio ── */
-              <div style={{ display: "flex", flex: 1, minHeight: 460, overflow: "hidden" }}>
-                {/* Visual Canvas Workspace */}
-                <div
-                  ref={containerRef}
-                  onMouseMove={(e) => {
-                    if (!isDraggingText || !containerRef.current) return;
-                    const rect = containerRef.current.getBoundingClientRect();
-                    const x = ((e.clientX - rect.left) / rect.width) * 100;
-                    const y = ((e.clientY - rect.top) / rect.height) * 100;
-                    setEditorPosX(Math.max(2, Math.min(80, x)));
-                    setEditorPosY(Math.max(2, Math.min(85, y)));
-                  }}
-                  onMouseUp={() => setIsDraggingText(false)}
-                  style={{
-                    flex: 1, background: "#060608", position: "relative",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    userSelect: "none", padding: 16, overflow: "hidden", minHeight: 0
-                  }}
-                >
-                  <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "calc(92vh - 135px)" }}>
-                    <img
-                      src={imageModalUrl}
-                      alt="Editor Canvas"
-                      style={{ maxWidth: "100%", maxHeight: "calc(92vh - 135px)", width: "auto", height: "auto", objectFit: "contain", display: "block", borderRadius: 8 }}
-                    />
-                    {/* Draggable Typography Bounding Box */}
-                    <div
-                      onMouseDown={(e) => { e.preventDefault(); setIsDraggingText(true); }}
-                      style={{
-                        position: "absolute",
-                        left: `${editorPosX}%`,
-                        top: `${editorPosY}%`,
-                        cursor: "grab",
-                        padding: "4px 10px",
-                        border: "2px dashed rgba(255,255,255,0.75)",
-                        borderRadius: 6,
-                        background: "rgba(0,0,0,0.55)",
-                        backdropFilter: "blur(4px)",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
-                        zIndex: 10,
-                        maxWidth: "85%",
-                        transform: "translateY(0%)",
-                      }}
-                    >
-                      <div style={{
-                        fontSize: editorFontSize,
-                        color: editorColor,
-                        fontFamily: editorFontFamily,
-                        fontWeight: 800,
-                        textAlign: editorAlign,
-                        lineHeight: 1.25,
-                        whiteSpace: "pre-wrap",
-                        textShadow: "0 2px 8px rgba(0,0,0,0.85)"
-                      }}>
-                        {editorText || "TYPE HEADLINE HERE"}
-                      </div>
-                      <div style={{ fontFamily: MONO, fontSize: 9, color: "rgba(255,255,255,0.7)", marginTop: 4, textAlign: "center" }}>
-                        ✋ Drag to reposition
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Typography Controls Panel */}
-                <div style={{
-                  width: 320, background: t.surface2, borderLeft: `1px solid ${t.border}`,
-                  padding: 20, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto"
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: 15, color: t.text }}>Visual Typography Editor</div>
-                    <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, marginTop: 2 }}>Edit text overlay wording, font size & position</div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: t.text2, display: "block", marginBottom: 6 }}>Headline Copy Wording</label>
-                    <textarea
-                      value={editorText}
-                      onChange={(e) => setEditorText(e.target.value)}
-                      rows={3}
-                      style={{
-                        width: "100%", padding: 10, borderRadius: 8, border: `1px solid ${t.border}`,
-                        background: t.surface, color: t.text, fontFamily: FONT, fontSize: 12.5, outline: "none", resize: "none"
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: t.text2, marginBottom: 6 }}>
-                      <span>Font Scale / Size</span>
-                      <span style={{ fontFamily: MONO }}>{editorFontSize}px</span>
-                    </div>
-                    <input
-                      type="range" min={14} max={56} value={editorFontSize}
-                      onChange={(e) => setEditorFontSize(Number(e.target.value))}
-                      style={{ width: "100%", accentColor: t.brain }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: t.text2, display: "block", marginBottom: 6 }}>Text Color Palette</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {["#FFFFFF", "#F3EFE0", "#D4AF37", "#111111", "#E11D48", "#2563EB"].map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => setEditorColor(c)}
-                          style={{
-                            width: 28, height: 28, borderRadius: "50%", background: c,
-                            border: editorColor === c ? "2px solid #fff" : "1px solid rgba(255,255,255,0.2)",
-                            boxShadow: editorColor === c ? "0 0 0 2px " + t.brain : "none", cursor: "pointer"
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: t.text2, display: "block", marginBottom: 6 }}>Font Family</label>
-                    <select
-                      value={editorFontFamily}
-                      onChange={(e) => setEditorFontFamily(e.target.value)}
-                      style={{
-                        width: "100%", padding: "8px 10px", borderRadius: 8, border: `1px solid ${t.border}`,
-                        background: t.surface, color: t.text, fontFamily: FONT, fontSize: 12, outline: "none"
-                      }}
-                    >
-                      <option value="sans-serif">Architectural Sans (Modern)</option>
-                      <option value="serif">Editorial Luxury Serif</option>
-                      <option value="monospace">Mono Technical</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: t.text2, display: "block", marginBottom: 6 }}>Text Alignment</label>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {["left", "center", "right"].map((align) => (
-                        <button
-                          key={align}
-                          onClick={() => setEditorAlign(align)}
-                          style={{
-                            flex: 1, padding: "6px 0", borderRadius: 6, border: `1px solid ${t.border}`,
-                            background: editorAlign === align ? t.brain : t.surface,
-                            color: editorAlign === align ? "#fff" : t.text,
-                            fontWeight: 700, fontSize: 11, cursor: "pointer", textTransform: "capitalize"
-                          }}
-                        >
-                          {align}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: "auto", paddingTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <button
-                      onClick={handleExportCanvasImage}
-                      style={{
-                        width: "100%", padding: "10px 0", borderRadius: 8, border: "none",
-                        background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
-                        color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                        boxShadow: `0 4px 14px ${t.brain}40`
-                      }}
-                    >
-                      💾 Bake & Save Visual
-                    </button>
-                    <button
-                      onClick={() => setEditorOpen(false)}
-                      style={{
-                        width: "100%", padding: "8px 0", borderRadius: 8, border: `1px solid ${t.border}`,
-                        background: t.surface, color: t.text2, fontWeight: 600, fontSize: 12, cursor: "pointer"
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* ── Standard Full Resolution Modal ── */
-              <>
-                <div style={{
-                  background: "#060609",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  padding: 16, overflow: "hidden", flex: "1 1 auto", minHeight: 0,
-                }}>
-                  <img
-                    src={imageModalUrl}
-                    alt="Full Resolution Visual Render"
-                    style={{
-                      maxWidth: "min(88vw, 940px)",
-                      maxHeight: "calc(92vh - 135px)",
-                      width: "auto",
-                      height: "auto",
-                      objectFit: "contain",
-                      display: "block",
-                      borderRadius: 8,
-                      boxShadow: "0 10px 40px rgba(0, 0, 0, 0.8)",
-                    }}
-                  />
-                </div>
-                <div style={{
-                  padding: "12px 20px", background: t.surface2, borderTop: `1px solid ${t.border}`,
-                  display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10,
-                  flexShrink: 0,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: "#10b981", boxShadow: "0 0 8px #10b981", display: "inline-block"
-                    }} />
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: t.text2 }}>
-                      100% Quality · Lossless Genfy Render
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <a
-                      href={imageModalUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        padding: "7px 14px", borderRadius: 8,
-                        background: t.surface, border: `1px solid ${t.border}`,
-                        color: t.text, fontWeight: 700, fontSize: 11.5,
-                        textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5,
-                      }}
-                    >
-                      Open in New Tab ↗
-                    </a>
-                    <a
-                      href={imageModalUrl}
-                      download="campaign-creative.png"
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        padding: "7px 16px", borderRadius: 8,
-                        background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
-                        color: "#fff", fontWeight: 700, fontSize: 11.5,
-                        textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6,
-                        boxShadow: `0 4px 14px ${t.brain}35`,
-                      }}
-                    >
-                      Download High-Res ⬇
-                    </a>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          {/* Full Resolution Image (Pure Image Only) */}
+          <img
+            src={imageModalUrl}
+            alt="Full Resolution Preview"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "92vw", maxHeight: "92vh",
+              width: "auto", height: "auto",
+              objectFit: "contain", display: "block",
+              borderRadius: 12,
+              boxShadow: "0 24px 70px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.12)",
+              cursor: "default", userSelect: "none",
+            }}
+          />
         </div>
       )}
     </div>

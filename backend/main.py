@@ -2383,7 +2383,7 @@ async def bff_create_conversation(
 
 @app.post("/bff/chat/variants/compare")
 async def bff_variants_compare(request: Request, suite_session: Optional[str] = Cookie(None)):
-    user_id = _get_current_user_id(suite_session)
+    user_id = _get_current_user_id(suite_session) or STATIC_USER_ID
     payload = await request.json()
     target_url = f"{COPYAGENT_BASE_URL}/api/variants/generate"
     headers = {"Content-Type": "application/json", "X-User-Id": user_id}
@@ -2395,7 +2395,7 @@ async def bff_variants_compare(request: Request, suite_session: Optional[str] = 
 
 @app.get("/bff/chat/variants/{session_id}")
 async def bff_variants_poll(session_id: str, suite_session: Optional[str] = Cookie(None)):
-    user_id = _get_current_user_id(suite_session)
+    user_id = _get_current_user_id(suite_session) or STATIC_USER_ID
     target_url = f"{COPYAGENT_BASE_URL}/api/variants/session/{session_id}"
     headers = {"X-User-Id": user_id}
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -2406,7 +2406,7 @@ async def bff_variants_poll(session_id: str, suite_session: Optional[str] = Cook
 
 @app.post("/bff/chat/variants/session/{session_id}/refine")
 async def bff_variants_refine(session_id: str, request: Request, suite_session: Optional[str] = Cookie(None)):
-    user_id = _get_current_user_id(suite_session)
+    user_id = _get_current_user_id(suite_session) or STATIC_USER_ID
     payload = await request.json()
     target_url = f"{COPYAGENT_BASE_URL}/api/variants/session/{session_id}/refine"
     headers = {"Content-Type": "application/json", "X-User-Id": user_id}
@@ -2418,7 +2418,7 @@ async def bff_variants_refine(session_id: str, request: Request, suite_session: 
 
 @app.post("/bff/chat/variants/session/{session_id}/select")
 async def bff_variants_select(session_id: str, request: Request, suite_session: Optional[str] = Cookie(None)):
-    user_id = _get_current_user_id(suite_session)
+    user_id = _get_current_user_id(suite_session) or STATIC_USER_ID
     payload = await request.json()
     target_url = f"{COPYAGENT_BASE_URL}/api/variants/session/{session_id}/select"
     headers = {"Content-Type": "application/json", "X-User-Id": user_id}
