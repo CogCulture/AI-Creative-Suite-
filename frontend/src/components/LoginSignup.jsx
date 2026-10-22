@@ -44,6 +44,7 @@ export default function LoginSignup({ onLogin, onNavigate, defaultSignUp = false
       if (!googleInitializedRef.current) {
         window.google.accounts.id.initialize({
           client_id:
+            import.meta.env.VITE_GOOGLE_CLIENT_ID ||
             "802361061203-55201dnd5a513n745tu2o0rv0uadsao2.apps.googleusercontent.com",
           callback: handleGoogleCredential,
         });

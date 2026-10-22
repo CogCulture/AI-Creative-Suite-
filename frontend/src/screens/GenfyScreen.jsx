@@ -1,1102 +1,2224 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-  Sparkles, Plus, Check, ArrowRight, RefreshCw, Copy as CopyIcon,
-  Send, X, Loader2, Image as ImageIcon, Sliders, Sun, HelpCircle,
-  Video, Eye, ZoomIn, Download, Trash2, Layers
+  Sparkles,
+  Camera,
+  Sun,
+  Wand2,
+  Maximize2,
+  Download,
+  Copy,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  X,
+  History,
+  Layers,
+  RefreshCw,
+  Sliders,
+  Check,
+  Eye,
+  Trash2,
+  Film,
+  Palette,
+  Compass,
+  Aperture,
+  Smile,
+  Zap,
+  ArrowRight,
+  Edit3,
 } from "lucide-react";
 import { FONT, MONO, R } from "../tokens.js";
-import { Card, Btn, Chip, Mono, Eyebrow } from "../components/primitives/index.jsx";
+import {
+  cats,
+  ratioData,
+  qualityData,
+  AVAILABLE_MODELS,
+  INTEGRATED_MODELS,
+  getShapeSVG,
+} from "../utils/studio-data.jsx";
+import { CameraControlPopover } from "../components/CameraControlPopover.jsx";
+import { RelightControlPopover } from "../components/RelightControlPopover.jsx";
+import { SkinEnhancerPopover } from "../components/SkinEnhancerPopover.jsx";
 
-const DUMMY_PREVIEWS = {
-  "photorealistic": "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=500&auto=format&fit=crop&q=80",
-  "cinematic": "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80",
-  "anime": "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=80",
-  "oil-paint": "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=500&auto=format&fit=crop&q=80",
-  "watercolor": "https://images.unsplash.com/photo-1579783928621-7a13d66a62d1?w=500&auto=format&fit=crop&q=80",
-  "concept-art": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80",
-  "3d-render": "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&auto=format&fit=crop&q=80",
-  "minimalist": "https://images.unsplash.com/photo-1604871000636-074fa5117945?w=500&auto=format&fit=crop&q=80"
-};
+const CATEGORY_TABS = [
+  { id: "style", label: "Visual Style", icon: Palette },
+  { id: "medium", label: "Medium", icon: Layers },
+  { id: "lighting", label: "Lighting", icon: Sun },
+  { id: "composition", label: "Composition", icon: Compass },
+  { id: "camera", label: "Camera Angle", icon: Camera },
+  { id: "lens", label: "Lens", icon: Aperture },
+  { id: "mood", label: "Mood", icon: Smile },
+  { id: "color", label: "Color Palette", icon: Zap },
+];
 
 export default function GenfyScreen({ t, nav, showToast }) {
-  // ── Data states ──────────────────────────────────────────
-  const [catalog, setCatalog] = useState(null);
-  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  // ── View Mode: "presets" (Library/Setup) vs "canvas" (Generation Studio) ──
+  const [view, setView] = useState("presets");
 
-  // ── Selection states ─────────────────────────────────────
+  // ── Prompt & Inputs ──
   const [prompt, setPrompt] = useState("");
-  const [selectedStyle, setSelectedStyle] = useState(null);
-  const [selectedMedium, setSelectedMedium] = useState(null);
-  const [selectedLighting, setSelectedLighting] = useState(null);
-  const [selectedComposition, setSelectedComposition] = useState(null);
-  const [selectedCamera, setSelectedCamera] = useState(null);
-  const [selectedLens, setSelectedLens] = useState(null);
-  const [selectedMood, setSelectedMood] = useState(null);
-  const [selectedColor, setSelectedColor] = useState(null);
-  const [selectedCameraBody, setSelectedCameraBody] = useState(null);
+  const [ratio, setRatio] = useState(ratioData[1]); // Default 16:9
+  const [quality, setQuality] = useState(qualityData[1]); // Default High 2K
+  const [selectedModel, setSelectedModel] = useState("Nanobanana 2");
 
-  const [selectedRatio, setSelectedRatio] = useState("1:1");
-  const [selectedQuality, setSelectedQuality] = useState("Standard");
-  const [selectedModels, setSelectedModels] = useState(["Nanobanana"]);
-  const [chatgptModel, setChatgptModel] = useState("gpt-image-2");
+  // Dropdown states
+  const [ratioOpen, setRatioOpen] = useState(false);
+  const [qualOpen, setQualOpen] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
 
-  // ── Live generation states ────────────────────────────────
+  // Style Selections
+  const [activeCat, setActiveCat] = useState("style");
+  const [selections, setSelections] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isEnhancingBrand, setIsEnhancingBrand] = useState(false);
+
+  // Generation Lifecycle
+  const [generating, setGenerating] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
-  const [activeImage, setActiveImage] = useState(null);
+  const [imageItems, setImageItems] = useState([]);
+  const [focusedImgIndex, setFocusedImgIndex] = useState(0);
+  const [lightboxImg, setLightboxImg] = useState(null);
+  const [sessionLineage, setSessionLineage] = useState([]);
 
-  // ── Inline Edit Panel states ──────────────────────────────
-  const [activeTool, setActiveTool] = useState(null); // 'relight' | 'skin' | 'camera'
-  
-  // Relight tool parameters
-  const [lightRotate, setLightRotate] = useState(45);
-  const [lightElevation, setLightElevation] = useState(30);
-  const [lightColorHex, setLightColorHex] = useState("#ffaa33");
-  
-  // Skin Enhancer tool parameters
-  const [skinVersion, setSkinVersion] = useState("Flexible");
-  const [skinOptimize, setSkinOptimize] = useState("Enhance skin");
-  const [skinSharpen, setSkinSharpen] = useState(0);
-  const [skinGrain, setSkinGrain] = useState(13);
+  // Dedicated Image Edit & Iteration Mode
+  const [editMode, setEditMode] = useState(false);
+  const [editTargetIndex, setEditTargetIndex] = useState(0);
+  const [editInstruction, setEditInstruction] = useState("");
+  const [editGenerating, setEditGenerating] = useState(false);
 
-  // Camera Angle tool parameters
-  const [camRotate, setCamRotate] = useState(0);
-  const [camVertical, setCamVertical] = useState(0);
-  const [camZoom, setCamZoom] = useState(5);
+  // Popovers
+  const [showCameraPopover, setShowCameraPopover] = useState(false);
+  const [showRelightPopover, setShowRelightPopover] = useState(false);
+  const [showSkinPopover, setShowSkinPopover] = useState(false);
+  const [upscaling, setUpscaling] = useState(false);
 
-  const [isEditing, setIsEditing] = useState(false);
+  const pollingRef = useRef(null);
 
-  // ── Load styles dynamic catalog ───────────────────────────
-  useEffect(() => {
-    fetch("/bff/genfy/styles")
-      .then(res => res.json())
-      .then(data => {
-        setCatalog(data);
-        setLoadingCatalog(false);
-      })
-      .catch(() => {
-        showToast("Failed to fetch style catalog from BFF");
-        setLoadingCatalog(false);
-      });
-
-    try {
-      const seed = localStorage.getItem("genfy_seed_prompt");
-      if (seed) {
-        setPrompt(seed);
-        localStorage.removeItem("genfy_seed_prompt");
-        showToast("Pre-filled prompt from Copy Agent!");
-      }
-    } catch (_) {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Poll current session ─────────────────────────────────
-  const pollTimerRef = useRef(null);
-  const pollTimeoutRef = useRef(null);
-
-  const startPolling = (sessionId) => {
-    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-
-    // Safety: stop polling after 90 seconds no matter what
-    pollTimeoutRef.current = setTimeout(() => {
-      clearInterval(pollTimerRef.current);
-      setIsGenerating(false);
-      setIsEditing(false);
-      showToast("Generation timed out after 90 seconds.");
-    }, 90000);
-
-    pollTimerRef.current = setInterval(() => {
-      fetch(`/bff/genfy/sessions/${sessionId}`)
-        .then(res => res.json())
-        .then(data => {
-          // API wraps result under data.session; fall back to data.images for compat
-          const imagesArr = (data && data.session && data.session.images) || (data && data.images);
-          if (imagesArr) {
-            // Update live states
-            const allImages = imagesArr;
-            setGeneratedImages(allImages);
-
-            const active = allImages[0];
-            if (active) {
-              setActiveImage(active);
-            }
-
-            // Check if all images finished (none still pending)
-            const pending = allImages.some(img => img.status === "pending");
-            if (!pending) {
-              clearTimeout(pollTimeoutRef.current);
-              clearInterval(pollTimerRef.current);
-              setIsGenerating(false);
-              setIsEditing(false);
-              const anyCompleted = allImages.some(img => img.status === "completed");
-              const anyFailed    = allImages.some(img => img.status === "failed");
-              if (anyCompleted) {
-                showToast("Image generation complete!");
-              } else if (anyFailed) {
-                showToast("Generation failed — check image for details.");
-              }
-            }
-          }
-        })
-        .catch(err => {
-          console.error("Polling error:", err);
-        });
-    }, 2000);
-  };
-
+  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      clearInterval(pollTimerRef.current);
-      clearTimeout(pollTimeoutRef.current);
+      if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, []);
 
-  // ── Trigger standard generation ─────────────────────────
+  const formatImageUrl = (url) => {
+    if (!url || typeof url !== "string") return "";
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) {
+      return url;
+    }
+    return `https://genfyy.in${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
+  const toggleThumb = (catKey, id) => {
+    setSelections((prev) => {
+      const next = { ...prev };
+      if (next[catKey] === id) {
+        delete next[catKey];
+      } else {
+        next[catKey] = id;
+      }
+      return next;
+    });
+  };
+
+  const removeChip = (catKey) => {
+    setSelections((prev) => {
+      const next = { ...prev };
+      delete next[catKey];
+      return next;
+    });
+  };
+
+  const handleBrandEnhance = async () => {
+    if (!prompt.trim() || isEnhancingBrand) return;
+    setIsEnhancingBrand(true);
+    try {
+      const res = await fetch("/bff/genfy/enhance-brand-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, campaign_id: "" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.enhanced_prompt) {
+          setPrompt(data.enhanced_prompt);
+          if (showToast) showToast("Prompt enhanced with Brand Intelligence!");
+        }
+      }
+    } catch (e) {
+      console.warn("Brand enhance fallback:", e);
+    } finally {
+      setIsEnhancingBrand(false);
+    }
+  };
+
+  // ── Core Generation API Call ──
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      showToast("Please enter a prompt first.");
-      return;
-    }
+    if (!prompt.trim() || generating) return;
 
-    setIsGenerating(true);
-    showToast("Starting image generation session...");
+    setGenerating(true);
+    setView("canvas"); // Switch to canvas view to watch generation
 
-    // Build compound prompt incorporating styles
-    let finalPrompt = prompt.trim();
-    const styleParts = [];
-    if (selectedStyle && catalog) {
-      const item = catalog.categories.style.find(x => x.id === selectedStyle);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedMedium && catalog) {
-      const item = catalog.categories.medium.find(x => x.id === selectedMedium);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedLighting && catalog) {
-      const item = catalog.categories.lighting.find(x => x.id === selectedLighting);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedComposition && catalog) {
-      const item = catalog.categories.composition.find(x => x.id === selectedComposition);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedCamera && catalog) {
-      const item = catalog.categories.camera.find(x => x.id === selectedCamera);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedLens && catalog) {
-      const item = catalog.categories.lens.find(x => x.id === selectedLens);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedMood && catalog) {
-      const item = catalog.categories.mood.find(x => x.id === selectedMood);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedColor && catalog) {
-      const item = catalog.categories.color.find(x => x.id === selectedColor);
-      if (item) styleParts.push(item.prompt);
-    }
-    if (selectedCameraBody && catalog) {
-      const item = catalog.categories.camera_body.find(x => x.id === selectedCameraBody);
-      if (item) styleParts.push(item.prompt);
-    }
+    let fullPrompt = prompt.trim();
+    const activeStylePrompts = [];
+    Object.entries(selections).forEach(([catKey, valId]) => {
+      const item = cats[catKey]?.find((x) => x.id === valId);
+      if (item?.prompt) activeStylePrompts.push(item.prompt);
+    });
 
-    if (styleParts.length > 0) {
-      finalPrompt = `${finalPrompt}, ${styleParts.join(", ")}`;
+    if (activeStylePrompts.length > 0) {
+      fullPrompt += ` -- ${activeStylePrompts.join(", ")}`;
     }
-
-    // Build categories map for Genfy API
-    const categories = {};
-    if (selectedStyle) categories.style = selectedStyle;
-    if (selectedMedium) categories.medium = selectedMedium;
-    if (selectedLighting) categories.lighting = selectedLighting;
-    if (selectedComposition) categories.composition = selectedComposition;
-    if (selectedCamera) categories.camera = selectedCamera;
-    if (selectedLens) categories.lens = selectedLens;
-    if (selectedMood) categories.mood = selectedMood;
-    if (selectedColor) categories.color = selectedColor;
-    if (selectedCameraBody) categories.camera_body = selectedCameraBody;
+    if (ratio?.prompt) fullPrompt += `, ${ratio.prompt}`;
+    if (quality?.prompt) fullPrompt += `, ${quality.prompt}`;
 
     try {
       const payload = {
-        prompt: finalPrompt,
-        model_ids: selectedModels,
-        ratio: selectedRatio,
-        quality: selectedQuality,
-        categories: categories,
+        prompt: fullPrompt,
+        model_ids: [selectedModel],
+        ratio: ratio.id,
+        quality: quality.id,
+        active_configs: selections,
+        style_preset: selections.style || "",
+        iterations: 1,
       };
 
-      if (selectedModels.includes("ChatGPT")) {
-        payload.chatgpt_model = chatgptModel;
-      }
-
-      const response = await fetch("/bff/genfy/sessions", {
+      const res = await fetch("/bff/genfy/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-      if (response.ok && data.session_id) {
-        setCurrentSessionId(data.session_id);
-        startPolling(data.session_id);
-      } else {
-        setIsGenerating(false);
-        showToast(data.detail || "Failed to start session.");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Server returned ${res.status}`);
       }
+
+      const data = await res.json();
+      const sessionId = data.id || data.session_id;
+
+      if (!sessionId) throw new Error("No session ID returned from Genfy server");
+
+      setCurrentSessionId(sessionId);
+      setSessionLineage((prev) => [
+        {
+          id: sessionId,
+          prompt: prompt.trim(),
+          model: selectedModel,
+          ratio: ratio.id,
+          quality: quality.id,
+          timestamp: new Date().toLocaleTimeString(),
+          images: [],
+          status: "processing",
+        },
+        ...prev,
+      ]);
+
+      pollSession(sessionId);
     } catch (err) {
-      setIsGenerating(false);
-      showToast("Error communicating with Genfy backend.");
+      console.error("Genfy generation failed:", err);
+      setGenerating(false);
+      if (showToast) showToast(err.message || "Failed to start generation.");
     }
   };
 
-  // ── Trigger post-gen edit tool ───────────────────────────
+  const pollSession = (sessionId) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    pollingRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch(`/bff/genfy/sessions/${sessionId}`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const rawImgs = data.session?.images || data.images || [];
+
+        const completedImgs = rawImgs.filter((img) => {
+          if (typeof img === "string") return true;
+          return img && img.status === "completed" && img.url;
+        });
+
+        if (completedImgs.length > 0) {
+          const formatted = completedImgs
+            .map((img) => (typeof img === "string" ? img : img.url))
+            .map(formatImageUrl)
+            .filter(Boolean);
+
+          if (formatted.length > 0) {
+            const rawFirst = completedImgs[0];
+            const firstId =
+              (typeof rawFirst === "object" && (rawFirst.id || rawFirst.image_id)) ||
+              `img-${Date.now()}`;
+
+            const newItem = {
+              id: firstId,
+              url: formatted[0],
+              prompt: prompt.trim(),
+              sessionId: sessionId,
+              model: selectedModel,
+              ratio: ratio.id,
+              quality: quality.id,
+              iteration: 1,
+              type: "original",
+              createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+
+            setImageItems((prev) => [newItem, ...prev.filter((x) => x.sessionId !== sessionId)]);
+            setGeneratedImages((prev) => [...new Set([...formatted, ...prev])]);
+            setSessionLineage((prev) =>
+              prev.map((s) => (s.id === sessionId ? { ...s, images: formatted, status: "complete" } : s))
+            );
+            clearInterval(pollingRef.current);
+            setGenerating(false);
+            setFocusedImgIndex(0);
+            if (showToast) showToast("Image generated successfully!");
+            return;
+          }
+        }
+
+        const isFailed =
+          data.status === "failed" ||
+          data.status === "error" ||
+          rawImgs.some((img) => typeof img === "object" && img?.status === "failed");
+
+        if (isFailed) {
+          clearInterval(pollingRef.current);
+          setGenerating(false);
+          if (showToast) showToast(data.error || "Generation failed on Genfy server");
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(pollingRef.current);
+          setGenerating(false);
+          if (showToast) showToast("Generation timed out. Please try again.");
+        }
+      } catch (e) {
+        console.warn("Polling error:", e);
+      }
+    }, 2000);
+  };
+
+  // ── Image Edit & Variation Handlers ──
+  const startEditing = (idx = focusedImgIndex) => {
+    setEditTargetIndex(idx);
+    setEditMode(true);
+    setEditInstruction("");
+    setView("canvas");
+  };
+
+  const cancelEditing = () => {
+    setEditMode(false);
+    setEditInstruction("");
+  };
+
   const handleApplyEdit = async () => {
-    if (!activeImage || !currentSessionId) return;
-    
-    setIsEditing(true);
-    showToast("Translating controls and applying edit...");
+    if (!editInstruction.trim() || editGenerating) return;
+    setEditGenerating(true);
 
-    let translateUrl = "";
-    let translateBody = {};
-
-    if (activeTool === "relight") {
-      translateUrl = "/bff/genfy/tools/relight/translate";
-      translateBody = { rotate: parseFloat(lightRotate), elevation: parseFloat(lightElevation), color_hex: lightColorHex };
-    } else if (activeTool === "skin") {
-      translateUrl = "/bff/genfy/tools/skin-enhancer/translate";
-      translateBody = { version: skinVersion, optimize_for: skinOptimize, sharpen: parseInt(skinSharpen), smart_grain: parseInt(skinGrain) };
-    } else if (activeTool === "camera") {
-      translateUrl = "/bff/genfy/tools/camera/translate";
-      translateBody = { rotate: parseFloat(camRotate), vertical: parseFloat(camVertical), zoom: parseFloat(camZoom) };
-    }
+    const source = imageItems[editTargetIndex] || {
+      id: "img-source",
+      url: generatedImages[editTargetIndex],
+      sessionId: currentSessionId,
+      iteration: editTargetIndex + 1,
+      prompt: prompt,
+    };
 
     try {
-      // 1. Translate controls to text instruction
-      const translateRes = await fetch(translateUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(translateBody)
-      });
-      const translateData = await translateRes.json();
+      let childSessionId = null;
 
-      if (!translateRes.ok || !translateData.instruction) {
-        setIsEditing(false);
-        showToast("Failed to translate edit controls.");
-        return;
+      // 1. Try dedicated image edit endpoint on live server
+      if (source.sessionId && source.id) {
+        try {
+          const editPayload = {
+            edit_prompt: editInstruction.trim(),
+            ratio: ratio.id,
+            quality: quality.id,
+            config_overrides: selections,
+          };
+          const res = await fetch(`/bff/genfy/sessions/${source.sessionId}/images/${source.id}/edit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(editPayload),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            childSessionId = data.child_session_id || data.session_id;
+          }
+        } catch (e) {
+          console.warn("Direct image edit call failed, trying fallback:", e);
+        }
       }
 
-      // 2. Submit edit session request
-      const imgId = activeImage.image_id || activeImage.id;
-      const editRes = await fetch(`/bff/genfy/sessions/${currentSessionId}/images/${imgId}/edit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          edit_prompt: translateData.instruction,
-          ratio: selectedRatio,
-          quality: selectedQuality,
-          model_ids: [activeImage.model_id]
-        })
-      });
-
-      const editData = await editRes.json();
-      if (editRes.ok && editData.child_session_id) {
-        startPolling(editData.child_session_id);
-      } else {
-        setIsEditing(false);
-        showToast(editData.detail || "Failed to start edit session.");
+      // 2. Fallback to /sessions with parent_session_id
+      if (!childSessionId) {
+        const fallbackPayload = {
+          prompt: `${source.prompt || prompt} -- edit: ${editInstruction.trim()}`,
+          model_ids: [selectedModel],
+          ratio: ratio.id,
+          quality: quality.id,
+          parent_session_id: source.sessionId || currentSessionId,
+          active_configs: selections,
+          iterations: 1,
+        };
+        const res = await fetch("/bff/genfy/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fallbackPayload),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server returned ${res.status}`);
+        }
+        const data = await res.json();
+        childSessionId = data.session_id || data.id;
       }
+
+      if (!childSessionId) throw new Error("Could not start edit session on Genfy server");
+
+      // 3. Poll edit session
+      let attempts = 0;
+      const maxAttempts = 60;
+      const pollTimer = setInterval(async () => {
+        attempts++;
+        try {
+          const pRes = await fetch(`/bff/genfy/sessions/${childSessionId}`);
+          if (!pRes.ok) return;
+          const pData = await pRes.json();
+          const rawImgs = pData.session?.images || pData.images || [];
+          const completedImgs = rawImgs.filter((img) => {
+            if (typeof img === "string") return true;
+            return img && img.status === "completed" && img.url;
+          });
+
+          if (completedImgs.length > 0) {
+            clearInterval(pollTimer);
+            const firstImg = completedImgs[0];
+            const newUrl = formatImageUrl(typeof firstImg === "string" ? firstImg : firstImg.url);
+            const newEditItem = {
+              id: typeof firstImg === "object" ? (firstImg.id || firstImg.image_id) : `edit-${Date.now()}`,
+              url: newUrl,
+              prompt: `${source.prompt || prompt} (${editInstruction.trim()})`,
+              editInstruction: editInstruction.trim(),
+              sessionId: childSessionId,
+              parentSessionId: source.sessionId,
+              model: selectedModel,
+              ratio: ratio.id,
+              quality: quality.id,
+              iteration: (source.iteration || 1) + 1,
+              type: "edit",
+              createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+
+            setImageItems((prev) => [newEditItem, ...prev]);
+            setGeneratedImages((prev) => [newUrl, ...prev]);
+            setFocusedImgIndex(0);
+            setEditGenerating(false);
+            setEditMode(false);
+            if (showToast) showToast("Edited image iteration generated!");
+            return;
+          }
+
+          if (pData.status === "failed" || pData.status === "error") {
+            clearInterval(pollTimer);
+            setEditGenerating(false);
+            if (showToast) showToast(pData.error || "Edit generation failed on server");
+            return;
+          }
+
+          if (attempts >= maxAttempts) {
+            clearInterval(pollTimer);
+            setEditGenerating(false);
+            if (showToast) showToast("Edit generation timed out.");
+          }
+        } catch (e) {
+          console.warn("Edit poll error:", e);
+        }
+      }, 2000);
     } catch (err) {
-      setIsEditing(false);
-      showToast("Error connecting to backend services.");
+      console.error("Edit generation failed:", err);
+      setEditGenerating(false);
+      if (showToast) showToast(err.message || "Failed to start edit generation.");
     }
+  };
+
+  const handleApplyCamera = (instruction) => {
+    setShowCameraPopover(false);
+    if (editMode) {
+      setEditInstruction((prev) => `${prev.trim() ? prev.trim() + ", " : ""}${instruction}`);
+    } else {
+      setPrompt((prev) => `${prev.trim()}, ${instruction}`);
+    }
+    if (showToast) showToast("Camera angle applied");
+  };
+
+  const handleApplyRelight = (instruction) => {
+    setShowRelightPopover(false);
+    if (editMode) {
+      setEditInstruction((prev) => `${prev.trim() ? prev.trim() + ", " : ""}${instruction}`);
+    } else {
+      setPrompt((prev) => `${prev.trim()}, ${instruction}`);
+    }
+    if (showToast) showToast("Lighting setup applied");
+  };
+
+  const handleApplySkin = (instruction) => {
+    setShowSkinPopover(false);
+    if (editMode) {
+      setEditInstruction((prev) => `${prev.trim() ? prev.trim() + ", " : ""}${instruction}`);
+    } else {
+      setPrompt((prev) => `${prev.trim()}, ${instruction}`);
+    }
+    if (showToast) showToast("Skin enhancer applied");
   };
 
   const handleUpscale = async () => {
-    if (!activeImage) return;
-    showToast("Submitting upscale task...");
-    const imgId = activeImage.image_id || activeImage.id;
+    const curImg = generatedImages[focusedImgIndex];
+    if (!curImg || upscaling) return;
+    setUpscaling(true);
     try {
-      const response = await fetch("/bff/genfy/upscale", {
+      const res = await fetch("/bff/genfy/upscale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_id: imgId })
+        body: JSON.stringify({ image_url: curImg, scale: 2 }),
       });
-      if (response.ok) {
-        showToast("Upscale task started successfully!");
-      } else {
-        const data = await response.json();
-        showToast(data.detail || "Failed to trigger upscale.");
+      if (!res.ok) throw new Error("Upscale request failed");
+      const data = await res.json();
+      if (data.url || data.upscaled_url) {
+        const newUrl = formatImageUrl(data.url || data.upscaled_url);
+        setGeneratedImages((prev) => [newUrl, ...prev]);
+        setFocusedImgIndex(0);
+        if (showToast) showToast("Upscaled image ready in Ultra 4K!");
       }
-    } catch (err) {
-      showToast("Error connecting to upscale services.");
+    } catch (e) {
+      if (showToast) showToast("Upscale failed: " + e.message);
+    } finally {
+      setUpscaling(false);
     }
   };
 
-  // Toggle model selection helper
-  const toggleModel = (model) => {
-    if (selectedModels.includes(model)) {
-      if (selectedModels.length > 1) {
-        setSelectedModels(selectedModels.filter(m => m !== model));
-      }
-    } else {
-      setSelectedModels([...selectedModels, model]);
-    }
-  };
+  const activeImageUrl = generatedImages[focusedImgIndex] || null;
+
+  // Filter items in active category by search term
+  const activeItems = (cats[activeCat] || []).filter((item) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      item.label.toLowerCase().includes(term) ||
+      (item.desc && item.desc.toLowerCase().includes(term))
+    );
+  });
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 64px)", fontFamily: FONT }}>
-      {/* ── Settings Sidebar Rail ───────────────────────────── */}
-      <div
-        style={{
-          width: 320,
-          background: t.surface,
-          borderRight: `1px solid ${t.border}`,
-          display: "flex",
-          flexDirection: "column",
-          overflowY: "auto",
-          padding: 24,
-        }}
-      >
-        <Eyebrow t={t}>Engine Config</Eyebrow>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 20px" }}>
-          <img
-            src="/images/genfy_logo.png"
-            alt="Genfy Logo"
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        minHeight: "calc(100vh - 65px)",
+        padding: "20px 32px 40px",
+        fontFamily: FONT,
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* ── Header Row (matching Prompts Library in Image 1) ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div
             style={{
-              height: "28px",
-              width: "auto",
-              objectFit: "contain",
-              filter: t.bg === "#151311" ? "none" : "invert(1) hue-rotate(180deg)",
+              fontFamily: FONT,
+              fontWeight: 700,
+              fontSize: 24,
+              letterSpacing: "-.02em",
+              color: t.text,
             }}
-          />
-        </div>
-
-        {/* Models list */}
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: t.text2, display: "block", marginBottom: 10 }}>
-            Active Models
-          </label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {catalog && catalog.models ? (
-              catalog.models.map(m => (
-                <div
-                  key={m.id}
-                  onClick={() => !m.coming_soon && toggleModel(m.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
-                    background: selectedModels.includes(m.id) ? t.accentSoft : t.bg,
-                    border: `1px solid ${selectedModels.includes(m.id) ? t.accent : t.border}`,
-                    borderRadius: 8,
-                    cursor: m.coming_soon ? "not-allowed" : "pointer",
-                    opacity: m.coming_soon ? 0.5 : 1,
-                    transition: "all .2s"
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedModels.includes(m.id)}
-                    disabled={m.coming_soon}
-                    onChange={() => {}}
-                    style={{ accentColor: t.accent }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: selectedModels.includes(m.id) ? t.accentText : t.text }}>
-                      {m.id}
-                    </span>
-                  </div>
-                  {m.coming_soon && (
-                    <span style={{ fontSize: 9.5, fontFamily: MONO, background: t.surface, padding: "2px 5px", borderRadius: 4, border: `1px solid ${t.border}` }}>
-                      SOON
-                    </span>
-                  )}
-                </div>
-              ))
-            ) : (
-              <span style={{ fontSize: 12, color: t.text3 }}>Loading models list...</span>
-            )}
+          >
+            Genfy Image Studio
+          </div>
+          <div style={{ fontSize: 12.5, color: t.text3, letterSpacing: "0em" }}>
+            Generate, style, and edit images using live Genfy AI models and cinematic presets.
           </div>
         </div>
 
-        {/* Aspect ratios */}
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: t.text2, display: "block", marginBottom: 10 }}>
-            Aspect Ratio
-          </label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-            {catalog && catalog.ratios ? (
-              catalog.ratios.map(r => (
-                <button
-                  key={r.id}
-                  onClick={() => setSelectedRatio(r.id)}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* View Switcher Pill */}
+          <div
+            style={{
+              display: "flex",
+              background: t.surface2,
+              border: `1px solid ${t.border}`,
+              borderRadius: R.pill,
+              padding: "3px",
+              gap: "4px",
+            }}
+          >
+            <button
+              onClick={() => setView("presets")}
+              style={{
+                background: view === "presets" ? (t.bg === "#151311" ? t.surface : "#ffffff") : "transparent",
+                border: "none",
+                borderRadius: R.pill,
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: view === "presets" ? 700 : 500,
+                color: view === "presets" ? t.text : t.text3,
+                cursor: "pointer",
+                boxShadow: view === "presets" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <Palette size={13} />
+              Presets & Prompt
+            </button>
+            <button
+              onClick={() => setView("canvas")}
+              style={{
+                background: view === "canvas" ? (t.bg === "#151311" ? t.surface : "#ffffff") : "transparent",
+                border: "none",
+                borderRadius: R.pill,
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: view === "canvas" ? 700 : 500,
+                color: view === "canvas" ? t.text : t.text3,
+                cursor: "pointer",
+                boxShadow: view === "canvas" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <Film size={13} />
+              Studio Canvas
+              {generatedImages.length > 0 && (
+                <span
                   style={{
-                    background: selectedRatio === r.id ? t.accentSoft : t.bg,
-                    border: `1px solid ${selectedRatio === r.id ? t.accent : t.border}`,
-                    borderRadius: 6,
-                    padding: "10px 4px",
-                    cursor: "pointer",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 5,
-                    transition: "all .2s"
+                    fontSize: 10,
+                    background: t.accent || "#FF6B2B",
+                    color: "#fff",
+                    padding: "1px 6px",
+                    borderRadius: 10,
+                    fontWeight: 700,
                   }}
                 >
-                  <span style={{ fontSize: 10, fontWeight: 700, color: selectedRatio === r.id ? t.accentText : t.text2 }}>
-                    {r.id}
-                  </span>
-                  <span style={{ fontSize: 9, color: t.text3, textTransform: "uppercase" }}>
-                    {r.label.split(" ")[1] || r.label.split(" ")[0]}
-                  </span>
-                </button>
-              ))
-            ) : (
-              <span style={{ fontSize: 12, color: t.text3 }}>Loading ratios...</span>
-            )}
+                  {generatedImages.length}
+                </span>
+              )}
+            </button>
           </div>
-        </div>
 
-        {/* Quality level */}
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: t.text2, display: "block", marginBottom: 10 }}>
-            Quality Tier
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            {catalog && catalog.qualities ? (
-              catalog.qualities.map(q => (
-                <button
-                  key={q.id}
-                  onClick={() => setSelectedQuality(q.id)}
-                  style={{
-                    flex: 1,
-                    background: selectedQuality === q.id ? t.accentSoft : t.bg,
-                    border: `1px solid ${selectedQuality === q.id ? t.accent : t.border}`,
-                    borderRadius: 6,
-                    padding: "8px 0",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: selectedQuality === q.id ? t.accentText : t.text,
-                    transition: "all .2s"
-                  }}
-                >
-                  {q.id} ({q.resolution})
-                </button>
-              ))
-            ) : (
-              <span style={{ fontSize: 12, color: t.text3 }}>Loading quality tiers...</span>
-            )}
-          </div>
+          {/* Back to Tools Button */}
+          <button
+            onClick={() => nav("tools")}
+            style={{
+              fontFamily: MONO,
+              fontSize: 11.5,
+              color: t.text2,
+              background: t.surface2,
+              border: `1px solid ${t.border}`,
+              borderRadius: R.pill,
+              padding: "6px 14px",
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            ← Back to tools
+          </button>
         </div>
       </div>
 
-      {/* ── Main Canvas Area ──────────────────────────────── */}
+      {/* ── Main Container Card ── */}
       <div
         style={{
+          background: t.bg === "#151311" ? t.surface : "#ffffff",
+          border: `1px solid ${t.border}`,
+          borderRadius: R.md,
+          overflow: "hidden",
           flex: 1,
-          background: t.bg,
           display: "flex",
           flexDirection: "column",
-          overflowY: "auto",
+          minHeight: "calc(100vh - 160px)",
+          padding: "24px 28px",
+          boxShadow: t.shadow || "0 2px 8px rgba(0,0,0,0.04)",
         }}
       >
-        {/* Top prompt bar */}
-        <div
-          style={{
-            padding: 32,
-            borderBottom: `1px solid ${t.border}`,
-            background: t.surface,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16
-          }}
-        >
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1, position: "relative" }}>
-              <textarea
-                value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                placeholder="A warm golden hour portrait of an athlete in city commuter outerwear..."
-                style={{
-                  width: "100%",
-                  height: 64,
-                  padding: "12px 16px",
-                  borderRadius: 12,
-                  border: `1px solid ${t.borderStrong}`,
-                  background: t.bg,
-                  color: t.text,
-                  fontFamily: FONT,
-                  fontSize: 14.5,
-                  resize: "none",
-                  outline: "none",
-                }}
-              />
-            </div>
-            <Btn
-              t={t}
-              hue="#E8552A"
-              disabled={isGenerating || isEditing}
-              onClick={handleGenerate}
-              style={{ padding: "0 28px", height: 64, borderRadius: 12, display: "flex", gap: 10, alignItems: "center" }}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {/* ── VIEW 1: PRESETS & PROMPT (Matching Image 1) ──            */}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {view === "presets" && (
+          <div>
+            {/* Top Prompt Search & Action Bar */}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                marginBottom: 20,
+                flexWrap: "wrap",
+              }}
             >
-              {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-              <span style={{ fontWeight: 700 }}>Generate</span>
-            </Btn>
-          </div>
-
-          {/* Active selections strip */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>Styles:</span>
-            {selectedStyle && (
-              <Chip t={t} removable onRemove={() => setSelectedStyle(null)}>Style: {selectedStyle}</Chip>
-            )}
-            {selectedMedium && (
-              <Chip t={t} removable onRemove={() => setSelectedMedium(null)}>Medium: {selectedMedium}</Chip>
-            )}
-            {selectedLighting && (
-              <Chip t={t} removable onRemove={() => setSelectedLighting(null)}>Lighting: {selectedLighting}</Chip>
-            )}
-            {selectedComposition && (
-              <Chip t={t} removable onRemove={() => setSelectedComposition(null)}>Composition: {selectedComposition}</Chip>
-            )}
-            {selectedCamera && (
-              <Chip t={t} removable onRemove={() => setSelectedCamera(null)}>Camera: {selectedCamera}</Chip>
-            )}
-            {selectedLens && (
-              <Chip t={t} removable onRemove={() => setSelectedLens(null)}>Lens: {selectedLens}</Chip>
-            )}
-            {selectedMood && (
-              <Chip t={t} removable onRemove={() => setSelectedMood(null)}>Mood: {selectedMood}</Chip>
-            )}
-            {selectedColor && (
-              <Chip t={t} removable onRemove={() => setSelectedColor(null)}>Color: {selectedColor}</Chip>
-            )}
-            {selectedCameraBody && (
-              <Chip t={t} removable onRemove={() => setSelectedCameraBody(null)}>Body: {selectedCameraBody}</Chip>
-            )}
-            {!selectedStyle && !selectedMedium && !selectedLighting && !selectedComposition && !selectedCamera && !selectedLens && !selectedMood && !selectedColor && !selectedCameraBody && (
-              <span style={{ fontSize: 12, color: t.text3, fontStyle: "italic" }}>None selected (Off-grid default)</span>
-            )}
-          </div>
-        </div>
-
-        {/* Content workspace */}
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-          {/* Main output canvas & style categories */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto", padding: 32, gap: 32 }}>
-            
-            {/* Live generation result card */}
-            {isGenerating && (
+              {/* Prompt Input Box */}
               <div
                 style={{
-                  background: t.surface,
-                  border: `1px solid ${t.border}`,
-                  borderRadius: 16,
-                  padding: 24,
+                  flex: 1,
+                  minWidth: 280,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  gap: 16,
-                  boxShadow: t.shadow
+                  background: t.surface,
+                  border: `1px solid ${t.border}`,
+                  borderRadius: R.sm,
+                  padding: "0 12px",
+                  height: 42,
                 }}
               >
-                <Loader2 className="animate-spin" size={24} style={{ color: t.accent }} />
-                <div>
-                  <h4 style={{ fontWeight: 700, color: t.text, margin: 0 }}>Generating Visuals...</h4>
-                  <p style={{ fontSize: 12.5, color: t.text2, margin: "2px 0 0" }}>
-                    Polling Genfy backend for results. This typically takes 15–30 seconds.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Generated display workspace */}
-            {activeImage && (
-              <div style={{ display: "flex", gap: 24, background: t.surface, padding: 24, borderRadius: 16, border: `1px solid ${t.border}` }}>
-                {/* Visual canvas */}
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-                  <div
+                <input
+                  type="text"
+                  placeholder="Describe the image you want to generate (e.g. A hyperrealistic cybernetic tiger in Tokyo)..."
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleGenerate();
+                  }}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    fontSize: 13,
+                    color: t.text,
+                    fontFamily: FONT,
+                  }}
+                />
+                {prompt.length > 0 && (
+                  <button
+                    onClick={() => setPrompt("")}
                     style={{
-                      width: "100%",
-                      maxWidth: 500,
-                      aspectRatio: activeImage.url ? "auto" : "1/1",
-                      borderRadius: 12,
-                      overflow: "hidden",
-                      background: t.bg,
-                      border: `1px solid ${t.border}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative"
+                      background: "none",
+                      border: "none",
+                      color: t.text3,
+                      cursor: "pointer",
+                      padding: 4,
                     }}
                   >
-                    {activeImage.status === "pending" ? (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                        <Loader2 className="animate-spin" size={32} style={{ color: t.accent }} />
-                        <span style={{ fontSize: 12, color: t.text3 }}>Processing image...</span>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Model Selector Dropdown */}
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => {
+                    setModelOpen(!modelOpen);
+                    setRatioOpen(false);
+                    setQualOpen(false);
+                  }}
+                  style={{
+                    height: 42,
+                    padding: "0 14px",
+                    borderRadius: R.sm,
+                    background: t.surface,
+                    border: `1px solid ${modelOpen ? t.text : t.border}`,
+                    color: t.text,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Sliders size={13} color={t.text3} />
+                  <span>{selectedModel}</span>
+                  <span style={{ fontSize: 9, opacity: 0.5 }}>▼</span>
+                </button>
+                {modelOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      background: t.bg === "#151311" ? t.surface : "#ffffff",
+                      border: `1px solid ${t.border}`,
+                      borderRadius: R.sm,
+                      padding: 6,
+                      minWidth: 180,
+                      zIndex: 100,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    }}
+                  >
+                    {INTEGRATED_MODELS.map((m) => (
+                      <div
+                        key={m}
+                        onClick={() => {
+                          setSelectedModel(m);
+                          setModelOpen(false);
+                        }}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          color: selectedModel === m ? t.accent : t.text,
+                          fontWeight: selectedModel === m ? 700 : 500,
+                          background: selectedModel === m ? t.surface2 : "transparent",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span>{m}</span>
+                        {selectedModel === m && <Check size={13} />}
                       </div>
-                    ) : activeImage.status === "failed" ? (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: 20, textAlign: "center" }}>
-                        <X size={32} style={{ color: t.danger }} />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Generation Failed</span>
-                        <span style={{ fontSize: 11, color: t.text3 }}>{activeImage.error_msg}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Ratio Selector Dropdown */}
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => {
+                    setRatioOpen(!ratioOpen);
+                    setModelOpen(false);
+                    setQualOpen(false);
+                  }}
+                  style={{
+                    height: 42,
+                    padding: "0 14px",
+                    borderRadius: R.sm,
+                    background: t.surface,
+                    border: `1px solid ${ratioOpen ? t.text : t.border}`,
+                    color: t.text,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span>Ratio: {ratio.id}</span>
+                  <span style={{ fontSize: 9, opacity: 0.5 }}>▼</span>
+                </button>
+                {ratioOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      background: t.bg === "#151311" ? t.surface : "#ffffff",
+                      border: `1px solid ${t.border}`,
+                      borderRadius: R.sm,
+                      padding: 8,
+                      minWidth: 220,
+                      zIndex: 100,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    }}
+                  >
+                    {ratioData.slice(0, 6).map((r) => (
+                      <div
+                        key={r.id}
+                        onClick={() => {
+                          setRatio(r);
+                          setRatioOpen(false);
+                        }}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          color: ratio.id === r.id ? t.accent : t.text,
+                          fontWeight: ratio.id === r.id ? 700 : 500,
+                          background: ratio.id === r.id ? t.surface2 : "transparent",
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span>{r.id} ({r.name})</span>
+                        {ratio.id === r.id && <Check size={13} />}
                       </div>
-                    ) : (
-                      <img
-                        src={activeImage.url}
-                        alt="Generated visual"
-                        style={{ width: "100%", height: "auto", display: "block" }}
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Quality Selector Dropdown */}
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => {
+                    setQualOpen(!qualOpen);
+                    setRatioOpen(false);
+                    setModelOpen(false);
+                  }}
+                  style={{
+                    height: 42,
+                    padding: "0 14px",
+                    borderRadius: R.sm,
+                    background: t.surface,
+                    border: `1px solid ${qualOpen ? t.text : t.border}`,
+                    color: t.text,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span>Quality: {quality.id}</span>
+                  <span style={{ fontSize: 9, opacity: 0.5 }}>▼</span>
+                </button>
+                {qualOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      background: t.bg === "#151311" ? t.surface : "#ffffff",
+                      border: `1px solid ${t.border}`,
+                      borderRadius: R.sm,
+                      padding: 6,
+                      minWidth: 190,
+                      zIndex: 100,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    }}
+                  >
+                    {qualityData.map((q) => (
+                      <div
+                        key={q.id}
+                        onClick={() => {
+                          setQuality(q);
+                          setQualOpen(false);
+                        }}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          color: quality.id === q.id ? t.accent : t.text,
+                          fontWeight: quality.id === q.id ? 700 : 500,
+                          background: quality.id === q.id ? t.surface2 : "transparent",
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <span>{q.label} ({q.res})</span>
+                        {quality.id === q.id && <Check size={13} />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Brand Enhance Button */}
+              <button
+                onClick={handleBrandEnhance}
+                disabled={isEnhancingBrand || !prompt.trim()}
+                style={{
+                  height: 42,
+                  padding: "0 14px",
+                  borderRadius: R.sm,
+                  background: t.surface2,
+                  border: `1px solid ${t.border}`,
+                  color: isEnhancingBrand || !prompt.trim() ? t.text3 : t.text,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: isEnhancingBrand || !prompt.trim() ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.15s",
+                }}
+              >
+                <Sparkles size={14} color="#10A37F" />
+                <span>{isEnhancingBrand ? "Enhancing..." : "Enhance"}</span>
+              </button>
+
+              {/* Primary Generate Button (matching Write your own > from Image 1) */}
+              <button
+                onClick={handleGenerate}
+                disabled={generating || !prompt.trim()}
+                style={{
+                  height: 42,
+                  padding: "0 20px",
+                  borderRadius: R.sm,
+                  background: "#000000",
+                  color: "#ffffff",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: generating || !prompt.trim() ? "not-allowed" : "pointer",
+                  opacity: generating || !prompt.trim() ? 0.45 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  transition: "all 0.15s",
+                }}
+              >
+                <span>{generating ? "Generating..." : "Generate Image"}</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+
+            {/* ── Category Cards Row (matching the 6 category cards in Image 1) ── */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: 12,
+                marginBottom: 24,
+              }}
+            >
+              {CATEGORY_TABS.map((cat) => {
+                const IconComponent = cat.icon;
+                const isSelected = activeCat === cat.id;
+                const hasSelectedItems = Boolean(selections[cat.id]);
+
+                return (
+                  <div
+                    key={cat.id}
+                    onClick={() => setActiveCat(cat.id)}
+                    style={{
+                      padding: "14px 12px",
+                      borderRadius: R.sm,
+                      border: isSelected ? "2px solid #000000" : `1px solid ${t.border}`,
+                      background: isSelected
+                        ? (t.bg === "#151311" ? "rgba(255,255,255,0.06)" : "#ffffff")
+                        : t.surface,
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 8,
+                      textAlign: "center",
+                      transition: "all 0.2s",
+                      position: "relative",
+                      boxShadow: isSelected ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.borderColor = t.text2;
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.borderColor = t.border;
+                    }}
+                  >
+                    {/* Icon */}
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        background: isSelected ? "rgba(0,0,0,0.05)" : "#ffffff",
+                        border: `1px solid ${t.border}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: isSelected ? "#000000" : t.text2,
+                      }}
+                    >
+                      <IconComponent size={18} />
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: t.text }}>{cat.label}</div>
+                    {hasSelectedItems && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 6,
+                          right: 6,
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: "#FF6B2B",
+                        }}
                       />
                     )}
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Canvas actions bar */}
-                  {activeImage.status === "completed" && (
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <Btn
-                        t={t}
-                        kind="secondary"
-                        onClick={() => {
-                          const imgId = activeImage.image_id || activeImage.id;
-                          const link = document.createElement("a");
-                          link.href = activeImage.url;
-                          link.download = `genfy-${imgId}.png`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        icon={Download}
-                        style={{ fontSize: 12, padding: "8px 16px" }}
+            {/* ── Active Selections Strip ── */}
+            {Object.keys(selections).length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  padding: "10px 14px",
+                  background: t.surface,
+                  borderRadius: R.sm,
+                  marginBottom: 20,
+                  border: `1px solid ${t.border}`,
+                }}
+              >
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>
+                  Selected Presets:
+                </span>
+                {Object.entries(selections).map(([catKey, id]) => {
+                  const item = cats[catKey]?.find((i) => i.id === id);
+                  if (!item) return null;
+                  return (
+                    <div
+                      key={catKey}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background: "#ffffff",
+                        border: `1px solid ${t.border}`,
+                        padding: "4px 10px",
+                        borderRadius: R.pill,
+                        fontSize: 12,
+                        color: t.text,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {item.img && (
+                        <img
+                          src={item.img}
+                          alt={item.label}
+                          style={{ width: 14, height: 14, borderRadius: 3, objectFit: "cover" }}
+                        />
+                      )}
+                      <span>{item.label}</span>
+                      <span
+                        onClick={() => removeChip(catKey)}
+                        style={{ cursor: "pointer", color: t.text3, marginLeft: 2 }}
                       >
-                        Download
-                      </Btn>
-                      <Btn
-                        t={t}
-                        kind="secondary"
-                        onClick={handleUpscale}
-                        icon={Sparkles}
-                        style={{ fontSize: 12, padding: "8px 16px" }}
-                      >
-                        Upscale
-                      </Btn>
-                    </div>
-                  )}
-                </div>
-
-                {/* Edit & parameters sidebar panel */}
-                <div style={{ width: 280, display: "flex", flexDirection: "column", gap: 20 }}>
-                  <div>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>Model</span>
-                    <h4 style={{ margin: "4px 0 0", color: t.text }}>{activeImage.model_id}</h4>
-                  </div>
-
-                  {activeImage.status === "completed" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: `1px solid ${t.border}`, paddingTop: 16 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", marginBottom: 4 }}>
-                        Creative Refinements
+                        ✕
                       </span>
-                      
-                      {/* Tool selection buttons */}
-                      <button
-                        onClick={() => setActiveTool(activeTool === "relight" ? null : "relight")}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "10px 12px",
-                          borderRadius: 8,
-                          border: `1px solid ${activeTool === "relight" ? t.accent : t.border}`,
-                          background: activeTool === "relight" ? t.accentSoft : t.bg,
-                          color: activeTool === "relight" ? t.accentText : t.text,
-                          cursor: "pointer",
-                          textAlign: "left"
-                        }}
-                      >
-                        <Sun size={18} />
-                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>Relight Tool</span>
-                      </button>
-
-                      {activeTool === "relight" && (
-                        <div style={{ padding: 12, background: t.bg, borderRadius: 8, border: `1px solid ${t.border}`, display: "flex", flexDirection: "column", gap: 12 }}>
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "between", fontSize: 11, color: t.text2, marginBottom: 4 }}>
-                              <span>Rotate: {lightRotate}°</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="-180"
-                              max="180"
-                              value={lightRotate}
-                              onChange={e => setLightRotate(e.target.value)}
-                              style={{ width: "100%", accentColor: t.accent }}
-                            />
-                          </div>
-
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "between", fontSize: 11, color: t.text2, marginBottom: 4 }}>
-                              <span>Elevation: {lightElevation}°</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="-90"
-                              max="90"
-                              value={lightElevation}
-                              onChange={e => setLightElevation(e.target.value)}
-                              style={{ width: "100%", accentColor: t.accent }}
-                            />
-                          </div>
-
-                          <div>
-                            <span style={{ fontSize: 11, color: t.text2, display: "block", marginBottom: 6 }}>Light Presets</span>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              {catalog && catalog.relight_presets && catalog.relight_presets.map(p => (
-                                <button
-                                  key={p.id}
-                                  onClick={() => setLightColorHex(p.hex)}
-                                  title={p.label}
-                                  style={{
-                                    width: 24,
-                                    height: 24,
-                                    borderRadius: 6,
-                                    background: p.hex,
-                                    border: `2px solid ${lightColorHex === p.hex ? t.accent : "transparent"}`,
-                                    cursor: "pointer"
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-
-                          <Btn t={t} hue="#E8552A" disabled={isEditing} onClick={handleApplyEdit} style={{ width: "100%", fontSize: 12, padding: "8px 0" }}>
-                            {isEditing ? "Applying..." : "Apply Relight"}
-                          </Btn>
-                        </div>
-                      )}
-
-                      <button
-                        onClick={() => setActiveTool(activeTool === "skin" ? null : "skin")}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "10px 12px",
-                          borderRadius: 8,
-                          border: `1px solid ${activeTool === "skin" ? t.accent : t.border}`,
-                          background: activeTool === "skin" ? t.accentSoft : t.bg,
-                          color: activeTool === "skin" ? t.accentText : t.text,
-                          cursor: "pointer",
-                          textAlign: "left"
-                        }}
-                      >
-                        <Sparkles size={18} />
-                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>Skin Enhancer</span>
-                      </button>
-
-                      {activeTool === "skin" && (
-                        <div style={{ padding: 12, background: t.bg, borderRadius: 8, border: `1px solid ${t.border}`, display: "flex", flexDirection: "column", gap: 12 }}>
-                          <div>
-                            <label style={{ fontSize: 11, color: t.text2, display: "block", marginBottom: 4 }}>Optimize For</label>
-                            <select
-                              value={skinOptimize}
-                              onChange={e => setSkinOptimize(e.target.value)}
-                              style={{ width: "100%", padding: "6px 8px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12, color: t.text }}
-                            >
-                              <option>Enhance skin</option>
-                              <option>Enhance everything</option>
-                              <option>Improve light</option>
-                              <option>Transform to real</option>
-                              <option>No makeup</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "between", fontSize: 11, color: t.text2, marginBottom: 4 }}>
-                              <span>Sharpen: {skinSharpen}</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={skinSharpen}
-                              onChange={e => setSkinSharpen(e.target.value)}
-                              style={{ width: "100%", accentColor: t.accent }}
-                            />
-                          </div>
-
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "between", fontSize: 11, color: t.text2, marginBottom: 4 }}>
-                              <span>Smart Grain: {skinGrain}</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={skinGrain}
-                              onChange={e => setSkinGrain(e.target.value)}
-                              style={{ width: "100%", accentColor: t.accent }}
-                            />
-                          </div>
-
-                          <Btn t={t} hue="#E8552A" disabled={isEditing} onClick={handleApplyEdit} style={{ width: "100%", fontSize: 12, padding: "8px 0" }}>
-                            {isEditing ? "Applying..." : "Apply Enhance"}
-                          </Btn>
-                        </div>
-                      )}
-
-                      <button
-                        onClick={() => setActiveTool(activeTool === "camera" ? null : "camera")}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "10px 12px",
-                          borderRadius: 8,
-                          border: `1px solid ${activeTool === "camera" ? t.accent : t.border}`,
-                          background: activeTool === "camera" ? t.accentSoft : t.bg,
-                          color: activeTool === "camera" ? t.accentText : t.text,
-                          cursor: "pointer",
-                          textAlign: "left"
-                        }}
-                      >
-                        <Video size={18} />
-                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>Camera Angle</span>
-                      </button>
-
-                      {activeTool === "camera" && (
-                        <div style={{ padding: 12, background: t.bg, borderRadius: 8, border: `1px solid ${t.border}`, display: "flex", flexDirection: "column", gap: 12 }}>
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "between", fontSize: 11, color: t.text2, marginBottom: 4 }}>
-                              <span>Horizontal Orbit: {camRotate}°</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="-180"
-                              max="180"
-                              value={camRotate}
-                              onChange={e => setCamRotate(e.target.value)}
-                              style={{ width: "100%", accentColor: t.accent }}
-                            />
-                          </div>
-
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "between", fontSize: 11, color: t.text2, marginBottom: 4 }}>
-                              <span>Elevation Orbit: {camVertical}°</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="-90"
-                              max="90"
-                              value={camVertical}
-                              onChange={e => setCamVertical(e.target.value)}
-                              style={{ width: "100%", accentColor: t.accent }}
-                            />
-                          </div>
-
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "between", fontSize: 11, color: t.text2, marginBottom: 4 }}>
-                              <span>Zoom Framing: {camZoom}</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="1"
-                              max="10"
-                              value={camZoom}
-                              onChange={e => setCamZoom(e.target.value)}
-                              style={{ width: "100%", accentColor: t.accent }}
-                            />
-                          </div>
-
-                          <Btn t={t} hue="#E8552A" disabled={isEditing} onClick={handleApplyEdit} style={{ width: "100%", fontSize: 12, padding: "8px 0" }}>
-                            {isEditing ? "Applying..." : "Apply Camera"}
-                          </Btn>
-                        </div>
-                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })}
+                <button
+                  onClick={() => setSelections({})}
+                  style={{
+                    marginLeft: "auto",
+                    background: "none",
+                    border: "none",
+                    color: t.accent || "#FF6B2B",
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Clear all
+                </button>
               </div>
             )}
 
-            {/* Dynamic style configurations catalog */}
-            {loadingCatalog ? (
-              <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center" }}>
-                <Loader2 className="animate-spin" size={16} />
-                <span style={{ fontSize: 12, color: t.text3 }}>Loading dynamic style catalog...</span>
+            {/* ── Section Title: Style Presets ── */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
+                {CATEGORY_TABS.find((c) => c.id === activeCat)?.label} Presets
               </div>
-            ) : catalog && catalog.categories ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                {Object.keys(catalog.categories).map(catKey => (
-                  <div key={catKey}>
-                    <SectionHeading text={catKey.replace("_", " ")} />
+              <div style={{ fontSize: 12, color: t.text3 }}>
+                Click a card to apply to your generation prompt
+              </div>
+            </div>
+
+            {/* ── Grid of Style Cards (matching Recent Prompts in Image 1) ── */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {activeItems.map((item) => {
+                const isSelected = selections[activeCat] === item.id;
+                const [c1, c2] = item.grad || ["#4A5568", "#2D3748"];
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => toggleThumb(activeCat, item.id)}
+                    style={{
+                      border: isSelected ? "2px solid #000000" : `1px solid ${t.border}`,
+                      borderRadius: R.sm,
+                      background: isSelected ? (t.bg === "#151311" ? t.surface2 : "#FBFBFA") : "#ffffff",
+                      cursor: "pointer",
+                      overflow: "hidden",
+                      transition: "all 0.2s",
+                      boxShadow: isSelected ? "0 4px 16px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.04)",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = t.text2;
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = t.border;
+                        e.currentTarget.style.transform = "translateY(0)";
+                      }
+                    }}
+                  >
+                    {/* Visual Artwork Thumbnail */}
+                    <div
+                      style={{
+                        height: 140,
+                        width: "100%",
+                        position: "relative",
+                        background: `linear-gradient(135deg, ${c1}, ${c2})`,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {item.img ? (
+                        <img
+                          src={item.img}
+                          alt={item.label}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : null}
+                      <svg
+                        viewBox="0 0 170 190"
+                        preserveAspectRatio="xMidYMid slice"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          position: "absolute",
+                          inset: 0,
+                          zIndex: 0,
+                        }}
+                      >
+                        {getShapeSVG(item.id, activeCat, item)}
+                      </svg>
+                      {isSelected && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            right: 8,
+                            width: 22,
+                            height: 22,
+                            borderRadius: "50%",
+                            background: "#000000",
+                            color: "#ffffff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: 700,
+                          }}
+                        >
+                          ✓
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content / Labels */}
+                    <div style={{ padding: "12px 14px" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>{item.label}</div>
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: t.text3,
+                          marginTop: 4,
+                          lineHeight: 1.4,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {item.desc || item.prompt}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {/* ── VIEW 2: STUDIO CANVAS & GENERATION WORKSPACE ──           */}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {view === "canvas" && (
+          <div
+            style={{
+              flex: 1,
+              display: "grid",
+              gridTemplateColumns: "360px 1fr",
+              gap: 24,
+              minHeight: "calc(100vh - 210px)",
+              alignItems: "stretch",
+            }}
+          >
+            {/* ── Left Sidebar: Create OR Edit Workspace ── */}
+            <div
+              style={{
+                width: 360,
+                flexShrink: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+                borderRight: `1px solid ${t.border}`,
+                paddingRight: 22,
+              }}
+            >
+              {editMode ? (
+                /* ── EDIT MODE CONTROLS ── */
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingBottom: 12,
+                      borderBottom: `1px solid ${t.border}`,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span
+                        style={{
+                          background: "#FF6B2B",
+                          color: "#ffffff",
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 20,
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        ✦ Edit Mode
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: t.text }}>
+                        Editing Iteration #{imageItems[editTargetIndex]?.iteration || editTargetIndex + 1}
+                      </span>
+                    </div>
+                    <button
+                      onClick={cancelEditing}
+                      style={{
+                        background: "none",
+                        border: `1px solid ${t.border}`,
+                        borderRadius: R.pill,
+                        padding: "3px 10px",
+                        fontSize: 11,
+                        color: t.text3,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✕ Cancel
+                    </button>
+                  </div>
+
+                  {/* Source Image Thumbnail */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>
+                      Source Image to Modify
+                    </label>
                     <div
                       style={{
                         display: "flex",
                         gap: 12,
-                        overflowX: "auto",
-                        padding: "8px 0",
-                        scrollbarWidth: "thin",
+                        alignItems: "center",
+                        marginTop: 6,
+                        padding: 10,
+                        borderRadius: R.sm,
+                        background: t.surface,
+                        border: `1px solid ${t.border}`,
                       }}
                     >
-                      {catalog.categories[catKey].map(item => {
-                        const isSelected =
-                          catKey === "style" ? selectedStyle === item.id :
-                          catKey === "medium" ? selectedMedium === item.id :
-                          catKey === "lighting" ? selectedLighting === item.id :
-                          catKey === "composition" ? selectedComposition === item.id :
-                          catKey === "camera" ? selectedCamera === item.id :
-                          catKey === "lens" ? selectedLens === item.id :
-                          catKey === "mood" ? selectedMood === item.id :
-                          catKey === "color" ? selectedColor === item.id :
-                          catKey === "camera_body" ? selectedCameraBody === item.id : false;
-
-                        const setFunc =
-                          catKey === "style" ? setSelectedStyle :
-                          catKey === "medium" ? setSelectedMedium :
-                          catKey === "lighting" ? setSelectedLighting :
-                          catKey === "composition" ? setSelectedComposition :
-                          catKey === "camera" ? setSelectedCamera :
-                          catKey === "lens" ? setSelectedLens :
-                          catKey === "mood" ? setSelectedMood :
-                          catKey === "color" ? setSelectedColor :
-                          catKey === "camera_body" ? setSelectedCameraBody : () => {};
-
-                        const thumbnail = DUMMY_PREVIEWS[item.id] || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80";
-
-                        return (
-                          <div
-                            key={item.id}
-                            onClick={() => setFunc(isSelected ? null : item.id)}
-                            style={{
-                              flex: "0 0 160px",
-                              height: 110,
-                              borderRadius: 12,
-                              overflow: "hidden",
-                              position: "relative",
-                              cursor: "pointer",
-                              border: `2px solid ${isSelected ? t.accent : "transparent"}`,
-                              boxShadow: t.shadow,
-                              transition: "all .2s"
-                            }}
-                          >
-                            <img
-                              src={thumbnail}
-                              alt={item.label}
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            />
-                            {/* Overlay gradient */}
-                            <div
-                              style={{
-                                position: "absolute",
-                                inset: 0,
-                                background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 80%)",
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "flex-end",
-                                padding: 12
-                              }}
-                            >
-                              <span style={{ color: "#FFFFFF", fontSize: 12.5, fontWeight: 700 }}>
-                                {item.label}
-                              </span>
-                              <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 9.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
-                                {item.desc}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      <img
+                        src={generatedImages[editTargetIndex] || activeImageUrl}
+                        alt="Source"
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 6,
+                          objectFit: "cover",
+                          border: `1px solid ${t.border}`,
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, color: t.text3, fontWeight: 600 }}>Active Base</div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: t.text,
+                            fontWeight: 500,
+                            lineHeight: 1.35,
+                            marginTop: 2,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {imageItems[editTargetIndex]?.prompt || prompt || "Original image"}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
 
-          {/* Right generation history sidebar */}
-          <div
-            style={{
-              width: 240,
-              background: t.surface,
-              borderLeft: `1px solid ${t.border}`,
-              display: "flex",
-              flexDirection: "column",
-              overflowY: "auto",
-              padding: 20,
-              gap: 16
-            }}
-          >
-            <span style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>
-              Session History
-            </span>
+                  {/* Edit Instructions Textarea */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>
+                      Edit / Refinement Instructions
+                    </label>
+                    <textarea
+                      value={editInstruction}
+                      onChange={(e) => setEditInstruction(e.target.value)}
+                      rows={3}
+                      placeholder="Describe what to change or add (e.g. Add aviator sunglasses, change lighting to warm golden hour, make background a modern city penthouse)..."
+                      style={{
+                        width: "100%",
+                        marginTop: 6,
+                        padding: 10,
+                        borderRadius: R.sm,
+                        background: t.surface,
+                        border: `1px solid #FF6B2B`,
+                        color: t.text,
+                        fontSize: 12.5,
+                        fontFamily: FONT,
+                        resize: "vertical",
+                        outline: "none",
+                        boxShadow: "0 0 0 2px rgba(255, 107, 43, 0.15)",
+                      }}
+                    />
+                  </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {generatedImages.map((img, idx) => {
-                const imgId = img.image_id || img.id || idx;
-                const activeImgId = activeImage ? (activeImage.image_id || activeImage.id) : null;
-                return (
-                  <div
-                    key={imgId}
-                    onClick={() => setActiveImage(img)}
+                  {/* Quick Edit Suggestions */}
+                  <div>
+                    <label style={{ fontSize: 10.5, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>
+                      Quick Edit Presets:
+                    </label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                      {[
+                        "Add stylish sunglasses",
+                        "Change background to cyberpunk neon city",
+                        "Golden hour warm sunset lighting",
+                        "Soft studio portrait lighting",
+                        "Dramatic cinematic rim light",
+                        "Clear smooth skin with natural eye shine",
+                        "35mm film bokeh blur",
+                      ].map((sug) => (
+                        <button
+                          key={sug}
+                          onClick={() =>
+                            setEditInstruction((prev) => (prev.trim() ? `${prev.trim()}, ${sug}` : sug))
+                          }
+                          style={{
+                            padding: "4px 8px",
+                            borderRadius: R.pill,
+                            border: `1px solid ${t.border}`,
+                            background: t.surface,
+                            color: t.text2,
+                            fontSize: 11,
+                            cursor: "pointer",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = "#FF6B2B";
+                            e.currentTarget.style.color = t.text;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = t.border;
+                            e.currentTarget.style.color = t.text2;
+                          }}
+                        >
+                          + {sug}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Apply Edit Action Button */}
+                  <button
+                    onClick={handleApplyEdit}
+                    disabled={editGenerating || !editInstruction.trim()}
                     style={{
-                      borderRadius: 10,
-                      overflow: "hidden",
-                      border: `2px solid ${activeImgId && activeImgId === imgId ? t.accent : "transparent"}`,
-                    cursor: "pointer",
-                    position: "relative",
-                    background: t.bg,
-                    aspectRatio: "1/1",
+                      width: "100%",
+                      height: 44,
+                      borderRadius: R.sm,
+                      background: "#000000",
+                      color: "#ffffff",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      border: "none",
+                      cursor: editGenerating || !editInstruction.trim() ? "not-allowed" : "pointer",
+                      opacity: editGenerating || !editInstruction.trim() ? 0.5 : 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+                    }}
+                  >
+                    <RefreshCw size={14} className={editGenerating ? "animate-spin" : ""} />
+                    <span>{editGenerating ? "Generating Edit..." : "Apply Edit & Generate Variation →"}</span>
+                  </button>
+
+                  {/* Refinement Triggers for Edit Mode */}
+                  <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", marginBottom: 8 }}>
+                      Quick Tool Modifiers
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      <button
+                        onClick={() => setShowCameraPopover(true)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "8px 10px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Camera size={13} color="#4B8BFF" />
+                        <span>Camera</span>
+                      </button>
+                      <button
+                        onClick={() => setShowRelightPopover(true)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "8px 10px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Sun size={13} color="#FFAA33" />
+                        <span>Relight</span>
+                      </button>
+                      <button
+                        onClick={() => setShowSkinPopover(true)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "8px 10px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Wand2 size={13} color="#E040FB" />
+                        <span>Skin Enhancer</span>
+                      </button>
+                      <button
+                        onClick={handleUpscale}
+                        disabled={!activeImageUrl || upscaling}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "8px 10px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: !activeImageUrl || upscaling ? "not-allowed" : "pointer",
+                          opacity: !activeImageUrl || upscaling ? 0.5 : 1,
+                        }}
+                      >
+                        <Maximize2 size={13} color="#10A37F" />
+                        <span>{upscaling ? "Upscaling..." : "4K Upscale"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* ── REGULAR GENERATION CONTROLS ── */
+                <>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase" }}>
+                      Active Prompt
+                    </label>
+                    <textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      rows={3}
+                      placeholder="Describe the image to generate..."
+                      style={{
+                        width: "100%",
+                        marginTop: 6,
+                        padding: 10,
+                        borderRadius: R.sm,
+                        background: t.surface,
+                        border: `1px solid ${t.border}`,
+                        color: t.text,
+                        fontSize: 12.5,
+                        fontFamily: FONT,
+                        resize: "vertical",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+
+                  {/* Settings Badges */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    <span
+                      style={{
+                        background: t.surface2,
+                        padding: "4px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        color: t.text2,
+                      }}
+                    >
+                      Model: {selectedModel}
+                    </span>
+                    <span
+                      style={{
+                        background: t.surface2,
+                        padding: "4px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        color: t.text2,
+                      }}
+                    >
+                      Ratio: {ratio.id}
+                    </span>
+                    <span
+                      style={{
+                        background: t.surface2,
+                        padding: "4px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        color: t.text2,
+                      }}
+                    >
+                      Quality: {quality.id}
+                    </span>
+                  </div>
+
+                  {/* Regenerate Button */}
+                  <button
+                    onClick={handleGenerate}
+                    disabled={generating || !prompt.trim()}
+                    style={{
+                      width: "100%",
+                      height: 42,
+                      borderRadius: R.sm,
+                      background: "#000000",
+                      color: "#ffffff",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      border: "none",
+                      cursor: generating || !prompt.trim() ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <RefreshCw size={14} className={generating ? "animate-spin" : ""} />
+                    <span>{generating ? "Generating..." : "Generate New Image"}</span>
+                  </button>
+
+                  {/* Creative Refinement Tools */}
+                  <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", marginBottom: 10 }}>
+                      Creative Refinement Tools
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <button
+                        onClick={() => setShowCameraPopover(true)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "10px 12px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <Camera size={15} color="#4B8BFF" />
+                        <span>Camera Angle & Viewport</span>
+                      </button>
+                      <button
+                        onClick={() => setShowRelightPopover(true)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "10px 12px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <Sun size={15} color="#FFAA33" />
+                        <span>Relight Scene (Directional)</span>
+                      </button>
+                      <button
+                        onClick={() => setShowSkinPopover(true)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "10px 12px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <Wand2 size={15} color="#E040FB" />
+                        <span>Skin & Facial Enhancer</span>
+                      </button>
+                      <button
+                        onClick={handleUpscale}
+                        disabled={!activeImageUrl || upscaling}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "10px 12px",
+                          borderRadius: R.sm,
+                          background: t.surface,
+                          border: `1px solid ${t.border}`,
+                          color: t.text,
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: !activeImageUrl || upscaling ? "not-allowed" : "pointer",
+                          opacity: !activeImageUrl || upscaling ? 0.5 : 1,
+                          textAlign: "left",
+                        }}
+                      >
+                        <Maximize2 size={15} color="#10A37F" />
+                        <span>{upscaling ? "Upscaling..." : "AI 4K Upscale"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ── Right Main Canvas: Expansive Studio Viewport ── */}
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: "flex",
+                flexDirection: "column",
+                background: t.surface,
+                borderRadius: R.sm,
+                border: `1px solid ${t.border}`,
+                padding: "20px 24px",
+                position: "relative",
+              }}
+            >
+              {/* Top Viewport Header */}
+              {activeImageUrl && (
+                <div
+                  style={{
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center"
+                    justifyContent: "space-between",
+                    paddingBottom: 14,
+                    marginBottom: 14,
+                    borderBottom: `1px solid ${t.border}`,
                   }}
                 >
-                  {img.status === "completed" ? (
-                    <img src={img.url} alt={`History ${idx}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                      <Loader2 className="animate-spin" size={16} style={{ color: t.accent }} />
-                      <span style={{ fontSize: 9, color: t.text3 }}>Pending...</span>
-                    </div>
-                  )}
-                  <div style={{ position: "absolute", bottom: 6, left: 6, background: "rgba(0,0,0,0.6)", color: "#FFF", fontSize: 8.5, fontFamily: MONO, padding: "2px 5px", borderRadius: 4 }}>
-                    {img.model_id.split(" ")[0]}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span
+                      style={{
+                        background: "#000000",
+                        color: "#ffffff",
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.03em",
+                      }}
+                    >
+                      ✦ Iteration #{imageItems[focusedImgIndex]?.iteration || focusedImgIndex + 1}
+                    </span>
+                    <span
+                      style={{
+                        background: t.surface2,
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        color: t.text2,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {ratio.id}
+                    </span>
+                    <span
+                      style={{
+                        background: t.surface2,
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        color: t.text2,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {selectedModel}
+                    </span>
+                    {imageItems[focusedImgIndex]?.type === "edit" && (
+                      <span
+                        style={{
+                          background: "rgba(255, 107, 43, 0.1)",
+                          color: "#FF6B2B",
+                          border: "1px solid rgba(255, 107, 43, 0.3)",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Refined Variation
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      onClick={() => setLightboxImg(activeImageUrl)}
+                      style={{
+                        background: t.surface2,
+                        border: `1px solid ${t.border}`,
+                        borderRadius: R.sm,
+                        padding: "5px 10px",
+                        fontSize: 11.5,
+                        color: t.text,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <Eye size={13} /> Fullscreen
+                    </button>
                   </div>
                 </div>
-              );
-            })}
+              )}
 
-              {generatedImages.length === 0 && (
-                <div style={{ padding: "40px 0", textAlign: "center", color: t.text3, fontSize: 12.5 }}>
-                  No generations this session.
+              {/* Center Main Stage */}
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                  minHeight: 460,
+                  background:
+                    t.bg === "#151311"
+                      ? "radial-gradient(circle at 50% 50%, #1e1b18 0%, #151311 100%)"
+                      : "radial-gradient(circle at 50% 50%, #f7f8fa 0%, #edf0f5 100%)",
+                  borderRadius: R.sm,
+                  padding: 20,
+                  border: `1px solid ${t.border}`,
+                  overflow: "hidden",
+                }}
+              >
+                {(generating || editGenerating) && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: "rgba(255,255,255,0.85)",
+                      backdropFilter: "blur(6px)",
+                      zIndex: 30,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: "50%",
+                        border: "3.5px solid #E5E7EB",
+                        borderTopColor: editGenerating ? "#FF6B2B" : "#000000",
+                        animation: "spin 1s linear infinite",
+                      }}
+                    />
+                    <div style={{ marginTop: 16, fontSize: 14, fontWeight: 700, color: t.text }}>
+                      {editGenerating ? "Applying edits on Genfy servers..." : "Creating your image on Genfy..."}
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: t.text3 }}>
+                      Synthesizing neural features on live model clusters (5-15s)
+                    </div>
+                  </div>
+                )}
+
+                {activeImageUrl ? (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      position: "relative",
+                    }}
+                  >
+                    <img
+                      src={activeImageUrl}
+                      alt="Genfy Generation"
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "58vh",
+                        borderRadius: 10,
+                        objectFit: "contain",
+                        boxShadow: "0 16px 48px rgba(0,0,0,0.16)",
+                        border: `1px solid rgba(0,0,0,0.06)`,
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", color: t.text3, padding: 32 }}>
+                    <Sparkles size={40} style={{ margin: "0 auto 14px", opacity: 0.35 }} />
+                    <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>No image generated yet</div>
+                    <div style={{ fontSize: 12.5, marginTop: 4, maxWidth: 320 }}>
+                      Enter a prompt in the left sidebar or select from Presets to generate your first studio visual.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Prominent Action Bar directly below image ── */}
+              {activeImageUrl && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    marginTop: 18,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {/* EDIT IMAGE BUTTON (Highlighted boldly so user immediately sees it!) */}
+                  <button
+                    onClick={() => startEditing(focusedImgIndex)}
+                    style={{
+                      padding: "9px 18px",
+                      borderRadius: R.sm,
+                      background: editMode ? "#FF6B2B" : "#000000",
+                      color: "#ffffff",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      border: "none",
+                      boxShadow: "0 3px 12px rgba(0,0,0,0.18)",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <Edit3 size={15} />
+                    <span>{editMode ? "Currently Editing" : "Edit / Iterate Image"}</span>
+                  </button>
+
+                  <button
+                    onClick={handleUpscale}
+                    disabled={upscaling}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: R.sm,
+                      background: t.surface,
+                      border: `1px solid ${t.border}`,
+                      color: t.text,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: upscaling ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Maximize2 size={14} color="#10A37F" />
+                    <span>{upscaling ? "Upscaling..." : "AI 4K Upscale"}</span>
+                  </button>
+
+                  <a
+                    href={activeImageUrl}
+                    download={`genfy-iter-${focusedImgIndex + 1}.png`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: R.sm,
+                      background: t.surface,
+                      border: `1px solid ${t.border}`,
+                      color: t.text,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Download size={14} /> Download
+                  </a>
+
+                  <button
+                    onClick={() => setLightboxImg(activeImageUrl)}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: R.sm,
+                      background: t.surface,
+                      border: `1px solid ${t.border}`,
+                      color: t.text,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Eye size={14} /> Fullscreen
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (nav) nav("storyboard");
+                      if (showToast) showToast("Sent image to Storyboard!");
+                    }}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: R.sm,
+                      background: t.surface2,
+                      border: `1px solid ${t.border}`,
+                      color: t.text,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Film size={14} /> Add to Storyboard
+                  </button>
+                </div>
+              )}
+
+              {/* ── Bottom Iterations Filmstrip & History ── */}
+              {generatedImages.length > 0 && (
+                <div
+                  style={{
+                    width: "100%",
+                    marginTop: 18,
+                    paddingTop: 16,
+                    borderTop: `1px solid ${t.border}`,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      Lineage & Iterations ({generatedImages.length})
+                    </div>
+                    <div style={{ fontSize: 11, color: t.text3 }}>Click thumbnail to view or edit from that point</div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      overflowX: "auto",
+                      paddingBottom: 4,
+                    }}
+                  >
+                    {generatedImages.map((img, idx) => {
+                      const isSel = idx === focusedImgIndex;
+                      const itemMeta = imageItems[idx];
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setFocusedImgIndex(idx)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "6px 10px 6px 6px",
+                            borderRadius: R.sm,
+                            border: isSel ? "2px solid #000000" : `1px solid ${t.border}`,
+                            background: isSel ? (t.bg === "#151311" ? t.surface2 : "#ffffff") : t.surface,
+                            cursor: "pointer",
+                            flexShrink: 0,
+                            boxShadow: isSel ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          <img
+                            src={img}
+                            alt={`iter-${idx}`}
+                            style={{
+                              width: 50,
+                              height: 50,
+                              borderRadius: 6,
+                              objectFit: "cover",
+                            }}
+                          />
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 80 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: t.text }}>
+                              #{itemMeta?.iteration || generatedImages.length - idx} {itemMeta?.type === "edit" ? "(Edit)" : ""}
+                            </div>
+                            <div style={{ fontSize: 10.5, color: t.text3 }}>{itemMeta?.createdAt || "Live"}</div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditing(idx);
+                              }}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "#FF6B2B",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                padding: 0,
+                                textAlign: "left",
+                                marginTop: 2,
+                              }}
+                            >
+                              ✏️ Edit this
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        )}
       </div>
-    </div>
-  );
-}
 
-function SectionHeading({ text }) {
-  return (
-    <h3
-      style={{
-        fontFamily: FONT,
-        fontSize: 12,
-        fontWeight: 700,
-        color: "#847D71",
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
-        margin: "0 0 10px 0",
-      }}
-    >
-      {text}
-    </h3>
+      {/* ── TOOL POPOVERS ── */}
+      {showCameraPopover && (
+        <CameraControlPopover
+          imageUrl={activeImageUrl}
+          onApply={handleApplyCamera}
+          onClose={() => setShowCameraPopover(false)}
+        />
+      )}
+
+      {showRelightPopover && (
+        <RelightControlPopover
+          imageUrl={activeImageUrl}
+          onApply={handleApplyRelight}
+          onClose={() => setShowRelightPopover(false)}
+        />
+      )}
+
+      {showSkinPopover && (
+        <SkinEnhancerPopover
+          onApply={handleApplySkin}
+          onClose={() => setShowSkinPopover(false)}
+        />
+      )}
+
+      {/* ── FULLSCREEN LIGHTBOX MODAL ── */}
+      {lightboxImg && (
+        <div
+          onClick={() => setLightboxImg(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.92)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <img
+            src={lightboxImg}
+            alt="Lightbox view"
+            style={{ maxWidth: "95vw", maxHeight: "95vh", objectFit: "contain", borderRadius: 8 }}
+          />
+          <button
+            onClick={() => setLightboxImg(null)}
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              color: "#fff",
+              fontSize: 18,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

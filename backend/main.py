@@ -56,6 +56,8 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt as jose_jwt
 
 # ── Load environment ──────────────────────────────────────────────────────────
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(_env_path)
 load_dotenv()
 
 # ── RAG engine (Pinecone) ─────────────────────────────────────────────────────
@@ -2194,19 +2196,28 @@ async def bff_variants_select(session_id: str, request: Request, suite_session: 
 
 
 # ── Genfy Integration ──────────────────────────────────────────────────────────
-GENFY_URL: str      = os.getenv("GENFY_URL", "http://localhost:8005")
-GENFY_EMAIL: str    = os.getenv("GENFY_EMAIL", "admin@genfy.app")
+GENFY_URL: str      = os.getenv("GENFY_URL", "https://genfyy.in")
+if "host.docker.internal" in GENFY_URL or not GENFY_URL.startswith("http"):
+    GENFY_URL = "https://genfyy.in"
+
+GENFY_EMAIL: str    = os.getenv("GENFY_EMAIL", "anoop@genfy.app")
 GENFY_PASSWORD: str = os.getenv("GENFY_PASSWORD", "Genfy@Admin123!Secure")
 GENFY_TOKEN: str    = ""
 GENFY_TOKEN_FETCHED_AT: float = 0.0
 GENFY_TOKEN_TTL: float = 6 * 3600  # re-auth every 6 hours
 
+
 async def _get_genfy_token() -> str:
-    global GENFY_TOKEN, GENFY_TOKEN_FETCHED_AT
+    global GENFY_TOKEN, GENFY_TOKEN_FETCHED_AT, GENFY_URL
     import time as _time
     now = _time.time()
     if GENFY_TOKEN and (now - GENFY_TOKEN_FETCHED_AT) < GENFY_TOKEN_TTL:
         return GENFY_TOKEN
+    
+    # Always ensure live production URL
+    if "host.docker.internal" in GENFY_URL:
+        GENFY_URL = "https://genfyy.in"
+
     # Reset stale token
     GENFY_TOKEN = ""
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -2215,7 +2226,7 @@ async def _get_genfy_token() -> str:
                 f"{GENFY_URL}/api/users/login",
                 json={"email": GENFY_EMAIL, "password": GENFY_PASSWORD},
             )
-            print(f"Genfy login status: {r.status_code}")
+            print(f"Genfy login status: {r.status_code}, url: {GENFY_URL}")
             if r.status_code == 200:
                 token = ""
                 # 1. Try cookies dict first
@@ -2245,8 +2256,10 @@ async def _get_genfy_token() -> str:
                     return GENFY_TOKEN
                 else:
                     print(f"Genfy login 200 but no token found. Headers: {dict(r.headers)}")
+            else:
+                print(f"Genfy login failed with status {r.status_code}: {r.text[:200]}")
         except Exception as exc:
-            print(f"Error logging into Genfy: {exc}")
+            print(f"Error logging into Genfy ({GENFY_URL}): {exc}")
     return ""
 
 @app.get("/bff/genfy/styles")
@@ -2426,80 +2439,83 @@ async def genfy_debug():
 
 @app.api_route("/bff/genfy/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy_genfy(path: str, request: Request):
-    # Handle image generation session requests - OpenAI only
-    if path == "sessions" and request.method == "POST":
-        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-        if not openai_key:
-            raise HTTPException(status_code=503, detail="OpenAI API key not configured. Image generation unavailable.")
+    """Proxy requests directly to the deployed Genfy production server (https://genfyy.in)."""
+    token = await _get_genfy_token()
+    if not token:
+        raise HTTPException(status_code=502, detail="Unable to authenticate with deployed Genfy server.")
 
-        try:
-            body_bytes = await request.body()
-            body_json = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
-            prompt = body_json.get("prompt", "")
-            ratio = body_json.get("ratio", "1:1")
+    # Route paths to the appropriate /api/ namespace on the deployed Genfy server
+    if path.startswith("api/"):
+        target_path = path
+    else:
+        target_path = f"api/{path}"
 
-            if not prompt:
-                raise HTTPException(status_code=400, detail="Prompt is required for image generation.")
+    target_url = f"{GENFY_URL}/{target_path}"
 
-            # Map ratio to supported sizes for gpt-image-1 (1024x1024, 1024x1536, 1536x1024)
-            if ratio == "9:16":
-                size = "1024x1536"
-            elif ratio == "16:9":
-                size = "1536x1024"
-            else:
-                size = "1024x1024"
+    headers = {
+        "cookie": f"session_token={token}",
+        "authorization": f"Bearer {token}",
+    }
+    client_content_type = request.headers.get("content-type")
+    if client_content_type:
+        headers["content-type"] = client_content_type
 
-            print(f"[Image Engine] OpenAI image generation (prompt len={len(prompt)}, ratio={ratio}, size={size})...", flush=True)
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                # Try gpt-image-1 (latest available model)
-                req_body: dict = {
-                    "model": "gpt-image-1",
-                    "prompt": prompt[:4000],
-                    "n": 1,
-                    "size": size,
-                    "output_format": "png"
-                }
+    query_params = dict(request.query_params)
 
-                resp = await client.post(
-                    "https://api.openai.com/v1/images/generations",
-                    headers={
-                        "Authorization": f"Bearer {openai_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json=req_body
-                )
+    try:
+        body = await request.body()
+        if request.method == "POST" and "sessions" in target_path and body and "application/json" in (client_content_type or ""):
+            try:
+                body_dict = json.loads(body.decode("utf-8"))
+                if "model" in body_dict and "model_ids" not in body_dict:
+                    body_dict["model_ids"] = [body_dict.pop("model")]
+                if "aspect_ratio" in body_dict and "ratio" not in body_dict:
+                    body_dict["ratio"] = body_dict.pop("aspect_ratio")
+                if "active_configs" not in body_dict:
+                    body_dict["active_configs"] = {}
+                body = json.dumps(body_dict).encode("utf-8")
+                headers["content-length"] = str(len(body))
+            except Exception as e:
+                print(f"[Genfy Body Normalization]: {e}", flush=True)
 
-                if resp.status_code == 200:
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            resp = await client.request(
+                method=request.method,
+                url=target_url,
+                headers=headers,
+                params=query_params,
+                content=body if body else None,
+            )
+
+            # If response is JSON, fix relative image URLs to point to https://genfyy.in
+            content_type = resp.headers.get("content-type", "")
+            if "application/json" in content_type:
+                try:
                     data = resp.json()
-                    img_data = data["data"][0]
-                    img_url = img_data.get("url") or ""
-                    if not img_url and img_data.get("b64_json"):
-                        img_url = f"data:image/png;base64,{img_data['b64_json']}"
-                    revised_prompt = img_data.get("revised_prompt", prompt)
-                    print(f"[Image Engine] OpenAI gpt-image-1 success!", flush=True)
-                    return JSONResponse({
-                        "session_id": f"openai-{int(time.time())}",
-                        "status": "completed",
-                        "results": [{"image_url": img_url, "url": img_url,
-                                     "model": "OpenAI GPT-IMAGE-1",
-                                     "revised_prompt": revised_prompt}],
-                        "images": [{"url": img_url}]
-                    })
-                else:
-                    error_text = resp.text[:500]
-                    print(f"[Image Engine] OpenAI error {resp.status_code}: {error_text}", flush=True)
-                    raise HTTPException(status_code=resp.status_code, detail=f"OpenAI image generation failed: {error_text}")
+                    def _fix_urls(obj):
+                        if isinstance(obj, dict):
+                            return {k: _fix_urls(v) for k, v in obj.items()}
+                        elif isinstance(obj, list):
+                            return [_fix_urls(item) for item in obj]
+                        elif isinstance(obj, str) and (obj.startswith("/exports/") or obj.startswith("/api/exports/")):
+                            return f"{GENFY_URL}{obj}"
+                        return obj
 
-        except httpx.TimeoutException:
-            raise HTTPException(status_code=504, detail="OpenAI image generation timed out.")
-        except HTTPException:
-            raise
-        except Exception as exc:
-            print(f"[Image Engine Error]: {exc}", flush=True)
-            raise HTTPException(status_code=500, detail=f"Image generation error: {str(exc)}")
+                    data = _fix_urls(data)
+                    return JSONResponse(content=data, status_code=resp.status_code)
+                except Exception:
+                    pass
 
-    # For all other paths, return 501 Not Implemented (Genfy removed)
-    raise HTTPException(status_code=501, detail="Genfy image service disabled. Only OpenAI image generation is available via POST /bff/genfy/sessions")
+            return Response(
+                content=resp.content,
+                status_code=resp.status_code,
+                headers={"Content-Type": content_type}
+            )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Request to deployed Genfy server timed out.")
+    except Exception as exc:
+        print(f"[Genfy Proxy Error]: {exc}", flush=True)
+        raise HTTPException(status_code=502, detail=f"Error connecting to deployed Genfy server: {str(exc)}")
 
 
 # ── Master Workflow Supervisor & Intermediary Agent Endpoints ─────────────────────

@@ -13,6 +13,7 @@ const VIEW_LABELS = {
   workflow: "Spring Drop Launch",
   storyboard: "Campaign Storyboard",
   "tool-detail": "Copy Agent",
+  "genfy-detail": "Genfy Image Generator",
 };
 
 export default function TopBar({ t, mode, toggle, view, nav, activeWorkspace, workspaces = [], onSelectWorkspace, onAddWorkspace, onNavigateToLibrary }) {
