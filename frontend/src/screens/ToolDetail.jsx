@@ -1464,8 +1464,47 @@ export default function ToolDetail({ t, nav, showToast, goToLibrarySignal }) {
                   }}
                   onRegenerate={regenerate}
                   onNavigateToPrompts={() => setView("library")}
-                  onApprove={() => {
-                    showToast("This chat is not connected to any workflow");
+                  onApprove={(copyText) => {
+                    const text = (typeof copyText === "string" && copyText)
+                      ? copyText
+                      : (messages.filter(m => m.role === 'assistant').slice(-1)[0]?.text || "");
+                    if (!text) {
+                      showToast("No copy content found to approve");
+                      return;
+                    }
+
+                    // Extract a clean title from the first heading or subject line
+                    const firstHeader = text.match(/^#+\s*(.+)$/m)?.[1] ||
+                                        text.match(/^(?:Subject Line|Headline|Title):\s*(.+)$/im)?.[1] ||
+                                        text.split('\n')[0].replace(/^#+\s*/, '').trim() ||
+                                        "Approved Copy";
+                    const cleanTitle = firstHeader.slice(0, 80);
+
+                    try {
+                      const existingRaw = localStorage.getItem("studio-generated-assets");
+                      const existing = existingRaw ? JSON.parse(existingRaw) : [];
+                      const newAsset = {
+                        id: "copy-asset-" + Date.now(),
+                        name: cleanTitle,
+                        title: cleanTitle,
+                        type: "COPY",
+                        category: "Email & Copy",
+                        content: text,
+                        preview: text.slice(0, 240),
+                        by: "Copy Agent",
+                        byHue: "#8B5CF6",
+                        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                        real: true,
+                        status: "Approved",
+                      };
+                      const updated = [newAsset, ...existing.filter(a => a.id !== newAsset.id)];
+                      localStorage.setItem("studio-generated-assets", JSON.stringify(updated));
+                      localStorage.setItem("studio-approved-copy", JSON.stringify({ title: cleanTitle, text, date: Date.now() }));
+                    } catch (err) {
+                      console.error("Error saving approved copy:", err);
+                    }
+
+                    showToast(`✓ "${cleanTitle.slice(0, 28)}..." approved & saved to Assets!`);
                   }}
                 />
               </div>

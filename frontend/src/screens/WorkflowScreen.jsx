@@ -592,6 +592,7 @@ function IntegratedCopyBox({ output, onUpdateOutput, nodeId, t }) {
           value={bodyText}
           onChange={handleBodyChange}
           placeholder="Campaign copy paragraphs..."
+          className="thin-scrollbar"
           style={{
             width: "100%",
             minHeight: 140,
@@ -606,6 +607,8 @@ function IntegratedCopyBox({ output, onUpdateOutput, nodeId, t }) {
             padding: 0,
             margin: 0,
             boxSizing: "border-box",
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(140, 140, 160, 0.22) transparent",
           }}
         />
       </div>
@@ -698,6 +701,7 @@ function NodeCard({
 
   return (
     <div
+      className="node-card thin-scrollbar"
       onClick={() => onSelect(node.id)}
       style={{
         borderRadius: R.lg,
@@ -1691,7 +1695,7 @@ function NodeDataBox({ label, data, t, editable = false, onSave = null, nodeId =
         </div>
       </div>
 
-      <div style={dataBoxStyle(t)}>
+      <div className="node-data-box thin-scrollbar" style={dataBoxStyle(t)}>
         {mode === "raw" ? (
           editable && onSave ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1967,6 +1971,8 @@ function cfgTextarea(t) {
     border: `1px solid ${t.border}`, background: t.bg,
     color: t.text, fontFamily: FONT, fontSize: 12.5, outline: "none",
     resize: "vertical", lineHeight: 1.55,
+    scrollbarWidth: "thin",
+    scrollbarColor: "rgba(140, 140, 160, 0.22) transparent",
   };
 }
 
@@ -1998,6 +2004,10 @@ function dataBoxStyle(t) {
     lineHeight: 1.55,
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
+    maxHeight: 280,
+    overflowY: "auto",
+    scrollbarWidth: "thin",
+    scrollbarColor: "rgba(140, 140, 160, 0.22) transparent",
   };
 }
 
@@ -3313,7 +3323,48 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   }
 
   return (
-    <div style={{ fontFamily: FONT, minHeight: "100vh" }}>
+    <div className="workflow-screen" style={{ fontFamily: FONT, minHeight: "100vh" }}>
+      {/* ── Global thin transparent scrollbar for workflow nodes & sidebar ── */}
+      <style>{`
+        .workflow-screen *::-webkit-scrollbar,
+        .node-card::-webkit-scrollbar,
+        .node-data-box::-webkit-scrollbar,
+        .thin-scrollbar::-webkit-scrollbar,
+        .workflow-canvas *::-webkit-scrollbar,
+        .workflow-screen textarea::-webkit-scrollbar,
+        .workflow-screen pre::-webkit-scrollbar {
+          width: 4px !important;
+          height: 4px !important;
+        }
+        .workflow-screen *::-webkit-scrollbar-track,
+        .node-card::-webkit-scrollbar-track,
+        .node-data-box::-webkit-scrollbar-track,
+        .thin-scrollbar::-webkit-scrollbar-track,
+        .workflow-canvas *::-webkit-scrollbar-track,
+        .workflow-screen textarea::-webkit-scrollbar-track,
+        .workflow-screen pre::-webkit-scrollbar-track {
+          background: transparent !important;
+        }
+        .workflow-screen *::-webkit-scrollbar-thumb,
+        .node-card::-webkit-scrollbar-thumb,
+        .node-data-box::-webkit-scrollbar-thumb,
+        .thin-scrollbar::-webkit-scrollbar-thumb,
+        .workflow-canvas *::-webkit-scrollbar-thumb,
+        .workflow-screen textarea::-webkit-scrollbar-thumb,
+        .workflow-screen pre::-webkit-scrollbar-thumb {
+          background: rgba(140, 140, 160, 0.22) !important;
+          border-radius: 9999px !important;
+        }
+        .workflow-screen *::-webkit-scrollbar-thumb:hover,
+        .node-card::-webkit-scrollbar-thumb:hover,
+        .node-data-box::-webkit-scrollbar-thumb:hover,
+        .thin-scrollbar::-webkit-scrollbar-thumb:hover,
+        .workflow-canvas *::-webkit-scrollbar-thumb:hover,
+        .workflow-screen textarea::-webkit-scrollbar-thumb:hover,
+        .workflow-screen pre::-webkit-scrollbar-thumb:hover {
+          background: rgba(140, 140, 160, 0.5) !important;
+        }
+      `}</style>
 
       {/* ── Master Supervisor Banner with Inline Back Navigation ─────────── */}
       <div style={{
@@ -3721,11 +3772,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
         {/* ── RIGHT: Node Options & Config Panel (sticky) ───────────────────── */}
         {rightSidebarMode !== "closed" && (
-          <aside style={{
+          <aside className="thin-scrollbar" style={{
             width: 330, flexShrink: 0,
             borderLeft: `1px solid ${t.border}`,
             position: "sticky", top: 0, alignSelf: "flex-start",
             maxHeight: "calc(100vh - 56px)", overflowY: "auto",
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(140, 140, 160, 0.22) transparent",
             background: t.surface2,
             boxShadow: "-4px 0 20px rgba(0,0,0,0.03)",
             display: "flex", flexDirection: "column"
