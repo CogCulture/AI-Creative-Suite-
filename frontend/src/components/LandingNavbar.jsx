@@ -44,7 +44,7 @@ export default function LandingNavbar({ currentHash, onLogin }) {
                   <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#16192b", marginBottom: "12px", fontFamily: "Inter Tight, system-ui, sans-serif" }}>Manage</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     {["HR", "Manage"].map(item => (
-                      <a key={item} href="#" style={{ display: "block", fontSize: "13px", color: "#6b7080", fontFamily: "Inter, system-ui, sans-serif", textDecoration: "none", transition: "color 0.15s" }}
+                      <a key={item} href={item === "HR" ? "https://testhr.duckdns.org/" : "#"} style={{ display: "block", fontSize: "13px", color: "#6b7080", fontFamily: "Inter, system-ui, sans-serif", textDecoration: "none", transition: "color 0.15s" }}
                         onMouseEnter={e => e.target.style.color = "#16192b"}
                         onMouseLeave={e => e.target.style.color = "#6b7080"}
                       >{item}</a>

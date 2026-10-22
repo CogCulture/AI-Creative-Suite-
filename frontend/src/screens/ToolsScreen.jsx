@@ -4,6 +4,18 @@ import { TOOLS, WORKFLOW_TEMPLATES, toolById } from "../data.js";
 import { Card, Btn, Eyebrow, H1, Sub, SectionH } from "../components/primitives/index.jsx";
 
 export default function ToolsScreen({ t, nav, showToast }) {
+  const handleOpenTool = (tool) => {
+    if (tool.id === "copy") {
+      nav("tool-detail");
+    } else if (tool.id === "genfy") {
+      nav("genfy-detail");
+    } else if (tool.id === "hr" || tool.url) {
+      window.location.href = tool.url || "https://testhr.duckdns.org/";
+    } else {
+      showToast(`${tool.name} — coming soon`);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "16px 40px 80px", fontFamily: FONT }}>
       <H1 t={t}>Tools</H1>
@@ -21,7 +33,14 @@ export default function ToolsScreen({ t, nav, showToast }) {
         }}
       >
         {TOOLS.map((tool) => (
-          <Card key={tool.id} t={t} hoverable accentTop={tool.hue} style={{ padding: 20 }}>
+          <Card
+            key={tool.id}
+            t={t}
+            hoverable
+            accentTop={tool.hue}
+            onClick={() => handleOpenTool(tool)}
+            style={{ padding: 20 }}
+          >
             <div
               style={{
                 width: 44,
@@ -92,13 +111,10 @@ export default function ToolsScreen({ t, nav, showToast }) {
               <Btn
                 t={t}
                 hue={tool.hue}
-                onClick={() =>
-                  tool.id === "copy"
-                    ? nav("tool-detail")
-                    : tool.id === "genfy"
-                    ? nav("genfy-detail")
-                    : showToast(`${tool.name} — coming soon`)
-                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenTool(tool);
+                }}
                 style={{ flex: 1 }}
               >
                 Open
@@ -106,7 +122,10 @@ export default function ToolsScreen({ t, nav, showToast }) {
               <Btn
                 t={t}
                 kind="secondary"
-                onClick={() => showToast(`${tool.name} added to workflow`)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  showToast(`${tool.name} added to workflow`);
+                }}
                 icon={Plus}
                 style={{ width: 36, padding: 0 }}
               />

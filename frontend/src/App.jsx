@@ -213,6 +213,10 @@ export default function App() {
   };
 
   const nav = (id, projectData, options) => {
+    if (id === "hr") {
+      window.location.href = "https://testhr.duckdns.org/";
+      return;
+    }
     if (projectData !== undefined) setActiveProject(projectData);
     if (options?.fresh) {
       setActiveProject(null);

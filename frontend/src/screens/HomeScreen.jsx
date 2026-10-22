@@ -31,6 +31,13 @@ export default function HomeScreen({ t, nav, showToast }) {
             {TOOLS.map((tool) => (
               <div
                 key={tool.id}
+                title={tool.name}
+                onClick={(e) => {
+                  if (tool.id === "hr" || tool.url) {
+                    e.stopPropagation();
+                    window.location.href = tool.url || "https://testhr.duckdns.org/";
+                  }
+                }}
                 style={{
                   width: 24, height: 24, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
                   background: tool.id === "copy" ? "#000000" : tool.id === "genfy" ? "rgba(232, 85, 42, 0.12)" : `${tool.hue}1F`,
@@ -38,6 +45,7 @@ export default function HomeScreen({ t, nav, showToast }) {
                   border: tool.id === "copy" ? "none" : tool.id === "genfy" ? "1px solid rgba(232, 85, 42, 0.35)" : `1px solid ${t.border}`,
                   boxShadow: tool.id === "genfy" ? "0 0 6px rgba(232, 85, 42, 0.25)" : "none",
                   overflow: "hidden",
+                  cursor: (tool.id === "hr" || tool.url) ? "pointer" : "inherit",
                 }}
               >
                 {tool.id === "copy" ? (

@@ -64,6 +64,7 @@ const ALL_TOOLS = [
     hue: "#12A0A0",
     tags: ["JD", "COMMS"],
     desc: "Job posts, JDs and internal comms — in the company's own voice.",
+    url: "https://testhr.duckdns.org/",
   },
   {
     id: "geo",

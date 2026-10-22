@@ -54,7 +54,7 @@ const TOOLS = [
   { id: "edit", name: "Image Editor", icon: Wand2, hue: "#B84FD8", tags: ["INPAINT", "UPSCALE"], desc: "Retouch, inpaint, upscale and swap backgrounds. Polish any generation before it ships." },
   { id: "deck", name: "Deck Builder", icon: Presentation, hue: "#DE9B18", tags: ["PPTX", "TEMPLATES"], desc: "Turn strategy, copy and visuals into a branded deck — pitch-ready in minutes." },
   { id: "leads", name: "Lead Agent", icon: Users, hue: "#E0447A", tags: ["SEQUENCES", "SCORING"], desc: "Build, score and sequence outreach lists. Wire approved copy into campaigns." },
-  { id: "hr", name: "HR Studio", icon: UserCog, hue: "#12A0A0", tags: ["JD", "COMMS"], desc: "Job posts, JDs and internal comms — in the company's own voice." },
+  { id: "hr", name: "HR Studio", icon: UserCog, hue: "#12A0A0", tags: ["JD", "COMMS"], desc: "Job posts, JDs and internal comms — in the company's own voice.", url: "https://testhr.duckdns.org/" },
 ];
 const toolById = id => TOOLS.find(t => t.id === id);
 
@@ -469,14 +469,39 @@ function ToolsScreen({ t, nav, showToast }) {
       <Sub t={t}>Open any tool directly for a quick task — each reads OFFGRID's brand automatically. Or tap + to drop it into a workflow instead.</Sub>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))", gap: 16, marginTop: 20 }}>
         {TOOLS.map(tool => (
-          <Card t={t} key={tool.id} hoverable accentTop={tool.hue} style={{ padding: 20 }}>
+          <Card
+            t={t}
+            key={tool.id}
+            hoverable
+            accentTop={tool.hue}
+            onClick={() => {
+              if (tool.id === "copy") nav("tool-detail");
+              else if (tool.id === "genfy") nav("genfy-detail");
+              else if (tool.id === "hr" || tool.url) window.location.href = tool.url || "https://testhr.duckdns.org/";
+              else showToast(`${tool.name} opened — brand injected`);
+            }}
+            style={{ padding: 20 }}
+          >
             <div style={{ width: 44, height: 44, borderRadius: 12, display: "grid", placeItems: "center", marginBottom: 16, background: `${tool.hue}1F`, color: tool.hue }}><tool.icon size={22} /></div>
             <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 16.5, letterSpacing: "-.01em", color: t.text, margin: 0 }}>{tool.name}</h3>
             <p style={{ fontFamily: FONT, fontSize: 12.5, color: t.text2, marginTop: 6, lineHeight: 1.45, minHeight: 54 }}>{tool.desc}</p>
             <div style={{ display: "flex", gap: 5, margin: "14px 0" }}>{tool.tags.map(tg => <span key={tg} style={{ fontFamily: MONO, fontSize: 9.5, color: t.text3, background: t.surface2, padding: "2px 7px", borderRadius: 5, border: `1px solid ${t.border}` }}>{tg}</span>)}</div>
             <div style={{ display: "flex", gap: 8 }}>
-              <Btn t={t} hue={tool.hue} onClick={() => tool.id === "copy" ? nav("tool-detail") : tool.id === "genfy" ? nav("genfy-detail") : showToast(`${tool.name} opened — brand injected`)} style={{ flex: 1 }}>Open</Btn>
-              <Btn t={t} kind="secondary" onClick={() => showToast(`${tool.name} added to a workflow`)} icon={Plus} style={{ width: 36, padding: 0 }} />
+              <Btn
+                t={t}
+                hue={tool.hue}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (tool.id === "copy") nav("tool-detail");
+                  else if (tool.id === "genfy") nav("genfy-detail");
+                  else if (tool.id === "hr" || tool.url) window.location.href = tool.url || "https://testhr.duckdns.org/";
+                  else showToast(`${tool.name} opened — brand injected`);
+                }}
+                style={{ flex: 1 }}
+              >
+                Open
+              </Btn>
+              <Btn t={t} kind="secondary" onClick={(e) => { e.stopPropagation(); showToast(`${tool.name} added to a workflow`); }} icon={Plus} style={{ width: 36, padding: 0 }} />
             </div>
           </Card>
         ))}
