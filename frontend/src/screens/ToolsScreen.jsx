@@ -4,6 +4,7 @@ import { FONT, MONO, R } from "../tokens.js";
 import { TOOLS, WORKFLOW_TEMPLATES, toolById } from "../data.js";
 import { Card, Btn, Eyebrow, H1, Sub, SectionH } from "../components/primitives/index.jsx";
 
+export default function ToolsScreen({ t, nav, showToast }) {
   const [launchingGeo, setLaunchingGeo] = useState(false);
 
   const handleLaunchGeo = async () => {

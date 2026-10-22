@@ -161,12 +161,12 @@ const analyzeGenerationMode = () => ({});
 const isGenerationRequest = () => false;
 
 const LLM_OPTIONS = [
-  { id: "claude-4-sonnet", label: "Claude Sonnet 5" },
-  { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4o-mini", label: "GPT-4o Mini" },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" }
+  { id: "claude-sonnet-5", label: "Claude Sonnet 5", description: "Creative & Brand Voice" },
+  { id: "gpt-6-luna", label: "GPT-6 Luna", description: "Fast & Efficient" },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", description: "Advanced Reasoning & Strategy" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "High Speed & Multimodal" },
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", description: "Deep Complex Reasoning" },
+  { id: "claude-opus-4-8", label: "Claude Opus 4.8", description: "In-depth Analysis" }
 ];
 
 // Add fade animation styles
