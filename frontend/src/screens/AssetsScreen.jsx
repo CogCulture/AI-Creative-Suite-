@@ -22,15 +22,16 @@ export default function AssetsScreen({ t, nav, showToast }) {
     setGeneratedAssets(loadGeneratedAssets());
   }, []);
 
-  // Merge real generated images (type IMAGE) with static demo assets
+  // Merge real generated images and approved copy assets with static demo assets
   const allAssets = [
     ...generatedAssets.map((a) => ({
-      name: a.name || "Generated Image",
-      type: "IMAGE",
-      g: a.gradient || "232 85 42, 232 133 12",
+      name: a.name || a.title || (a.type === "COPY" ? "Approved Copy" : "Generated Image"),
+      type: a.type || "IMAGE",
+      g: a.type === "COPY" ? null : (a.gradient || "232 85 42, 232 133 12"),
       url: a.url || null,
-      by: a.by || "Workflow",
-      byHue: "#E8552A",
+      preview: a.preview || a.content || null,
+      by: a.by || (a.type === "COPY" ? "Copy Agent" : "Workflow"),
+      byHue: a.byHue || (a.type === "COPY" ? "#8B5CF6" : "#E8552A"),
       date: a.date || "just now",
       real: true,
     })),
@@ -151,10 +152,11 @@ export default function AssetsScreen({ t, nav, showToast }) {
                 <div
                   style={{
                     fontFamily: FONT, fontSize: 11.5, color: t.text3, lineHeight: 1.5, marginTop: 10,
+                    display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden",
+                    wordBreak: "break-word"
                   }}
                 >
-                  The forecast doesn't get a vote. Spring Drop lands Friday — technical shells that
-                  pack down smaller than your excuses…
+                  {a.preview || a.content || "The forecast doesn't get a vote. Spring Drop lands Friday — technical shells that pack down smaller than your excuses…"}
                 </div>
               </div>
             )}

@@ -190,8 +190,23 @@ export default function App() {
         return el;
       })();
     style.textContent = `
-      .studio-scroll::-webkit-scrollbar-thumb {
-        background: ${t.borderStrong};
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent !important;
+      }
+      ::-webkit-scrollbar-thumb,
+      .studio-scroll::-webkit-scrollbar-thumb,
+      .thin-scrollbar::-webkit-scrollbar-thumb {
+        background: ${t.mode === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)'};
+        border-radius: 9999px;
+      }
+      ::-webkit-scrollbar-thumb:hover,
+      .studio-scroll::-webkit-scrollbar-thumb:hover,
+      .thin-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: ${t.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'};
       }
     `; 
   }, [t]);

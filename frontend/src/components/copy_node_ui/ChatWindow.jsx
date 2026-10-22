@@ -1,16 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { marked } from 'marked'
 
-// Stubbed/local marked implementation to avoid external dependency
-const marked = (text) => {
+// Configure marked for rich copywriting rendering
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
+
+const hasDocumentStructure = (txt) => {
+  if (!txt || typeof txt !== "string") return false;
+  return (
+    /^#{1,4}\s+/m.test(txt) || // ### Headings
+    /\b(Subject Line|Email\s+\d+|Dear\s+\[|Best regards|Warm regards|Cheers|Sincerely|Why Choose Us|Here's how to redeem)\b/i.test(txt) ||
+    /^-{3,}$/m.test(txt) || // --- dividers
+    /\[CTA Button/i.test(txt)
+  );
+};
+
+const formatCopyAgentMarkdown = (text) => {
   if (!text) return "";
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/`(.*?)`/g, "<code>$1</code>")
-    .replace(/\n/g, "<br />");
+  // Convert bullet dots (• or ●) at the start of a line to standard markdown list items (- )
+  let formatted = text.replace(/^[\t ]*[•●][\t ]+/gm, "- ");
+  // Ensure horizontal rules have proper clean line breaks around them
+  formatted = formatted.replace(/\n?---+\n?/g, "\n\n---\n\n");
+  // Convert [CTA Button: Text] to styled button HTML
+  formatted = formatted.replace(/\[CTA Button:\s*([^\]]+)\]/gi, '<div class="copy-cta-button">$1</div>');
+  try {
+    return marked.parse(formatted);
+  } catch (_) {
+    return String(formatted);
+  }
 };
 
 // Stubbed/dummy components to avoid missing files
@@ -1022,28 +1041,42 @@ const MessageItem = React.memo(({
                           )}
                         </div>
                       ) : (() => {
-                        const cleanText = (txt) => txt ? txt.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*\*/g, '') : '';
-                        const sanitizedText = cleanText(displayedText)
+                        // If output has document structure (email sequences, headings, subject lines, dividers), render as full rich copy document
+                        if (hasDocumentStructure(displayedText)) {
+                          return (
+                            <div
+                              className="copyagent-rich-content"
+                              dangerouslySetInnerHTML={{ __html: formatCopyAgentMarkdown(displayedText) }}
+                            />
+                          );
+                        }
+
+                        const sanitizedText = displayedText
                           .split('\n')
                           .map(line => line.trimEnd())
                           .join('\n')
                           .replace(/\n{3,}/g, '\n\n')
                           .trim();
                         const parsed = parseOptions(sanitizedText);
-                        if (parsed) {
+                        if (parsed && parsed.options && parsed.options.length > 0) {
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              {parsed.intro && <div dangerouslySetInnerHTML={{ __html: marked(cleanText(parsed.intro)) }} />}
+                              {parsed.intro && <div className="copyagent-rich-content" dangerouslySetInnerHTML={{ __html: formatCopyAgentMarkdown(parsed.intro) }} />}
                               <div className="options-canvas-container">
                                 {parsed.options.map((opt, index) => (
                                   <OptionCanvasCard key={opt.id || index} option={{ ...opt, displayIndex: index + 1 }} />
                                 ))}
                               </div>
-                              {parsed.outro && <div dangerouslySetInnerHTML={{ __html: marked(cleanText(parsed.outro)) }} />}
+                              {parsed.outro && <div className="copyagent-rich-content" dangerouslySetInnerHTML={{ __html: formatCopyAgentMarkdown(parsed.outro) }} />}
                             </div>
                           );
                         }
-                        return <div dangerouslySetInnerHTML={{ __html: marked(sanitizedText) }} />;
+                        return (
+                          <div
+                            className="copyagent-rich-content"
+                            dangerouslySetInnerHTML={{ __html: formatCopyAgentMarkdown(sanitizedText) }}
+                          />
+                        );
                       })()}
 
                     {/* 🔥 Top Up Button for token exhaustion message */}

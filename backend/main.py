@@ -126,7 +126,7 @@ if not SUITE_SECRET_KEY or SUITE_SECRET_KEY == "fallback-insecure-key":
     )
 
 SUITE_SSO_SECRET: str  = os.getenv("SUITE_SSO_SECRET", SUITE_SECRET_KEY)
-GEO_TOOL_URL: str      = os.getenv("GEO_TOOL_URL", "http://geocc.duckdns.org")
+GEO_TOOL_URL: str      = os.getenv("GEO_TOOL_URL", "http://geotest2026.duckdns.org:3000")
 
 SUITE_DB_URL: str      = os.getenv("SUITE_DB_URL", "sqlite:////app/data/suite.db")
 
@@ -1112,7 +1112,7 @@ async def launch_geo_tool(
         name = user.name or user.email.split("@")[0]
 
     ticket = generate_geo_sso_ticket(user_id=user_id, email=email, name=name)
-    geo_base = (GEO_TOOL_URL or "http://geocc.duckdns.org").rstrip("/")
+    geo_base = (GEO_TOOL_URL or "http://geotest2026.duckdns.org:3000").rstrip("/")
     use_sso_route = os.getenv("GEO_USE_SSO_ROUTE", "false").lower() == "true"
     launch_url = f"{geo_base}/sso?ticket={ticket}" if use_sso_route else f"{geo_base}/"
 

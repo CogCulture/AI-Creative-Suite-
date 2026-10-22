@@ -40,6 +40,7 @@ const ALL_TOOLS = [
     hue: "#0EA5E9",
     tags: ["LOCAL AI", "SEARCH", "VISIBILITY"],
     desc: "Generative Engine Optimization & local visibility engine across AI platforms and search.",
+    url: "http://geotest2026.duckdns.org:3000/",
   },
   {
     id: "edit",

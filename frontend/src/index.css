@@ -85,15 +85,45 @@ body {
   }
 }
 
-/* ── Scrollbar styling ───────────────────────────────────── */
-.studio-scroll::-webkit-scrollbar {
-  width: 10px;
+/* ── Thin & Transparent Scrollbar styling across entire app ───────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 160, 0.22);
+  border-radius: 9999px;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 160, 0.5);
+}
+::-webkit-scrollbar-corner {
+  background: transparent !important;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 140, 160, 0.22) transparent;
+}
+
+.studio-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.studio-scroll::-webkit-scrollbar-track {
+  background: transparent !important;
+}
 .studio-scroll::-webkit-scrollbar-thumb {
-  border-radius: 20px;
-  border: 3px solid transparent;
-  background-clip: padding-box;
+  border-radius: 9999px;
+  background: rgba(140, 140, 160, 0.22);
+}
+.studio-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 160, 0.5);
 }
 
 /* ── Responsive layout helpers ───────────────────────────── */
@@ -732,6 +762,102 @@ body.dark .text-brand {
   background: rgba(120, 120, 120, 0.45);
 }
 
+/* Thin scrollbar explicit utility */
+.thin-scrollbar::-webkit-scrollbar,
+.node-card::-webkit-scrollbar,
+.node-data-box::-webkit-scrollbar,
+textarea.thin-scrollbar::-webkit-scrollbar,
+pre::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.thin-scrollbar::-webkit-scrollbar-track,
+.node-card::-webkit-scrollbar-track,
+.node-data-box::-webkit-scrollbar-track,
+textarea.thin-scrollbar::-webkit-scrollbar-track,
+pre::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb,
+.node-card::-webkit-scrollbar-thumb,
+.node-data-box::-webkit-scrollbar-thumb,
+textarea.thin-scrollbar::-webkit-scrollbar-thumb,
+pre::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 160, 0.22);
+  border-radius: 9999px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover,
+.node-card::-webkit-scrollbar-thumb:hover,
+.node-data-box::-webkit-scrollbar-thumb:hover,
+textarea.thin-scrollbar::-webkit-scrollbar-thumb:hover,
+pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 160, 0.5);
+}
+.thin-scrollbar,
+.node-card,
+.node-data-box,
+textarea.thin-scrollbar,
+pre {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 140, 160, 0.22) transparent;
+}
+
+/* ── CopyAgent Rich Document Output Styling ── */
+.copyagent-rich-content {
+  font-size: 13.5px;
+  line-height: 1.68;
+  color: inherit;
+  word-break: break-word;
+}
+.copyagent-rich-content h1,
+.copyagent-rich-content h2,
+.copyagent-rich-content h3,
+.copyagent-rich-content h4 {
+  color: inherit;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+.copyagent-rich-content h1 { font-size: 1.35em; border-bottom: 1px solid rgba(130, 130, 150, 0.2); padding-bottom: 6px; }
+.copyagent-rich-content h2 { font-size: 1.2em; }
+.copyagent-rich-content h3 { font-size: 1.1em; color: #8B5CF6; }
+.copyagent-rich-content h4 { font-size: 1em; color: #8B5CF6; font-weight: 700; margin-top: 14px; }
+.copyagent-rich-content p {
+  margin: 0 0 10px 0;
+  line-height: 1.65;
+}
+.copyagent-rich-content hr {
+  border: 0;
+  border-top: 1.5px dashed rgba(140, 140, 160, 0.25);
+  margin: 20px 0;
+}
+.copyagent-rich-content ul,
+.copyagent-rich-content ol {
+  margin: 8px 0 12px 0;
+  padding-left: 22px;
+}
+.copyagent-rich-content li {
+  margin-bottom: 5px;
+  line-height: 1.6;
+}
+.copyagent-rich-content strong {
+  font-weight: 700;
+  color: inherit;
+}
+.copyagent-rich-content .copy-cta-button {
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+  color: #ffffff !important;
+  font-weight: 700;
+  font-size: 12.5px;
+  margin: 10px 0;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
 
 /* ── Chat Messages & Bubble Styles ── */
 .message {
