@@ -134,7 +134,7 @@ export default function LandingNavbar({ currentHash, onLogin }) {
             Login
           </button>
           <button
-            onClick={() => go("login")}
+            onClick={() => go("signup")}
             style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", fontSize: "14px", fontWeight: 600, color: "#fff", backgroundColor: "#000", border: "none", cursor: "none", fontFamily: "Inter, system-ui, sans-serif", transition: "all 0.3s ease" }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.filter = "brightness(1.1)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.filter = "brightness(1)"; }}

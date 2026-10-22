@@ -76,10 +76,25 @@ STATIC_USER_EMAIL: str = os.getenv(
 )
 COPYAGENT_URL: str    = os.getenv(
     "COPYAGENT_URL",
-    "https://www.copyagennt.in/api/integration/v1/chat/completions",
+    "https://copyagennt.in/api/integration/v1/chat/completions",
 )
 FRONTEND_ORIGIN: str  = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
-COPYAGENT_BASE_URL: str = os.getenv("COPYAGENT_BASE_URL", "https://www.copyagennt.in")
+COPYAGENT_BASE_URL: str = os.getenv("COPYAGENT_BASE_URL", "https://copyagennt.in")
+
+# Safety fallback for local execution outside Docker
+if "host.docker.internal" in COPYAGENT_URL:
+    import socket
+    try:
+        socket.gethostbyname("host.docker.internal")
+    except Exception:
+        COPYAGENT_URL = "https://copyagennt.in/api/integration/v1/chat/completions"
+
+if "host.docker.internal" in COPYAGENT_BASE_URL:
+    import socket
+    try:
+        socket.gethostbyname("host.docker.internal")
+    except Exception:
+        COPYAGENT_BASE_URL = "https://copyagennt.in"
 
 if not SUITE_API_KEY:
     raise RuntimeError("SUITE_API_KEY is not set in environment.")
@@ -94,6 +109,11 @@ if not SUITE_SECRET_KEY or SUITE_SECRET_KEY == "fallback-insecure-key":
     )
 
 SUITE_DB_URL: str      = os.getenv("SUITE_DB_URL", "sqlite:////app/data/suite.db")
+
+# Fallback for local development if Docker volume /app/data is not mounted
+if "sqlite:////app/data" in SUITE_DB_URL and not os.path.exists("/app/data"):
+    _local_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "suite.db")
+    SUITE_DB_URL = f"sqlite:///{_local_db_path.replace(os.sep, '/')}"
 
 # Ensure directory exists for persistent SQLite DB
 if "sqlite:////" in SUITE_DB_URL:
@@ -260,6 +280,9 @@ def _ensure_sqlite_columns():
                 conn.execute(text("ALTER TABLE suite_brands ADD COLUMN rag_linked BOOLEAN DEFAULT 0"))
             if "rag_linked_at" not in cols:
                 conn.execute(text("ALTER TABLE suite_brands ADD COLUMN rag_linked_at DATETIME"))
+            pending_cols = [c["name"] for c in inspector.get_columns("suite_pending_users")]
+            if "otp_attempts" not in pending_cols:
+                conn.execute(text("ALTER TABLE suite_pending_users ADD COLUMN otp_attempts INTEGER DEFAULT 0"))
             conn.commit()
     except Exception as _e:
         print(f"[DB Migration Note]: {_e}", flush=True)
@@ -502,6 +525,9 @@ def _build_copyagent_user_payload(
         "profile_picture": profile_picture,
         "plan_type":       "agency",
         "plan_name":       "agency",
+        "role":            "admin",
+        "token_balance":   5000000,
+        "max_projects":    10,
         "is_suite_user":   True,
     }
 
@@ -730,6 +756,7 @@ async def auth_signup(
         pending.name           = body.name or pending.name
         pending.otp_hash       = otp_hash
         pending.otp_expires_at = expires_at
+        pending.otp_attempts   = 0
     else:
         pending = SuitePendingUser(
             id=str(uuid.uuid4()),
@@ -808,6 +835,7 @@ async def auth_verify_otp(
         name=name or email.split("@")[0],
         password_hash=pw_hash,
         auth_provider="email",
+        db=db,
     )
     if synced:
         new_user.copyagent_synced = True
@@ -837,6 +865,7 @@ async def auth_resend_otp(
     otp, otp_hash = _generate_otp()
     pending.otp_hash       = otp_hash
     pending.otp_expires_at = datetime.utcnow() + timedelta(minutes=OTP_EXPIRE_MINUTES)
+    pending.otp_attempts   = 0
     db.commit()
 
     background_tasks.add_task(_send_otp_email, email, otp, pending.name or "")
@@ -1411,6 +1440,8 @@ async def _ingest_dam_file_bg(dam_file_id: str, pinecone_client_key: str, filena
                 dam_file.ingest_error= result.get("error", "Unknown error")
             db.commit()
         print(f"[RAG Ingest] {dam_file_id}: success={result['success']} chunks={result['chunk_count']}", flush=True)
+        if result["success"] and dam_file:
+            await _trigger_cograg_sync(dam_file.brand_id, pinecone_client_key, filename)
     except Exception as exc:
         print(f"[RAG Ingest] Background ingest error for {dam_file_id}: {exc}", flush=True)
         try:
@@ -1423,6 +1454,28 @@ async def _ingest_dam_file_bg(dam_file_id: str, pinecone_client_key: str, filena
             pass
     finally:
         db.close()
+
+
+async def _trigger_cograg_sync(brand_id: str, client_name: str, filename: str):
+    """Notify CopyAgent to sync a freshly ingested file from CogRAG into its RAG."""
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                f"{COPYAGENT_BASE_URL}/api/integration/v1/sync/cograg",
+                headers={"X-Suite-API-Key": SUITE_API_KEY},
+                json={
+                    "source_namespace": os.getenv("PINECONE_NAMESPACE", ""),
+                    "brand_id":         brand_id,
+                    "client_name":      client_name,
+                    "filter_file":      filename,
+                },
+            )
+        if resp.status_code >= 400:
+            print(f"[CogRAG Sync] brand={brand_id} file={filename}: HTTP {resp.status_code} - {resp.text[:200]}", flush=True)
+        else:
+            print(f"[CogRAG Sync] Synced brand={brand_id} file={filename}: HTTP {resp.status_code}", flush=True)
+    except Exception as sync_exc:
+        print(f"[CogRAG Sync] Trigger failed brand={brand_id} file={filename}: {sync_exc}", flush=True)
 
 
 @app.post("/bff/dam/files/{file_id}/ingest")
@@ -1741,74 +1794,79 @@ def _upstream_headers(user_id: Optional[str] = None, db: Optional[Session] = Non
 # ── SSE streaming passthrough ─────────────────────────────────────────────────
 async def _stream_from_upstream(payload: dict, user_id: Optional[str]) -> AsyncGenerator[str, None]:
     """Open an SSE connection to copyagennt.in and yield each raw SSE line back."""
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        async with client.stream(
-            "POST",
-            COPYAGENT_URL,
-            headers=_upstream_headers(user_id),
-            json=payload,
-        ) as upstream:
-            if upstream.status_code == 404:
-                # Read error body to check if it's the missing user detail or thread issue
-                error_body = await upstream.aread()
-                error_text = error_body.decode("utf-8", errors="replace")
-                
-                if user_id and "User specified in X-User-Id does not exist" in error_text:
-                    print(f"[Self-Healing Stream] User {user_id} missing from CopyAgent. Force syncing and retrying...", flush=True)
-                    db_local = SuiteSessionLocal()
-                    try:
-                        await _sync_user_forced(user_id, db_local)
-                    finally:
-                        db_local.close()
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                COPYAGENT_URL,
+                headers=_upstream_headers(user_id),
+                json=payload,
+            ) as upstream:
+                if upstream.status_code == 404:
+                    # Read error body to check if it's the missing user detail or thread issue
+                    error_body = await upstream.aread()
+                    error_text = error_body.decode("utf-8", errors="replace")
                     
-                    # Retry the connection once with fresh headers
-                    async with client.stream(
-                        "POST",
-                        COPYAGENT_URL,
-                        headers=_upstream_headers(user_id),
-                        json=payload,
-                    ) as retry_upstream:
-                        if retry_upstream.status_code != 200:
-                            retry_err_body = await retry_upstream.aread()
-                            retry_err_text = retry_err_body.decode("utf-8", errors="replace")
-                            err_payload = json.dumps({"error": f"Upstream retry error {retry_upstream.status_code}: {retry_err_text[:300]}"})
-                            yield f"data: {err_payload}\n\n"
+                    if user_id and "User specified in X-User-Id does not exist" in error_text:
+                        print(f"[Self-Healing Stream] User {user_id} missing from CopyAgent. Force syncing and retrying...", flush=True)
+                        db_local = SuiteSessionLocal()
+                        try:
+                            await _sync_user_forced(user_id, db_local)
+                        finally:
+                            db_local.close()
+                        
+                        # Retry the connection once with fresh headers
+                        async with client.stream(
+                            "POST",
+                            COPYAGENT_URL,
+                            headers=_upstream_headers(user_id),
+                            json=payload,
+                        ) as retry_upstream:
+                            if retry_upstream.status_code != 200:
+                                retry_err_body = await retry_upstream.aread()
+                                retry_err_text = retry_err_body.decode("utf-8", errors="replace")
+                                err_payload = json.dumps({"error": f"Upstream retry error {retry_upstream.status_code}: {retry_err_text[:300]}"})
+                                yield f"data: {err_payload}\n\n"
+                                return
+                            async for line in retry_upstream.aiter_lines():
+                                if line:
+                                    yield f"{line}\n\n"
                             return
-                        async for line in retry_upstream.aiter_lines():
-                            if line:
-                                yield f"{line}\n\n"
-                        return
 
-                elif "Conversation thread not found" in error_text:
-                    print(f"[Self-Healing Stream] Thread {payload.get('conversation_id')} not found. Retrying with new thread...", flush=True)
-                    payload.pop("conversation_id", None)
-                    async with client.stream(
-                        "POST",
-                        COPYAGENT_URL,
-                        headers=_upstream_headers(user_id),
-                        json=payload,
-                    ) as retry_upstream:
-                        if retry_upstream.status_code != 200:
-                            retry_err_body = await retry_upstream.aread()
-                            retry_err_text = retry_err_body.decode("utf-8", errors="replace")
-                            err_payload = json.dumps({"error": f"Upstream retry error {retry_upstream.status_code}: {retry_err_text[:300]}"})
-                            yield f"data: {err_payload}\n\n"
+                    elif "Conversation thread not found" in error_text:
+                        print(f"[Self-Healing Stream] Thread {payload.get('conversation_id')} not found. Retrying with new thread...", flush=True)
+                        payload.pop("conversation_id", None)
+                        async with client.stream(
+                            "POST",
+                            COPYAGENT_URL,
+                            headers=_upstream_headers(user_id),
+                            json=payload,
+                        ) as retry_upstream:
+                            if retry_upstream.status_code != 200:
+                                retry_err_body = await retry_upstream.aread()
+                                retry_err_text = retry_err_body.decode("utf-8", errors="replace")
+                                err_payload = json.dumps({"error": f"Upstream retry error {retry_upstream.status_code}: {retry_err_text[:300]}"})
+                                yield f"data: {err_payload}\n\n"
+                                return
+                            async for line in retry_upstream.aiter_lines():
+                                if line:
+                                    yield f"{line}\n\n"
                             return
-                        async for line in retry_upstream.aiter_lines():
-                            if line:
-                                yield f"{line}\n\n"
-                        return
 
-            if upstream.status_code != 200:
-                error_body = await upstream.aread()
-                error_text = error_body.decode("utf-8", errors="replace")
-                snippet    = error_text[:300]
-                err_payload = json.dumps({"error": f"Upstream error {upstream.status_code}: {snippet}"})
-                yield f"data: {err_payload}\n\n"
-                return
-            async for line in retry_upstream.aiter_lines() if 'retry_upstream' in locals() else upstream.aiter_lines():
-                if line:
-                    yield f"{line}\n\n"
+                if upstream.status_code != 200:
+                    error_body = await upstream.aread()
+                    error_text = error_body.decode("utf-8", errors="replace")
+                    snippet    = error_text[:300]
+                    err_payload = json.dumps({"error": f"Upstream error {upstream.status_code}: {snippet}"})
+                    yield f"data: {err_payload}\n\n"
+                    return
+                async for line in retry_upstream.aiter_lines() if 'retry_upstream' in locals() else upstream.aiter_lines():
+                    if line:
+                        yield f"{line}\n\n"
+    except Exception as exc:
+        print(f"[Stream] Upstream connection error: {exc}", flush=True)
+        err_payload = json.dumps({"error": f"Failed to connect to AI engine: {exc}"})
+        yield f"data: {err_payload}\n\n"
 
 
 # ── Main chat endpoint ────────────────────────────────────────────────────────
@@ -2075,12 +2133,17 @@ async def bff_create_conversation(
             resp = await client.post(url, json=upstream_payload)
         if resp.is_success:
             return resp.json()
-        raise HTTPException(status_code=resp.status_code, detail=f"Failed to create conversation: {resp.text[:200]}")
-    except HTTPException:
-        raise
+        print(f"[Conversation Create] Upstream status {resp.status_code}, using fallback conversation ID", flush=True)
     except Exception as e:
-        print(f"[Conversation Create] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[Conversation Create] Upstream error (using fallback): {e}", flush=True)
+
+    # Resilient fallback: return valid conversation object so chat starts cleanly without 500
+    return {
+        "id": f"conv_{uuid.uuid4().hex[:12]}",
+        "title": payload.title,
+        "user_id": effective_user_id,
+        "messages": [],
+    }
 
 @app.post("/bff/chat/variants/compare")
 async def bff_variants_compare(request: Request, suite_session: Optional[str] = Cookie(None)):

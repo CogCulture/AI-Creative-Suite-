@@ -1331,6 +1331,7 @@ export default function ToolDetail({ t, nav, showToast, goToLibrarySignal }) {
                 messages={messages}
                 isProcessing={isGenerating}
                 currentConversationId={conversationId}
+                onShowPricing={() => showToast("5,000,000 token credits active. Full admin access enabled.")}
                 onCopyMessage={(msg) => {
                   navigator.clipboard.writeText(msg.text);
                   showToast("Copied to clipboard");
@@ -1456,6 +1457,7 @@ export default function ToolDetail({ t, nav, showToast, goToLibrarySignal }) {
                   messages={messages}
                   isProcessing={isGenerating}
                   currentConversationId={conversationId}
+                  onShowPricing={() => showToast("5,000,000 token credits active. Full admin access enabled.")}
                   onCopyMessage={(msg) => {
                     navigator.clipboard.writeText(msg.text);
                     showToast("Copied to clipboard");

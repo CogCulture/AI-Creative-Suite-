@@ -1,8 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Mail, Lock, User, Loader2 } from "lucide-react";
 
-export default function LoginSignup({ onLogin, onNavigate }) {
-  const [isSignUp, setIsSignUp] = useState(false);
+export default function LoginSignup({ onLogin, onNavigate, defaultSignUp = false }) {
+  const [isSignUp, setIsSignUp] = useState(defaultSignUp || window.location.hash === "#signup");
+
+  useEffect(() => {
+    if (typeof defaultSignUp === "boolean") {
+      setIsSignUp(defaultSignUp);
+    }
+  }, [defaultSignUp]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -83,8 +89,13 @@ export default function LoginSignup({ onLogin, onNavigate }) {
         throw new Error(data.detail || "Google authentication failed.");
       }
       // Store only display fields — no sensitive data in localStorage
-      const { id, name, email, auth_provider } = data.user || {};
-      localStorage.setItem("studio-user-info", JSON.stringify({ id, name, email, auth_provider }));
+      const userData = data.user || {};
+      localStorage.setItem("studio-user-info", JSON.stringify({
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        auth_provider: userData.auth_provider,
+      }));
       triggerLoginTransition();
     } catch (err) {
       setError(err.message);
@@ -170,8 +181,13 @@ export default function LoginSignup({ onLogin, onNavigate }) {
         if (!res.ok) {
           throw new Error(data.detail || "Invalid email or password.");
         }
-        const { id, name, email, auth_provider } = data.user || {};
-        localStorage.setItem("studio-user-info", JSON.stringify({ id, name, email, auth_provider }));
+        const userData = data.user || {};
+        localStorage.setItem("studio-user-info", JSON.stringify({
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          auth_provider: userData.auth_provider,
+        }));
         triggerLoginTransition();
       }
     } catch (err) {
@@ -201,8 +217,13 @@ export default function LoginSignup({ onLogin, onNavigate }) {
       if (!res.ok) {
         throw new Error(data.detail || "OTP verification failed.");
       }
-      const { id, name, email, auth_provider } = data.user || {};
-      localStorage.setItem("studio-user-info", JSON.stringify({ id, name, email, auth_provider }));
+      const userData = data.user || {};
+      localStorage.setItem("studio-user-info", JSON.stringify({
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        auth_provider: userData.auth_provider,
+      }));
       triggerLoginTransition();
     } catch (err) {
       setError(err.message);

@@ -123,12 +123,13 @@ const createConversation = async (title, teamId, userId, projectId) => {
       })
     });
     if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}`);
+      console.warn(`[createConversation] Server responded with status ${response.status}`);
+      return null;
     }
     return await response.json();
   } catch (err) {
-    console.error("Failed to create conversation:", err);
-    return { id: "conv_" + Math.random().toString(36).substr(2, 9) };
+    console.warn("[createConversation] Pre-create skipped:", err?.message || err);
+    return null;
   }
 };
 const startVariantSession = async (payload) => {
@@ -966,13 +967,19 @@ const InputBar = forwardRef(function InputBar({
     let convId = currentConversationId;
     try {
       // Ensure we have a conversation
-      if (!convId && true) {
-        const userId = localStorage.getItem('userId');
-        const activeTeamId = currentTeam ? currentTeam.id : null;
-        const title = text.substring(0, 30) + '...';
-        const newConv = await createConversation(title, activeTeamId, userId, currentProject?.id);
-        convId = newConv.id;
-        onConversationIdChange(convId);
+      if (!convId) {
+        try {
+          const userId = localStorage.getItem('userId');
+          const activeTeamId = currentTeam ? currentTeam.id : null;
+          const title = text.substring(0, 30) + '...';
+          const newConv = await createConversation(title, activeTeamId, userId, currentProject?.id);
+          if (newConv && newConv.id && !newConv.id.startsWith("conv_")) {
+            convId = newConv.id;
+            onConversationIdChange(convId);
+          }
+        } catch {
+          // Handled gracefully
+        }
       }
 
       // Show user message
@@ -1110,12 +1117,18 @@ const InputBar = forwardRef(function InputBar({
     let convId = currentConversationId;
 
     try {
-      if (!convId && true) {
-        const title = text.substring(0, 25) + (text.length > 25 ? '...' : '');
-        const activeTeamId = currentTeam ? currentTeam.id : null;
-        const newConv = await createConversation(title, activeTeamId, userId, currentProject?.id);
-        convId = newConv.id;
-        onConversationIdChange(convId);
+      if (!convId) {
+        try {
+          const title = text.substring(0, 25) + (text.length > 25 ? '...' : '');
+          const activeTeamId = currentTeam ? currentTeam.id : null;
+          const newConv = await createConversation(title, activeTeamId, userId, currentProject?.id);
+          if (newConv && newConv.id && !newConv.id.startsWith("conv_")) {
+            convId = newConv.id;
+            onConversationIdChange(convId);
+          }
+        } catch {
+          // Handled gracefully
+        }
       }
 
       if (!skipPlaceholder) {

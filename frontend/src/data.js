@@ -4,7 +4,7 @@
    ============================================================ */
 import {
   Home, Boxes, LayoutGrid, Library, Brain,
-  Target, PenLine, Image as ImageIcon, Wand2, Presentation, Users, UserCog,
+  Target, PenLine, Image as ImageIcon, Wand2, Presentation, Users, UserCog, Globe,
 } from "lucide-react";
 
 /* ── Seven tools ─────────────────────────────────────────── */
@@ -65,9 +65,19 @@ const ALL_TOOLS = [
     tags: ["JD", "COMMS"],
     desc: "Job posts, JDs and internal comms — in the company's own voice.",
   },
+  {
+    id: "geo",
+    name: "GEO",
+    icon: Globe,
+    hue: "#0EA5E9",
+    tags: ["AI SEARCH", "VISIBILITY"],
+    desc: "Generative Engine Optimization — optimize your brand visibility across AI models and LLM search engines.",
+  },
 ];
 
-export const TOOLS = ALL_TOOLS.filter((t) => t.id !== "deck" && t.id !== "leads");
+export const TOOLS = ALL_TOOLS.filter(
+  (t) => !["deck", "leads", "edit", "strategy"].includes(t.id)
+);
 export const toolById = (id) => ALL_TOOLS.find((t) => t.id === id);
 
 /* ── Brand context ───────────────────────────────────────── */

@@ -22,18 +22,18 @@ import uuid
 import asyncio
 import logging
 from typing import Optional, List, Dict, Any
-
 log = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 PINECONE_API_KEY     = os.getenv("PINECONE_API_KEY", "")
 PINECONE_INDEX_NAME  = os.getenv("PINECONE_INDEX_NAME", "cograg")
-PINECONE_NAMESPACE   = os.getenv("PINECONE_NAMESPACE", "__default__")
+PINECONE_INDEX_HOST  = os.getenv("PINECONE_INDEX_HOST", "https://cograg-oubkmcx.svc.aped-4627-b74a.pinecone.io")
+PINECONE_NAMESPACE   = os.getenv("PINECONE_NAMESPACE", "")
 GEMINI_API_KEY       = os.getenv("GOOGLE_GEMINI_API_KEY", "")
-EMBEDDING_MODEL      = "intfloat/e5-base-v2"
-EMBEDDING_DIM        = 768    # intfloat/e5-base-v2 dimension matching cograg index
-CHUNK_TARGET_TOKENS  = 600
-CHUNK_OVERLAP_RATIO  = 0.15
+EMBEDDING_MODEL      = os.getenv("PINECONE_EMBED_MODEL", "llama-text-embed-v2")
+EMBEDDING_DIM        = 768    # llama-text-embed-v2 dimension matching cograg index
+CHUNK_TARGET_WORDS   = 350
+CHUNK_OVERLAP_WORDS  = 70
 RETRIEVAL_TOP_K      = 8
 CONTEXT_TOKEN_BUDGET = 2000
 
@@ -58,7 +58,7 @@ except ImportError:
     _PYPDF2_AVAILABLE = False
 
 
-# ── Text tokeniser (fallback to char count if tiktoken missing) ───────────────
+# ── Text tokeniser & chunker (from DAM-Test-Repo) ─────────────────────────────
 def _count_tokens(text: str) -> int:
     if _TIKTOKEN_AVAILABLE:
         try:
@@ -69,32 +69,21 @@ def _count_tokens(text: str) -> int:
     return len(text) // 4   # rough fallback: 1 token ≈ 4 chars
 
 
-def _split_to_chunks(text: str, target: int = CHUNK_TARGET_TOKENS, overlap_ratio: float = CHUNK_OVERLAP_RATIO) -> List[str]:
-    """Split text into overlapping chunks of ~target tokens."""
-    if _TIKTOKEN_AVAILABLE:
-        try:
-            enc = tiktoken.get_encoding("cl100k_base")
-            tokens = enc.encode(text)
-            step = max(1, int(target * (1 - overlap_ratio)))
-            chunks = []
-            for i in range(0, len(tokens), step):
-                chunk_tokens = tokens[i: i + target]
-                chunks.append(enc.decode(chunk_tokens))
-                if i + target >= len(tokens):
-                    break
-            return chunks if chunks else [text]
-        except Exception:
-            pass
-
-    # Char-based fallback
-    char_target = target * 4
-    char_step   = int(char_target * (1 - overlap_ratio))
+def chunk_text(text: str, chunk_words: int = CHUNK_TARGET_WORDS, overlap_words: int = CHUNK_OVERLAP_WORDS) -> List[Dict[str, Any]]:
+    """
+    Word-based chunking with overlap matching DAM-Test-Repo embed_to_pinecone.py.
+    Returns list of dicts: [{'index': int, 'text': str}, ...]
+    """
+    words = re.findall(r"\S+", text)
     chunks = []
-    for i in range(0, len(text), char_step):
-        chunks.append(text[i: i + char_target])
-        if i + char_target >= len(text):
+    start = 0
+    while start < len(words):
+        end = min(start + chunk_words, len(words))
+        chunks.append({"index": len(chunks), "text": " ".join(words[start:end])})
+        if end >= len(words):
             break
-    return chunks if chunks else [text]
+        start = end - overlap_words
+    return chunks
 
 
 # ── String similarity (Levenshtein ratio) ────────────────────────────────────
@@ -119,7 +108,7 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9 ]", "", name.lower()).strip()
 
 
-def match_brand_to_clients(brand_name: str, known_clients: List[str], tier1: float = 0.90, tier2: float = 0.60):
+def match_brand_to_clients(brand_name: str, known_clients: List[str], tier1: float = 0.85, tier2: float = 0.50):
     """
     Returns list of match dicts sorted by similarity descending.
     Each dict: { client, similarity, tier }
@@ -130,7 +119,12 @@ def match_brand_to_clients(brand_name: str, known_clients: List[str], tier1: flo
     norm_name = _normalize_name(brand_name)
     results = []
     for client in known_clients:
-        sim = _levenshtein_ratio(norm_name, _normalize_name(client))
+        norm_client = _normalize_name(client)
+        sim = _levenshtein_ratio(norm_name, norm_client)
+        # Check substring match (e.g. "Aarize" matches "Aarize Group")
+        if norm_name and norm_client and (norm_name in norm_client or norm_client in norm_name):
+            sub_sim = min(len(norm_name), len(norm_client)) / max(len(norm_name), len(norm_client))
+            sim = max(sim, 0.85 * (0.8 + 0.2 * sub_sim))
         if sim >= tier2:
             tier = 1 if sim >= tier1 else 2
             results.append({"client": client, "similarity": round(sim, 4), "tier": tier})
@@ -152,108 +146,108 @@ class RAGEngine:
             return False
         try:
             self._pc    = PineconeClient(api_key=PINECONE_API_KEY)
-            self._index = self._pc.Index(PINECONE_INDEX_NAME)
-            log.info(f"[RAG] Connected to Pinecone index '{PINECONE_INDEX_NAME}'")
+            self._index = self._pc.Index(name=PINECONE_INDEX_NAME, host=PINECONE_INDEX_HOST)
+            log.info(f"[RAG] Connected to Pinecone index '{PINECONE_INDEX_NAME}' at {PINECONE_INDEX_HOST}")
             return True
         except Exception as exc:
             log.error(f"[RAG] Failed to connect to Pinecone: {exc}")
             return False
 
-    # ── Embedding (intfloat/e5-base-v2) ───────────────────────────────────────
-    def _get_model(self):
-        if not hasattr(self, "_e5_model") or self._e5_model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-                log.info("[RAG] Loading intfloat/e5-base-v2 embedding model...")
-                self._e5_model = SentenceTransformer("intfloat/e5-base-v2")
-            except Exception as exc:
-                log.error(f"[RAG] Failed to load intfloat/e5-base-v2: {exc}")
-                self._e5_model = None
-        return self._e5_model
+    # ── Hosted Inference (llama-text-embed-v2 via Pinecone API) ───────────────
+    def _post_pinecone_embed(self, payload: dict) -> dict:
+        """Call Pinecone hosted embedding inference endpoint."""
+        import urllib.request, json
+        req = urllib.request.Request(
+            "https://api.pinecone.io/embed",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Api-Key": PINECONE_API_KEY,
+                "Content-Type": "application/json",
+                "X-Pinecone-Api-Version": "2025-04",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read().decode("utf-8"))
 
-    async def _embed(self, text: str) -> Optional[List[float]]:
-        """Embed search query using intfloat/e5-base-v2 with 'query: ' prefix."""
-        try:
-            model = self._get_model()
-            if not model:
-                return None
-            loop = asyncio.get_event_loop()
-            # E5 models require 'query: ' prefix for asymmetric retrieval queries
-            formatted_text = f"query: {text.strip()}"
-            embedding = await loop.run_in_executor(
-                None,
-                lambda: model.encode(formatted_text, normalize_embeddings=True).tolist()
-            )
-            return embedding
-        except Exception as exc:
-            log.error(f"[RAG] E5 Query Embedding error: {exc}")
+    async def _embed_passages(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Embed text chunks using Pinecone hosted inference (llama-text-embed-v2, 768d) in batches of 96."""
+        if not chunks or not PINECONE_API_KEY:
+            return chunks
+        loop = asyncio.get_event_loop()
+        for start in range(0, len(chunks), 96):
+            batch = chunks[start:start + 96]
+            payload = {
+                "model": EMBEDDING_MODEL,
+                "parameters": {"input_type": "passage", "truncate": "END", "dimension": EMBEDDING_DIM},
+                "inputs": [{"text": chunk["text"]} for chunk in batch],
+            }
+            result = await loop.run_in_executor(None, self._post_pinecone_embed, payload)
+            vectors = result.get("data", [])
+            if len(vectors) != len(batch):
+                raise RuntimeError(f"Pinecone returned {len(vectors)} embeddings for {len(batch)} inputs")
+            for chunk, vector in zip(batch, vectors):
+                chunk["embedding"] = vector["values"]
+        return chunks
+
+    async def _embed_query(self, query: str) -> Optional[List[float]]:
+        """Embed search query using Pinecone hosted inference (llama-text-embed-v2, 768d)."""
+        if not PINECONE_API_KEY or not query.strip():
             return None
-
-    async def _embed_document(self, text: str) -> Optional[List[float]]:
-        """Embed a document chunk using intfloat/e5-base-v2 with 'passage: ' prefix."""
+        loop = asyncio.get_event_loop()
+        payload = {
+            "model": EMBEDDING_MODEL,
+            "parameters": {"input_type": "query", "truncate": "END", "dimension": EMBEDDING_DIM},
+            "inputs": [{"text": query.strip()}],
+        }
         try:
-            model = self._get_model()
-            if not model:
-                return None
-            loop = asyncio.get_event_loop()
-            # E5 models require 'passage: ' prefix for document passages
-            formatted_text = f"passage: {text.strip()}"
-            embedding = await loop.run_in_executor(
-                None,
-                lambda: model.encode(formatted_text, normalize_embeddings=True).tolist()
-            )
-            return embedding
+            result = await loop.run_in_executor(None, self._post_pinecone_embed, payload)
+            data = result.get("data", [])
+            if data and "values" in data[0]:
+                return data[0]["values"]
         except Exception as exc:
-            log.error(f"[RAG] E5 Document Embedding error: {exc}")
-            return None
-
+            log.error(f"[RAG] Query embedding error: {exc}")
+        return None
     # ── Known Clients ─────────────────────────────────────────────────────────
     def get_known_clients(self) -> List[str]:
         """
-        Fetch distinct `client` metadata values from Pinecone by iterating
-        over indexed vector IDs and fetching metadata in batches.
+        Fetch distinct `client` metadata values from Pinecone cograg index.
         Cached in-memory for 10 minutes to ensure instant response times.
         """
         now = time.time()
         if hasattr(self, "_clients_cache") and self._clients_cache and (now - getattr(self, "_clients_cache_time", 0) < 600):
             return self._clients_cache
 
+        known = {
+            "Aarize Group", "Emaar India", "Ganga Realty", "OZAR",
+            "Pyramid Infratech", "Rising Homes", "SPJ Group", "Santur Group",
+            "Signature Global", "SRHU", "TVS Emerald", "Trehan IRIS"
+        }
+
         if not self._ensure_index():
-            return []
+            return sorted(list(known))
+
         try:
-            clients = set()
-            # Fetch sample pages of IDs from index
-            raw_pages = list(self._index.list())
-            vector_ids = []
-            for page in raw_pages:
-                for item in page:
-                    item_id = item.id if hasattr(item, "id") else str(item)
-                    vector_ids.append(item_id)
-                if len(vector_ids) >= 200:
-                    break
-
-            # Fetch metadata in batches of 50
-            batch_size = 50
-            for i in range(0, min(len(vector_ids), 200), batch_size):
-                batch_ids = vector_ids[i : i + batch_size]
-                try:
-                    fetched = self._index.fetch(ids=batch_ids, namespace=PINECONE_NAMESPACE)
-                    for vec in fetched.vectors.values():
-                        if vec.metadata and vec.metadata.get("client"):
-                            clients.add(vec.metadata["client"].strip())
-                except Exception as b_err:
-                    log.warning(f"[RAG] Batch fetch error: {b_err}")
-
-            result = sorted([c for c in clients if c])
-            if result:
-                self._clients_cache = result
-                self._clients_cache_time = now
-            return result
+            resp = self._index.query(
+                vector=[0.01] * EMBEDDING_DIM,
+                top_k=100,
+                include_metadata=True,
+                namespace=PINECONE_NAMESPACE
+            )
+            matches = resp.get("matches", []) if isinstance(resp, dict) else getattr(resp, "matches", [])
+            for m in matches:
+                meta = m.get("metadata") if isinstance(m, dict) else getattr(m, "metadata", None)
+                if meta and meta.get("client"):
+                    c = str(meta["client"]).strip()
+                    if c:
+                        known.add(c)
         except Exception as exc:
-            log.error(f"[RAG] get_known_clients error: {exc}")
-            return getattr(self, "_clients_cache", [])
+            log.warning(f"[RAG] Client discovery query error: {exc}")
 
-
+        result = sorted(list(known))
+        self._clients_cache = result
+        self._clients_cache_time = now
+        return result
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
     async def retrieve_brand_context(
@@ -264,15 +258,14 @@ class RAGEngine:
         media_type_bias: Optional[str] = None,
     ) -> str:
         """
-        Embed query → Pinecone query filtered by client key → assemble context string.
+        Embed query via Pinecone llama-text-embed-v2 → query cograg index
+        filtered by client key → assemble context string.
         Returns empty string if retrieval fails or brand is not linked.
         """
-        if not self._ensure_index():
-            return ""
-        if not pinecone_client_key:
+        if not self._ensure_index() or not pinecone_client_key:
             return ""
 
-        embedding = await self._embed(query)
+        embedding = await self._embed_query(query)
         if not embedding:
             return ""
 
@@ -288,35 +281,36 @@ class RAGEngine:
                 include_metadata=True,
                 namespace=PINECONE_NAMESPACE,
             )
-            matches = resp.get("matches", [])
+            matches = resp.get("matches", []) if isinstance(resp, dict) else getattr(resp, "matches", [])
             if not matches:
                 log.info(f"[RAG] No Pinecone results for client='{pinecone_client_key}' query='{query[:60]}'")
                 return ""
 
-            # Dedupe by text content, trim to token budget
             seen_texts = set()
             chunks = []
             total_tokens = 0
             for m in matches:
-                meta = m.get("metadata") or {}
-                text = meta.get("text", "").strip()
+                meta = m.get("metadata") if isinstance(m, dict) else getattr(m, "metadata", None)
+                if not meta:
+                    continue
+                text = (meta.get("text") or "").strip()
                 if not text or text in seen_texts:
                     continue
                 seen_texts.add(text)
                 tokens = _count_tokens(text)
                 if total_tokens + tokens > CONTEXT_TOKEN_BUDGET:
                     break
+                score = m.get("score", 0) if isinstance(m, dict) else getattr(m, "score", 0)
                 chunks.append({
                     "text": text,
                     "file": meta.get("file_name", "unknown"),
-                    "score": round(m.get("score", 0), 3),
+                    "score": round(float(score or 0), 3),
                 })
                 total_tokens += tokens
 
             if not chunks:
                 return ""
 
-            # Format as clean context block
             context_lines = [f"--- Brand Knowledge Base Context (top {len(chunks)} relevant excerpts) ---"]
             for i, c in enumerate(chunks, 1):
                 context_lines.append(f"\n[Excerpt {i} | source: {c['file']} | relevance: {c['score']}]\n{c['text']}")
@@ -327,9 +321,9 @@ class RAGEngine:
             log.error(f"[RAG] Retrieval error for client='{pinecone_client_key}': {exc}")
             return ""
 
-    # ── PDF Text Extraction ───────────────────────────────────────────────────
+    # ── File Text Extraction (from DAM-Test-Repo) ────────────────────────────
     def extract_text_from_file(self, content: bytes, filename: str) -> str:
-        """Extract text from PDF or plain text bytes."""
+        """Extract text from PDF, DOCX, or plain text bytes."""
         ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
         if ext == "pdf":
             if not _PYPDF2_AVAILABLE:
@@ -345,13 +339,17 @@ class RAGEngine:
             except Exception as exc:
                 log.error(f"[RAG] PDF extraction error for {filename}: {exc}")
                 return ""
-        # Treat as plain text
-        try:
-            return content.decode("utf-8", errors="replace").strip()
-        except Exception:
-            return ""
 
-    # ── Ingestion ─────────────────────────────────────────────────────────────
+        # Treat as plain text / markdown / utf-8
+        try:
+            return content.decode("utf-8-sig", errors="replace").strip()
+        except Exception:
+            try:
+                return content.decode("utf-8", errors="replace").strip()
+            except Exception:
+                return ""
+
+    # ── Ingestion (from DAM-Test-Repo embed_to_pinecone) ─────────────────────
     async def ingest_file(
         self,
         dam_file_id: str,
@@ -362,11 +360,11 @@ class RAGEngine:
         media_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Extract text → chunk → embed → upsert to Pinecone.
+        Extract text → chunk (words=350, overlap=70) → embed with hosted llama-text-embed-v2 → upsert to cograg.
         Returns { success, chunk_count, error }.
         """
         if not self._ensure_index():
-            return {"success": False, "chunk_count": 0, "error": "Pinecone unavailable"}
+            return {"success": False, "chunk_count": 0, "error": "Pinecone cograg index unavailable"}
 
         ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else "txt"
         inferred_media_type = media_type or ("images" if ext in {"jpg", "jpeg", "png", "gif", "webp", "svg"} else "pdfs" if ext == "pdf" else "docs")
@@ -375,45 +373,49 @@ class RAGEngine:
         if not text:
             return {"success": False, "chunk_count": 0, "error": "Could not extract text from file"}
 
-        chunks = _split_to_chunks(text)
+        chunks = chunk_text(text, chunk_words=CHUNK_TARGET_WORDS, overlap_words=CHUNK_OVERLAP_WORDS)
         if not chunks:
             return {"success": False, "chunk_count": 0, "error": "No text chunks produced"}
 
-        # Embed all chunks (sequential to respect rate limits)
+        try:
+            await self._embed_passages(chunks)
+        except Exception as emb_err:
+            log.error(f"[RAG] Embedding failed: {emb_err}")
+            return {"success": False, "chunk_count": 0, "error": f"Embedding failed: {emb_err}"}
+
+        client_slug = re.sub(r"[^a-zA-Z0-9_-]", "-", pinecone_client_key).strip("-").lower()
+        file_slug = re.sub(r"[^a-zA-Z0-9_-]", "-", filename).strip("-").lower()
+
         vectors = []
-        for i, chunk in enumerate(chunks):
-            emb = await self._embed_document(chunk)
+        for chunk in chunks:
+            emb = chunk.get("embedding")
             if not emb:
                 continue
-            vector_id = f"{pinecone_client_key}_{dam_file_id}_chunk-{i}"
+            vector_id = f"{client_slug}_{dam_file_id}_chunk-{chunk['index']}"
             vectors.append({
                 "id": vector_id,
                 "values": emb,
                 "metadata": {
-                    "client":           pinecone_client_key,
-                    "file_name":        filename,
-                    "dam_file_id":      dam_file_id,
-                    "media_type":       inferred_media_type,
-                    "chunk_index":      i,
-                    "text":             chunk[:3000],    # cap at Pinecone metadata limit
-                    "project_id":       project_id or "",
-                    "embedding_model":  EMBEDDING_MODEL,
+                    "client": pinecone_client_key,
+                    "file_name": filename,
+                    "dam_file_id": dam_file_id,
+                    "media_type": inferred_media_type,
+                    "chunk_index": chunk["index"],
+                    "text": chunk["text"][:3000],    # within Pinecone metadata limit
+                    "project_id": project_id or "",
+                    "embedding_model": EMBEDDING_MODEL,
                 }
             })
-            # Small delay between embed calls to avoid rate limiting
-            if (i + 1) % 5 == 0:
-                await asyncio.sleep(0.2)
 
         if not vectors:
             return {"success": False, "chunk_count": 0, "error": "Embedding failed for all chunks"}
 
-        # Upsert in batches of 100
         try:
             batch_size = 100
             for j in range(0, len(vectors), batch_size):
                 batch = vectors[j: j + batch_size]
                 self._index.upsert(vectors=batch, namespace=PINECONE_NAMESPACE)
-            log.info(f"[RAG] Upserted {len(vectors)} vectors for dam_file_id={dam_file_id}, client={pinecone_client_key}")
+            log.info(f"[RAG] Upserted {len(vectors)} vectors to cograg for dam_file_id={dam_file_id}, client={pinecone_client_key}")
             return {"success": True, "chunk_count": len(vectors), "error": None}
         except Exception as exc:
             log.error(f"[RAG] Upsert error for {dam_file_id}: {exc}")
@@ -425,25 +427,22 @@ class RAGEngine:
         if not self._ensure_index():
             return False
         try:
-            # Pinecone v3: delete by ID prefix using list + delete
             prefix = f"{pinecone_client_key}_{dam_file_id}_chunk-"
             try:
-                # Try list (serverless)
                 ids = [v for v in self._index.list(prefix=prefix, namespace=PINECONE_NAMESPACE)]
                 if ids:
                     self._index.delete(ids=ids, namespace=PINECONE_NAMESPACE)
                     log.info(f"[RAG] Deleted {len(ids)} vectors for dam_file_id={dam_file_id}")
-            except AttributeError:
-                # Fallback for pod-based indexes: query by metadata then delete
-                dummy = [0.0] * EMBEDDING_DIM
+            except Exception:
                 resp = self._index.query(
-                    vector=dummy,
+                    vector=[0.0] * EMBEDDING_DIM,
                     top_k=1000,
                     filter={"dam_file_id": {"$eq": dam_file_id}},
                     include_metadata=False,
                     namespace=PINECONE_NAMESPACE,
                 )
-                ids = [m["id"] for m in resp.get("matches", [])]
+                matches = resp.get("matches", []) if isinstance(resp, dict) else getattr(resp, "matches", [])
+                ids = [m["id"] if isinstance(m, dict) else m.id for m in matches]
                 if ids:
                     self._index.delete(ids=ids, namespace=PINECONE_NAMESPACE)
                     log.info(f"[RAG] Deleted {len(ids)} vectors for dam_file_id={dam_file_id}")
@@ -455,3 +454,4 @@ class RAGEngine:
 
 # Singleton engine instance
 rag_engine = RAGEngine()
+

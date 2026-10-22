@@ -30,6 +30,9 @@ npm-debug.log*
 
 # Python env and cache
 .venv/
+backend/venv/
+backend/scratch/
+backend/test_conn.py
 .pytest_cache/
 __pycache__/
 *.pyc
@@ -42,3 +45,4 @@ Master_Database.pdf
 
 # Secrets
 AI_vichitra_client_secret_*.json
+
