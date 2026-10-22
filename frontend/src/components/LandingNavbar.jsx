@@ -55,7 +55,7 @@ export default function LandingNavbar({ currentHash, onLogin }) {
                   <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#16192b", marginBottom: "12px", fontFamily: "Inter Tight, system-ui, sans-serif" }}>Analytics</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <a
-                      href="http://geocc.duckdns.org"
+                      href="http://geotest2026.duckdns.org:3000/"
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ display: "block", fontSize: "13px", color: "#6b7080", fontFamily: "Inter, system-ui, sans-serif", textDecoration: "none", lineHeight: 1.35, transition: "color 0.15s" }}

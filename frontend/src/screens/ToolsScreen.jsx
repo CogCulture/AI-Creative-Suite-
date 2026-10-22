@@ -15,11 +15,11 @@ import { Card, Btn, Eyebrow, H1, Sub, SectionH } from "../components/primitives/
         credentials: "include",
       });
       const data = await res.json();
-      const targetUrl = data?.launch_url || "http://geocc.duckdns.org/";
+      const targetUrl = data?.launch_url || "http://geotest2026.duckdns.org:3000/";
       window.open(targetUrl, "_blank", "noopener,noreferrer");
       showToast("GEO Tool opened in a new tab");
     } catch (err) {
-      window.open("http://geocc.duckdns.org/", "_blank", "noopener,noreferrer");
+      window.open("http://geotest2026.duckdns.org:3000/", "_blank", "noopener,noreferrer");
       showToast("GEO Tool opened in a new tab");
     } finally {
       setLaunchingGeo(false);
