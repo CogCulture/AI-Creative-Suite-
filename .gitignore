@@ -46,3 +46,6 @@ Master_Database.pdf
 # Secrets
 AI_vichitra_client_secret_*.json
 
+# Local directories
+ApoorvGenfy/
+backend/venve/
