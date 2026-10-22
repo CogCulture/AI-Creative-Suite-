@@ -698,6 +698,14 @@ function cfgSelect(t) {
   };
 }
 
+function cfgInput(t) {
+  return {
+    width: "100%", padding: "8px 10px", borderRadius: R.md, boxSizing: "border-box",
+    border: `1px solid ${t.border}`, background: t.bg,
+    color: t.text, fontFamily: FONT, fontSize: 12.5, outline: "none",
+  };
+}
+
 function dataBoxStyle(t) {
   return {
     padding: "9px 11px",
