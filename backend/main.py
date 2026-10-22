@@ -78,8 +78,23 @@ COPYAGENT_URL: str    = os.getenv(
     "COPYAGENT_URL",
     "https://copyagennt.in/api/integration/v1/chat/completions",
 )
-FRONTEND_ORIGIN: str  = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 COPYAGENT_BASE_URL: str = os.getenv("COPYAGENT_BASE_URL", "https://copyagennt.in")
+FRONTEND_ORIGIN: str    = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+COPYAGENT_DATABASE_URL: str = os.getenv(
+    "COPYAGENT_DATABASE_URL",
+    os.getenv("DATABASE_URL", "postgresql://postgres.ptstsemkwqnyweisfigt:Tushar%401220@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"),
+)
+
+def _get_pg_connection():
+    if not COPYAGENT_DATABASE_URL:
+        return None
+    try:
+        import psycopg2
+        import psycopg2.extras
+        return psycopg2.connect(COPYAGENT_DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    except Exception as e:
+        print(f"[PostgreSQL Connection Error]: {e}", flush=True)
+        return None
 
 # Safety fallback for local execution outside Docker
 if "host.docker.internal" in COPYAGENT_URL:
@@ -686,6 +701,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:5173",
     ],
+    allow_origin_regex=r"^https?://(?:\w+\.)?(?:localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Accept", "Origin", "Authorization"],
@@ -2024,13 +2040,45 @@ async def bff_list_conversations(
         if user and user.copyagent_user_id:
             effective_user_id = user.copyagent_user_id
 
+    # 1. Primary: Direct lookup in shared CopyAgent PostgreSQL
+    pg_conn = _get_pg_connection()
+    if pg_conn:
+        try:
+            with pg_conn.cursor() as cur:
+                target_ids = list({uid for uid in [user_id, effective_user_id] if uid})
+                cur.execute(
+                    """
+                    SELECT id, title, user_id, user_name, created_at, updated_at
+                    FROM conversations
+                    WHERE user_id = ANY(%s)
+                    ORDER BY created_at DESC
+                    LIMIT 100
+                    """,
+                    (target_ids,),
+                )
+                rows = cur.fetchall()
+                result = []
+                for r in rows:
+                    result.append({
+                        "id": str(r["id"]),
+                        "title": r["title"] or "Untitled Chat",
+                        "user_id": str(r["user_id"]),
+                        "user_name": r.get("user_name") or "User",
+                        "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                        "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None,
+                    })
+                return result
+        except Exception as pg_exc:
+            print(f"[Conversations PG Error]: {pg_exc}", flush=True)
+        finally:
+            pg_conn.close()
+
+    # 2. Fallback: Query upstream CopyAgent endpoint
     url = f"{COPYAGENT_BASE_URL}/api/conversations/"
     params = {"user_id": effective_user_id}
-    print(f"[Conversations] Querying url={url} with params={params}", flush=True)
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             resp = await client.get(url, params=params)
-        print(f"[Conversations] Status={resp.status_code}, Body={resp.text[:300]}", flush=True)
         if resp.status_code == 200:
             return resp.json()
         return []
@@ -2044,6 +2092,47 @@ async def bff_get_conversation_details(
     suite_session: Optional[str] = Cookie(None),
     db: Session = Depends(get_suite_db),
 ):
+    # 1. Primary: Direct lookup in shared CopyAgent PostgreSQL
+    pg_conn = _get_pg_connection()
+    if pg_conn:
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, title, user_id FROM conversations WHERE id = %s",
+                    (conversation_id,)
+                )
+                conv = cur.fetchone()
+                
+                cur.execute(
+                    """
+                    SELECT id, role, content, created_at
+                    FROM messages
+                    WHERE conversation_id = %s
+                    ORDER BY created_at ASC
+                    """,
+                    (conversation_id,)
+                )
+                msgs = cur.fetchall()
+                mapped_messages = []
+                for m in msgs:
+                    mapped_messages.append({
+                        "id": str(m["id"]),
+                        "role": m["role"],
+                        "content": m["content"] or "",
+                        "text": m["content"] or "",
+                        "created_at": m["created_at"].isoformat() if m.get("created_at") else None,
+                    })
+                return {
+                    "id": str(conv["id"]) if conv else conversation_id,
+                    "title": conv["title"] if conv else "Chat",
+                    "messages": mapped_messages,
+                }
+        except Exception as pg_exc:
+            print(f"[Conversation Details PG Error]: {pg_exc}", flush=True)
+        finally:
+            pg_conn.close()
+
+    # 2. Fallback: Upstream endpoint
     url = f"{COPYAGENT_BASE_URL}/api/conversations/{conversation_id}"
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
@@ -2066,6 +2155,19 @@ async def bff_delete_conversation(
     suite_session: Optional[str] = Cookie(None),
     db: Session = Depends(get_suite_db),
 ):
+    pg_conn = _get_pg_connection()
+    if pg_conn:
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute("DELETE FROM messages WHERE conversation_id = %s", (conversation_id,))
+                cur.execute("DELETE FROM conversations WHERE id = %s", (conversation_id,))
+            pg_conn.commit()
+            return {"status": "success", "id": conversation_id}
+        except Exception as pg_exc:
+            print(f"[Delete Conversation PG Error]: {pg_exc}", flush=True)
+        finally:
+            pg_conn.close()
+
     url = f"{COPYAGENT_BASE_URL}/api/conversations/{conversation_id}"
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
@@ -2087,6 +2189,21 @@ async def bff_update_conversation_title(
     suite_session: Optional[str] = Cookie(None),
     db: Session = Depends(get_suite_db),
 ):
+    pg_conn = _get_pg_connection()
+    if pg_conn:
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET title = %s, updated_at = %s WHERE id = %s",
+                    (payload.title, datetime.utcnow(), conversation_id)
+                )
+            pg_conn.commit()
+            return {"status": "success", "id": conversation_id, "title": payload.title}
+        except Exception as pg_exc:
+            print(f"[Update Title PG Error]: {pg_exc}", flush=True)
+        finally:
+            pg_conn.close()
+
     url = f"{COPYAGENT_BASE_URL}/api/conversations/{conversation_id}/title"
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
@@ -2114,7 +2231,6 @@ async def bff_create_conversation(
     suite_session: Optional[str] = Cookie(None),
     db: Session = Depends(get_suite_db),
 ):
-    url = f"{COPYAGENT_BASE_URL}/api/conversations/"
     user_id = _get_current_user_id(suite_session)
     if not user_id:
         user_id = STATIC_USER_ID
@@ -2124,23 +2240,36 @@ async def bff_create_conversation(
         user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
         if user and user.copyagent_user_id:
             effective_user_id = user.copyagent_user_id
-            
-    upstream_payload = payload.dict()
-    upstream_payload["user_id"] = effective_user_id
-    
-    try:
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-            resp = await client.post(url, json=upstream_payload)
-        if resp.is_success:
-            return resp.json()
-        print(f"[Conversation Create] Upstream status {resp.status_code}, using fallback conversation ID", flush=True)
-    except Exception as e:
-        print(f"[Conversation Create] Upstream error (using fallback): {e}", flush=True)
 
-    # Resilient fallback: return valid conversation object so chat starts cleanly without 500
+    conv_id = str(uuid.uuid4())
+    title = payload.title or "New Chat"
+
+    pg_conn = _get_pg_connection()
+    if pg_conn:
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO conversations (id, title, user_id, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (conv_id, title, effective_user_id, datetime.utcnow(), datetime.utcnow()),
+                )
+            pg_conn.commit()
+            return {
+                "id": conv_id,
+                "title": title,
+                "user_id": effective_user_id,
+                "messages": [],
+            }
+        except Exception as pg_exc:
+            print(f"[Conversation Create PG Error]: {pg_exc}", flush=True)
+        finally:
+            pg_conn.close()
+
     return {
-        "id": f"conv_{uuid.uuid4().hex[:12]}",
-        "title": payload.title,
+        "id": conv_id,
+        "title": title,
         "user_id": effective_user_id,
         "messages": [],
     }
