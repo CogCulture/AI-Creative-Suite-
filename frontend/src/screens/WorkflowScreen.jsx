@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { marked } from "marked";
 import {
   Play, Loader2, Image as ImageIcon, MessageSquare, ShieldCheck, PenLine,
   FileText, Compass, Sliders, X, Crown, Terminal,
   ChevronDown, ChevronUp, CheckCircle, AlertCircle, Zap, Sparkles, Trash2,
-  RotateCcw, Settings, ArrowDown, ExternalLink
+  RotateCcw, Settings, ArrowDown, ExternalLink, Plus, ArrowLeft, Clock
 } from "lucide-react";
 import { FONT, MONO, R } from "../tokens.js";
 import { Card, Btn } from "../components/primitives/index.jsx";
@@ -14,54 +15,314 @@ const PIPELINE = [
     id: "brief", type: "tool", step: 1,
     label: "Campaign Brief", subtitle: "Input · Start of pipeline",
     icon: FileText, color: "#E8850C",
+    logo: null,
   },
   {
     id: "agent_strategy", type: "agent", step: 2,
     label: "Strategy Agent", subtitle: "Intermediary · Brief → Copy",
     icon: Compass, color: "#6D4AE8",
+    logo: null,
     defaultPrompt: "You are an expert Strategy Agent. Analyze campaign briefs and formulate structured strategy specs: Target Audience, Key Value Proposition, Tone of Voice, and Copywriting Angle for the Copy Agent.",
   },
   {
     id: "copy", type: "tool", step: 3,
     label: "Copy Agent", subtitle: "copyagennt.in · API",
     icon: PenLine, color: "#8B5CF6",
+    logo: "/images/copy_agent_logo.png",
   },
   {
     id: "agent_artdir", type: "agent", step: 4,
     label: "Art Director Agent", subtitle: "Intermediary · Copy → Visual",
     icon: Sliders, color: "#E8552A",
+    logo: null,
     defaultPrompt: "You are a World-Class Visual Art Director. Given campaign copy, select optimal Genfy visual parameters and write a detailed image generation prompt aligned with the brand tone.",
   },
   {
     id: "genfy", type: "tool", step: 5,
     label: "Genfy Image Engine", subtitle: "Nanobanana 2 · Vertex AI",
     icon: ImageIcon, color: "#E8552A",
+    logo: "/images/genfy_logo.png",
   },
 ];
 
-const MODELS = ["claude-4-sonnet", "claude-3-7-sonnet", "gpt-4o", "gemini-2.0-flash"];
+const MODELS = [
+  { id: "claude-sonnet-5", label: "Claude Sonnet 5", description: "Creative & Brand Voice" },
+  { id: "gpt-6-luna", label: "GPT-6 Luna", description: "Fast & Efficient" },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", description: "Advanced Reasoning & Strategy" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "High Speed & Multimodal" },
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", description: "Deep Complex Reasoning" },
+  { id: "claude-opus-4-8", label: "Claude Opus 4.8", description: "In-depth Analysis" }
+];
 const ASSET_TYPES = ["Instagram Ad Image", "Story Banner (9:16)", "Hero Banner (16:9)", "Facebook Ad", "LinkedIn Post Visual", "YouTube Thumbnail"];
 const RATIOS = ["1:1", "9:16", "16:9", "4:3", "3:2"];
 const QUALITIES = ["High", "Standard", "Ultra"];
 
-// ── Node connector line ──────────────────────────────────────────────────────
-function Connector({ color, active, done }) {
-  const c = done ? "#22C55E" : active ? color : "rgba(130,130,130,0.2)";
+const PREDEFINED_WORKFLOWS = [
+  {
+    id: "full",
+    name: "Full Multi-Agent Pipeline",
+    desc: "Brief → Strategy Agent → Copy Agent → Art Director → Genfy",
+    badge: "5 Nodes · End-to-End",
+    nodes: ["brief", "agent_strategy", "copy", "agent_artdir", "genfy"],
+  },
+  {
+    id: "strategy_copy",
+    name: "Strategy & Copywriting",
+    desc: "Brief → Strategy Agent → Copy Agent",
+    badge: "3 Nodes · Messaging",
+    nodes: ["brief", "agent_strategy", "copy"],
+  },
+  {
+    id: "direct_genfy",
+    name: "Direct Visual Creator",
+    desc: "Brief → Genfy Image Engine",
+    badge: "2 Nodes · Visuals",
+    nodes: ["brief", "genfy"],
+  },
+  {
+    id: "quick_copy",
+    name: "Quick Copy Agent",
+    desc: "Brief → Copy Agent",
+    badge: "2 Nodes · Copy",
+    nodes: ["brief", "copy"],
+  },
+];
+
+// ── Node Icon / Logo Badge ──────────────────────────────────────────────────
+function NodeIconBadge({ node, isAgent, containerSize = 32, radius, size = 15 }) {
+  if (!node) return null;
+  const r = radius !== undefined ? radius : (isAgent ? 10 : 8);
+
+  // 1. Copy Agent Logo
+  if (node.id === "copy" || node.id === "copy_agent") {
+    return (
+      <div
+        style={{
+          width: containerSize,
+          height: containerSize,
+          borderRadius: r,
+          background: "#000000",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          overflow: "hidden",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          position: "relative"
+        }}
+        title="Copy Agent"
+      >
+        <img
+          src="/images/copy_agent_logo.png"
+          alt="Copy Agent"
+          style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.15)" }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            const fallback = e.currentTarget.parentElement.querySelector(".ca-logo-fallback");
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+        <div
+          className="ca-logo-fallback"
+          style={{
+            display: "none",
+            width: "100%",
+            height: "100%",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#000000",
+            color: "#ffffff",
+            fontWeight: 800,
+            fontSize: Math.round(containerSize * 0.44),
+            fontFamily: "Inter, sans-serif",
+            userSelect: "none",
+            letterSpacing: "-0.03em"
+          }}
+        >
+          CA
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Genfy Tool Logo
+  if (node.id === "genfy") {
+    return (
+      <div
+        style={{
+          width: containerSize,
+          height: containerSize,
+          borderRadius: r,
+          background: "rgba(232, 85, 42, 0.12)",
+          border: "1px solid rgba(232, 85, 42, 0.35)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          overflow: "hidden",
+          boxShadow: "0 0 10px rgba(232, 85, 42, 0.25)",
+        }}
+        title="Genfy Image Engine"
+      >
+        <img
+          src="/images/genfy_logo.png"
+          alt="Genfy"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            filter: "drop-shadow(0 0 3px rgba(232, 85, 42, 0.6))",
+          }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            const fallback = e.currentTarget.parentElement.querySelector(".genfy-logo-fallback");
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+        <div
+          className="genfy-logo-fallback"
+          style={{
+            display: "none",
+            width: "100%",
+            height: "100%",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#E8552A"
+          }}
+        >
+          <ImageIcon size={size} color="#E8552A" />
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Campaign Brief
+  if (node.id === "brief") {
+    const Icon = node.icon || FileText;
+    return (
+      <div
+        style={{
+          width: containerSize,
+          height: containerSize,
+          borderRadius: r,
+          flexShrink: 0,
+          background: "linear-gradient(135deg, #F59E0B, #D97706)",
+          display: "grid",
+          placeItems: "center",
+          boxShadow: "0 2px 8px rgba(245, 158, 11, 0.35)",
+          color: "#ffffff"
+        }}
+        title="Campaign Brief"
+      >
+        <Icon size={size} color="#ffffff" />
+      </div>
+    );
+  }
+
+  // 4. Strategy Agent
+  if (node.id === "agent_strategy") {
+    const Icon = node.icon || Compass;
+    return (
+      <div
+        style={{
+          width: containerSize,
+          height: containerSize,
+          borderRadius: r,
+          flexShrink: 0,
+          background: "linear-gradient(135deg, #6D4AE8, #4F46E5)",
+          display: "grid",
+          placeItems: "center",
+          boxShadow: "0 3px 10px rgba(109, 74, 232, 0.35)",
+          color: "#ffffff"
+        }}
+        title="Strategy Agent"
+      >
+        <Icon size={size} color="#ffffff" />
+      </div>
+    );
+  }
+
+  // 5. Art Director Agent
+  if (node.id === "agent_artdir") {
+    const Icon = node.icon || Sliders;
+    return (
+      <div
+        style={{
+          width: containerSize,
+          height: containerSize,
+          borderRadius: r,
+          flexShrink: 0,
+          background: "linear-gradient(135deg, #E8552A, #C2410C)",
+          display: "grid",
+          placeItems: "center",
+          boxShadow: "0 3px 10px rgba(232, 85, 42, 0.35)",
+          color: "#ffffff"
+        }}
+        title="Art Director Agent"
+      >
+        <Icon size={size} color="#ffffff" />
+      </div>
+    );
+  }
+
+  // Fallback for custom nodes
+  const Icon = node.icon;
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "2px 0" }}>
+    <div
+      style={{
+        width: containerSize,
+        height: containerSize,
+        borderRadius: r,
+        flexShrink: 0,
+        background: isAgent
+          ? `linear-gradient(135deg, ${node.color || "#6D4AE8"}, ${(node.color || "#6D4AE8")}BB)`
+          : `${node.color || "#6D4AE8"}18`,
+        display: "grid",
+        placeItems: "center",
+        boxShadow: isAgent ? `0 3px 10px ${(node.color || "#6D4AE8")}55` : "none",
+        color: isAgent ? "#fff" : node.color,
+      }}
+      title={node.label}
+    >
+      {Icon && <Icon size={size} color={isAgent ? "#fff" : node.color} />}
+    </div>
+  );
+}
+
+// ── Node connector line ──────────────────────────────────────────────────────
+function Connector({ color, active, done, ready }) {
+  const isGlowing = active || ready;
+  const c = done ? "#22C55E" : isGlowing ? color : "rgba(130,130,130,0.22)";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "2px 0", position: "relative" }}>
       <div style={{
-        width: 2, height: 36,
-        background: `linear-gradient(to bottom, ${c}, ${c}44)`,
-        borderRadius: 2, transition: "background .5s ease",
-        boxShadow: active ? `0 0 8px ${color}66` : "none",
+        width: isGlowing ? 2.5 : 2, height: 36,
+        background: isGlowing
+          ? `linear-gradient(to bottom, #22C55E, ${c})`
+          : `linear-gradient(to bottom, ${c}, ${c}44)`,
+        borderRadius: 2, transition: "all .4s ease",
+        boxShadow: isGlowing ? `0 0 10px ${color}88` : "none",
       }} />
       <div style={{
         width: 0, height: 0,
         borderLeft: "5px solid transparent",
         borderRight: "5px solid transparent",
         borderTop: `7px solid ${c}`,
-        transition: "border-color .5s ease",
+        transition: "border-color .4s ease",
+        filter: isGlowing ? `drop-shadow(0 2px 5px ${color}77)` : "none",
       }} />
+      {ready && (
+        <span style={{
+          position: "absolute", right: -56, top: 10,
+          fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color,
+          background: `${color}18`, border: `1px solid ${color}40`,
+          padding: "1px 6px", borderRadius: 10, letterSpacing: "0.04em",
+          textTransform: "uppercase"
+        }}>
+          flow ready ↓
+        </span>
+      )}
     </div>
   );
 }
@@ -86,11 +347,316 @@ function StatusBadge({ status }) {
   );
 }
 
+// ── Markdown and Copy Text Cleaners (Strip raw MD, human-readable format) ────
+function stripMarkdownSymbols(text) {
+  if (!text || typeof text !== "string") return "";
+  return text
+    .replace(/^#+\s*/gm, "")           // remove leading #, ##, ### on any line
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // remove **bold**
+    .replace(/\*([^*]+)\*/g, "$1")     // remove *italic*
+    .replace(/__([^_]+)__/g, "$1")     // remove __bold__
+    .replace(/^["']|["']$/g, "")       // remove quotes
+    .trim();
+}
+
+function cleanHeadline(text) {
+  if (!text || typeof text !== "string") return "";
+  return stripMarkdownSymbols(text)
+    .replace(/^Headline:\s*/i, "")
+    .replace(/^Copy:\s*/i, "")
+    .trim();
+}
+
+// Strip headline from body copy so it is never displayed or saved twice
+function stripHeadlineFromBody(body, headline) {
+  if (!body || typeof body !== "string") return "";
+  let cleanBody = cleanRawJson(body).trim();
+  if (!headline) return cleanBody;
+
+  const cleanH = cleanHeadline(headline).toLowerCase();
+  const lines = cleanBody.split("\n");
+
+  while (lines.length > 0) {
+    const firstLineRaw = lines[0].trim();
+    if (!firstLineRaw || /^[•●\-\*\._\s~]+$/.test(firstLineRaw)) {
+      lines.shift();
+      continue;
+    }
+    const firstLineClean = cleanHeadline(firstLineRaw).toLowerCase();
+    if (
+      firstLineClean === cleanH ||
+      (cleanH.length > 10 && cleanH.startsWith(firstLineClean)) ||
+      (firstLineClean.length > 10 && firstLineClean.startsWith(cleanH)) ||
+      (cleanH.length > 10 && cleanH.includes(firstLineClean) && firstLineClean.length > 15) ||
+      /^headline\s*:/i.test(firstLineRaw)
+    ) {
+      lines.shift();
+      continue;
+    }
+    break;
+  }
+
+  return lines.join("\n").trim();
+}
+
+// Format copy plain text into clean, styled HTML without any raw markdown tokens or stray bullets
+function formatCopyHtml(raw, headline) {
+  if (!raw || typeof raw !== "string") return "";
+  let text = stripHeadlineFromBody(raw, headline);
+  text = text.replace(/^#+\s*/gm, "");
+  text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
+  text = text.replace(/__([^_]+)__/g, "$1");
+
+  const lines = text.split("\n");
+  const htmlParts = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Skip stray spacer lines like ".", "•", "-", "---", "***", etc.
+    if (/^[•●\-\*\._\s~]+$/.test(line)) continue;
+
+    // Check if line is a section header (e.g. Scene:, Tension:, Payoff:, Hook:, CTA:, etc.)
+    const isSectionHeader = /^(Scene|Tension|Payoff|Hook|Angle|CTA|Call to Action|Audience|Tone|Concept|Key Message|Why Choose Us|Visual Direction|Format|Specs|Benefits?|Features?)\s*:?/i.test(line)
+      || (line.endsWith(":") && line.length < 50);
+
+    if (isSectionHeader) {
+      // Section headers must NEVER have bullet dots! Clean uppercase header.
+      const cleanHeader = line.replace(/^[•●\-\*]\s*/, "");
+      htmlParts.push(`<div style="font-weight: 800; color: #8B5CF6; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 12px; margin-bottom: 3px;">${cleanHeader}</div>`);
+      continue;
+    }
+
+    // Check if line is a true bullet item (e.g. "• Superior Quality: Designed for those...")
+    const hasBulletPrefix = /^[•●\-\*]\s*/.test(line);
+    const stripped = line.replace(/^[•●\-\*]\s*/, "").trim();
+    const bulletMatch = stripped.match(/^([^:]+):\s*(.+)$/);
+
+    if (hasBulletPrefix && bulletMatch && bulletMatch[1].length < 40) {
+      const key = bulletMatch[1].trim();
+      const val = bulletMatch[2].trim();
+      htmlParts.push(`
+        <div style="margin-bottom: 6px; line-height: 1.55; display: flex; gap: 7px; align-items: baseline; padding-left: 2px;">
+          <span style="color: #8B5CF6; font-weight: 700; font-size: 12px;">•</span>
+          <div>
+            <strong style="color: inherit; font-weight: 700;">${key}:</strong> <span>${val}</span>
+          </div>
+        </div>
+      `);
+    } else if (hasBulletPrefix) {
+      if (stripped) {
+        htmlParts.push(`
+          <div style="margin-bottom: 6px; line-height: 1.55; display: flex; gap: 7px; align-items: baseline; padding-left: 2px;">
+            <span style="color: #8B5CF6; font-weight: 700; font-size: 12px;">•</span>
+            <span>${stripped}</span>
+          </div>
+        `);
+      }
+    } else {
+      htmlParts.push(`<p style="margin: 0 0 8px 0; line-height: 1.6;">${line}</p>`);
+    }
+  }
+
+  return htmlParts.join("");
+}
+
+// ── Integrated Rock-Solid Copy Box (Headline + Body + CTA all inside one box) ──
+function IntegratedCopyBox({ output, onUpdateOutput, nodeId, t }) {
+  const [headline, setHeadline] = useState(cleanHeadline(output.headline) || "");
+  const [bodyText, setBodyText] = useState(
+    stripMarkdownSymbols(stripHeadlineFromBody(output.bodyText, output.headline)) || ""
+  );
+  const [cta, setCta] = useState(cleanHeadline(output.cta) || "Shop Now");
+  const textareaRef = useRef(null);
+  const timerRef = useRef(null);
+
+  // Sync internal state when output changes externally
+  useEffect(() => {
+    setHeadline(cleanHeadline(output.headline) || "");
+    setBodyText(stripMarkdownSymbols(stripHeadlineFromBody(output.bodyText, output.headline)) || "");
+    setCta(cleanHeadline(output.cta) || "Shop Now");
+  }, [output.headline, output.bodyText, output.cta]);
+
+  // Auto-resize textarea to fit content smoothly without glitchy scrollbars
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.max(140, textareaRef.current.scrollHeight)}px`;
+    }
+  }, [bodyText]);
+
+  const scheduleSave = (newH, newBody, newCta) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onUpdateOutput(nodeId, {
+        ...output,
+        headline: newH,
+        bodyText: newBody,
+        cta: newCta,
+      });
+    }, 500);
+  };
+
+  const handleHeadlineChange = (e) => {
+    const val = cleanHeadline(e.target.value);
+    setHeadline(val);
+    scheduleSave(val, bodyText, cta);
+  };
+
+  const handleBodyChange = (e) => {
+    const val = stripMarkdownSymbols(e.target.value);
+    setBodyText(val);
+    scheduleSave(headline, val, cta);
+  };
+
+  const handleCtaChange = (e) => {
+    const val = cleanHeadline(e.target.value);
+    setCta(val);
+    scheduleSave(headline, bodyText, val);
+  };
+
+  return (
+    <div style={{
+      background: t.surface,
+      border: `1.5px solid rgba(139, 92, 246, 0.4)`,
+      borderRadius: 8,
+      padding: "12px 14px",
+      boxShadow: "0 2px 10px rgba(139, 92, 246, 0.08)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    }}>
+      {/* 1. Single Clean Headline (In-place editable, no markdown) */}
+      <div>
+        <input
+          type="text"
+          value={headline}
+          onChange={handleHeadlineChange}
+          placeholder="Campaign Headline..."
+          title="Campaign Headline"
+          style={{
+            width: "100%",
+            fontWeight: 800,
+            fontSize: 14.5,
+            color: t.text,
+            background: "transparent",
+            border: "none",
+            borderBottom: `1px solid ${t.border}`,
+            paddingBottom: 6,
+            outline: "none",
+            letterSpacing: "-0.01em",
+            fontFamily: FONT,
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      {/* 2. Body Text (Clean human readable copy, native textarea, rock solid, never glitchy) */}
+      <div>
+        <textarea
+          ref={textareaRef}
+          value={bodyText}
+          onChange={handleBodyChange}
+          placeholder="Campaign copy paragraphs..."
+          style={{
+            width: "100%",
+            minHeight: 140,
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            resize: "none",
+            fontSize: 12,
+            lineHeight: 1.6,
+            color: t.text,
+            fontFamily: FONT,
+            padding: 0,
+            margin: 0,
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      {/* 3. CTA (INSIDE the copy box as an integral part of copy) */}
+      <div style={{
+        paddingTop: 8,
+        borderTop: `1px dashed ${t.border}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+        flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 180 }}>
+          <span style={{
+            fontSize: 9.5,
+            fontFamily: MONO,
+            fontWeight: 800,
+            color: "#8B5CF6",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            flexShrink: 0,
+          }}>
+            CTA:
+          </span>
+          <input
+            type="text"
+            value={cta}
+            onChange={handleCtaChange}
+            placeholder="e.g. Shop Now"
+            title="Call to Action"
+            style={{
+              flex: 1,
+              maxWidth: 220,
+              background: t.surface2,
+              border: `1px solid rgba(139, 92, 246, 0.35)`,
+              borderRadius: 6,
+              padding: "4px 9px",
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#8B5CF6",
+              outline: "none",
+            }}
+          />
+        </div>
+        <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3 }}>
+          Autosaved ✓
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function RichFormattedText({ text, headline, t }) {
+  if (!text || typeof text !== "string") return null;
+
+  let cleanText = cleanRawJson(text).trim();
+  const html = formatCopyHtml(cleanText, headline);
+
+  return (
+    <div
+      className="rich-copy-output"
+      style={{
+        fontSize: 12,
+        lineHeight: 1.6,
+        color: t.text,
+      }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
 // ── Node Card ─────────────────────────────────────────────────────────────────
-function NodeCard({ node, config, status = "idle", output, isSelected, onSelect, onUpdateOutput, onRunFromNode, onPreviewImage, t }) {
+function NodeCard({
+  node, config, status = "idle", output, isSelected,
+  onSelect, onUpdateOutput, onRunFromNode, onPreviewImage, onRemove,
+  canRunThisStep = false, nextStepId = null, nextStepLabel = null, t
+}) {
   const isAgent = node.type === "agent";
   const isDone = status === "done";
   const isActive = status === "active";
+  const [isTweaking, setIsTweaking] = useState(false);
+
   const boxShadow = isActive
     ? `0 0 0 2px ${node.color}88, 0 4px 20px ${node.color}33`
     : isSelected
@@ -120,6 +686,32 @@ function NodeCard({ node, config, status = "idle", output, isSelected, onSelect,
         overflow: "hidden",
       }}
     >
+      {/* Full-Node Spinner Overlay on AI Refine ONLY (clean spinner only, no text) */}
+      {isTweaking && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 35,
+          background: "rgba(0, 0, 0, 0.55)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: R.lg,
+        }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: "50%",
+            background: "rgba(0, 0, 0, 0.5)",
+            border: `2px solid ${node.color || "#8B5CF6"}`,
+            display: "grid", placeItems: "center",
+            boxShadow: `0 0 24px ${node.color || "#8B5CF6"}77`,
+          }}>
+            <Loader2 size={24} className="spin" color={node.color || "#8B5CF6"} />
+          </div>
+        </div>
+      )}
+
       {/* Left color accent for tool nodes */}
       {!isAgent && (
         <div style={{
@@ -133,28 +725,64 @@ function NodeCard({ node, config, status = "idle", output, isSelected, onSelect,
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingLeft: isAgent ? 0 : 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: isAgent ? 10 : 8, flexShrink: 0,
-            background: isAgent
-              ? `linear-gradient(135deg, ${node.color}, ${node.color}BB)`
-              : `${node.color}18`,
-            display: "grid", placeItems: "center",
-            boxShadow: isAgent ? `0 3px 10px ${node.color}55` : "none",
-          }}>
-            <node.icon size={15} color={isAgent ? "#fff" : node.color} />
-          </div>
+          <NodeIconBadge node={node} isAgent={isAgent} containerSize={32} radius={isAgent ? 10 : 8} size={15} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: t.text, lineHeight: 1.2 }}>{node.label}</div>
             <div style={{ fontFamily: MONO, fontSize: 10, color: t.text3, marginTop: 1 }}>
-              {node.id === "copy" ? `copyagennt.in · ${config?.model || "claude-4-sonnet"}` : isAgent ? `${node.subtitle.split(" · ")[0]} · ${config?.model || "claude-4-sonnet"}` : node.subtitle}
+              {node.id === "copy" ? `copyagennt.in · ${config?.model || "claude-sonnet-5"}` : isAgent ? `${node.subtitle.split(" · ")[0]} · ${config?.model || "claude-sonnet-5"}` : node.subtitle}
             </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {isDone && <CheckCircle size={14} color="#22C55E" />}
           <StatusBadge status={status} />
+          {onRemove && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove(node.id); }}
+              title="Remove node from workflow"
+              style={{
+                background: "transparent", border: "none", cursor: "pointer",
+                color: t.text3, padding: "2px 4px", borderRadius: 4, display: "flex", alignItems: "center",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = t.text3; }}
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Ready to Run Action Button for Idle Connected Node */}
+      {status === "idle" && canRunThisStep && !isActive && (
+        <div style={{
+          marginTop: 10, paddingTop: 10, paddingLeft: isAgent ? 0 : 6,
+          borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center"
+        }}>
+          <div style={{ fontSize: 11, color: t.text3, fontFamily: MONO }}>
+            Pipeline ready for this step
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRunFromNode && onRunFromNode(node.id);
+            }}
+            style={{
+              padding: "5px 13px", borderRadius: 7, border: "none",
+              background: `linear-gradient(135deg, ${node.color || "#8B5CF6"}, ${(node.color || "#8B5CF6")}DD)`,
+              color: "#fff", fontWeight: 700, fontSize: 11,
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
+              boxShadow: `0 2px 8px ${(node.color || "#8B5CF6")}40`,
+              transition: "transform 0.15s ease",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+          >
+            <Play size={11} fill="#fff" />
+            Run this Step ({node.label})
+          </button>
+        </div>
+      )}
 
       {/* Output Preview */}
       {output && (
@@ -162,7 +790,18 @@ function NodeCard({ node, config, status = "idle", output, isSelected, onSelect,
           marginTop: 10, paddingTop: 10, paddingLeft: isAgent ? 0 : 6,
           borderTop: `1px solid ${t.border}`,
         }}>
-          <NodeOutputPreview node={node} output={output} onUpdateOutput={onUpdateOutput} onRunFromNode={onRunFromNode} onPreviewImage={onPreviewImage} t={t} />
+          <NodeOutputPreview
+            node={node}
+            output={output}
+            onUpdateOutput={onUpdateOutput}
+            onRunFromNode={onRunFromNode}
+            onPreviewImage={onPreviewImage}
+            isTweaking={isTweaking}
+            setIsTweaking={setIsTweaking}
+            nextStepId={nextStepId}
+            nextStepLabel={nextStepLabel}
+            t={t}
+          />
         </div>
       )}
 
@@ -178,38 +817,12 @@ function NodeCard({ node, config, status = "idle", output, isSelected, onSelect,
   );
 }
 
-// ── Output preview per node with Editable Mode & AI Refinement ─────────────────
-function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, onPreviewImage, t }) {
-  const [isEditing, setIsEditing] = useState(false);
+// ── Output preview per node with In-place Editing & AI Refinement ───────────────
+function NodeOutputPreview({
+  node, output, onUpdateOutput, onRunFromNode, onPreviewImage,
+  isTweaking, setIsTweaking, nextStepId, nextStepLabel, t
+}) {
   const [aiPrompt, setAiPrompt] = useState("");
-  const [isTweaking, setIsTweaking] = useState(false);
-
-  // Manual edit draft state
-  const [editHeadline, setEditHeadline] = useState(output.headline || "");
-  const [editBody, setEditBody] = useState(output.bodyText || output.brief || output.image_prompt || "");
-  const [editAudience, setEditAudience] = useState(output.target_audience || "");
-  const [editPrompt, setEditPrompt] = useState(output.image_prompt || output.recommended_copy_prompt || "");
-
-  // Sync edit drafts when output prop changes
-  useEffect(() => {
-    setEditHeadline(output.headline || "");
-    setEditBody(output.bodyText || output.brief || output.image_prompt || "");
-    setEditAudience(output.target_audience || "");
-    setEditPrompt(output.image_prompt || output.recommended_copy_prompt || "");
-  }, [output]);
-
-  const handleSaveManual = () => {
-    if (node.id === "copy") {
-      onUpdateOutput(node.id, { ...output, headline: editHeadline, bodyText: editBody });
-    } else if (node.id === "agent_strategy") {
-      onUpdateOutput(node.id, { ...output, target_audience: editAudience, recommended_copy_prompt: editPrompt });
-    } else if (node.id === "agent_artdir") {
-      onUpdateOutput(node.id, { ...output, image_prompt: editPrompt });
-    } else if (node.id === "brief") {
-      onUpdateOutput(node.id, { ...output, brief: editBody });
-    }
-    setIsEditing(false);
-  };
 
   const handleAiRefine = async () => {
     if (!aiPrompt.trim() || isTweaking) return;
@@ -219,32 +832,33 @@ function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, onPrev
         ? cleanRawJson(output.bodyText)
         : output.image_prompt || JSON.stringify(output);
 
-      // Build refinement history conversation structure for a true iterative feedback loop
       let conversationHistory = "";
       const existingRefinements = output.refinements || [];
       if (existingRefinements.length > 0) {
-        conversationHistory = "Previous refinements history:\n" + existingRefinements.map((ref, idx) => 
+        conversationHistory = "Previous refinements history:\n" + existingRefinements.map((ref, idx) =>
           `Iteration ${idx + 1} Tweak Request: "${ref.request}"\nAI Result: ${ref.response}`
         ).join("\n\n") + "\n\n";
       }
 
-      const promptToAgent = `ORIGINAL COPY:\n${output.original_copy || currentContent}\n\n${conversationHistory}NEW USER TWEAK REQUEST:\n${aiPrompt}\n\n[DIRECTIVE: Write natural, compelling advertising copy for social media. DO NOT output JSON syntax, keys, or curly braces. Output clean, human-readable copy paragraphs directly.]`;
+      const promptToAgent = `ORIGINAL COPY:\n${output.original_copy || currentContent}\n\n${conversationHistory}NEW USER TWEAK REQUEST:\n${aiPrompt}\n\n[DIRECTIVE: Write natural, compelling advertising copy for social media. DO NOT output JSON syntax, keys, or curly braces. Output clean, human-readable copy paragraphs directly without markdown hashes.]`;
       const r = await fetch("/bff/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_message: promptToAgent, llm_model: "claude-4-sonnet", temperature: 0.7, stream: false }),
+        body: JSON.stringify({ user_message: promptToAgent, llm_model: "claude-sonnet-5", stream: false }),
       });
       const raw = await r.json();
       let text = raw.assistant_message || raw.content || raw.text || "";
-      text = cleanRawJson(text);
+      text = stripMarkdownSymbols(cleanRawJson(text));
 
       if (node.id === "copy") {
+        const headline = cleanHeadline(extractHeadline(text, "Copy"));
+        const bodyText = stripHeadlineFromBody(text, headline);
         onUpdateOutput(node.id, {
           ...output,
           original_copy: output.original_copy || currentContent,
           refinements: [...existingRefinements, { request: aiPrompt, response: text }],
-          headline: extractHeadline(text, "Copy"),
-          bodyText: text,
+          headline,
+          bodyText,
           cta: output.cta || "Shop Now",
         });
       } else if (node.id === "agent_artdir") {
@@ -277,135 +891,150 @@ function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, onPrev
 
   return (
     <div style={{ position: "relative" }}>
-      {/* Action Buttons: Manual Edit, AI Prompt Tweaker & Continue Workflow */}
-      <div style={{ marginBottom: 8, display: "flex", gap: 6, justifyContent: "flex-end" }}>
+      {/* Top Action Bar: Run Next Step / Re-run */}
+      <div style={{ marginBottom: 8, display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
         <button
           onClick={() => onRunFromNode && onRunFromNode(node.id)}
-          title="Resume & run downstream agents from this node"
+          title="Re-run this node step"
           style={{
-            padding: "4px 10px", borderRadius: 6, border: "none",
-            background: "#22C55E", color: "#fff", fontWeight: 700, fontSize: 10.5,
-            cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
-            boxShadow: "0 2px 4px rgba(34, 197, 94, 0.2)"
+            padding: "3px 9px", borderRadius: 6, border: `1px solid ${t.border}`,
+            background: t.surface2, color: t.text2, fontWeight: 600, fontSize: 10,
+            cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4
           }}
         >
-          ▶ Continue from this Step
+          ↺ Re-run Step
         </button>
+        {nextStepId && (
+          <button
+            onClick={() => onRunFromNode && onRunFromNode(nextStepId)}
+            title={`Proceed and execute next step: ${nextStepLabel}`}
+            style={{
+              padding: "4px 11px", borderRadius: 6, border: "none",
+              background: "#22C55E", color: "#fff", fontWeight: 700, fontSize: 10.5,
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
+              boxShadow: "0 2px 5px rgba(34, 197, 94, 0.25)"
+            }}
+          >
+            ▶ Run Next Step ({nextStepLabel})
+          </button>
+        )}
       </div>
-      {/* Node specific rendering */}
+
+      {/* 1. Brief Node Output */}
       {node.id === "brief" && (
         <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
           <div style={{ fontWeight: 700, fontSize: 10, color: t.text3, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Brief Input</div>
-          {isEditing ? (
-            <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={3} style={cfgTextarea(t)} />
-          ) : (
-            output.brief
-          )}
+          <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{output.brief}</div>
         </div>
       )}
 
+      {/* 2. Strategy Agent Output */}
       {node.id === "agent_strategy" && (
         <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
           <div style={{ fontWeight: 700, fontSize: 10, color: t.brain, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Strategy Output</div>
-          {isEditing ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 700, color: t.text3 }}>Target Audience</label>
-                <input type="text" value={editAudience} onChange={e => setEditAudience(e.target.value)} style={cfgSelect(t)} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 700, color: t.text3 }}>Prompt Strategy</label>
-                <textarea value={editPrompt} onChange={e => setEditPrompt(e.target.value)} rows={2} style={cfgTextarea(t)} />
+          {output.error && (
+            <div style={{
+              padding: "8px 12px", borderRadius: 6, marginBottom: 8,
+              background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.35)",
+              color: "#EF4444", fontSize: 11.5, fontWeight: 700,
+            }}>
+              ⚠️ Upstream Error: {output.error}
+            </div>
+          )}
+          <div>
+            <b style={{ color: t.text }}>Target Audience:</b> {
+              (output.target_audience && output.target_audience.trim().toUpperCase() !== "ANALYSIS" && output.target_audience.length > 5)
+                ? output.target_audience
+                : "Target Demographics & Key Consumers"
+            }
+          </div>
+          {output.copy_specs && (
+            <div style={{ color: t.text2, marginTop: 8 }}>
+              <div style={{ fontWeight: 700, color: t.text, fontSize: 11, marginBottom: 4 }}>Strategy Specs:</div>
+              <div style={{
+                fontSize: 11.5, lineHeight: 1.6, color: t.text,
+                background: t.surface, padding: "10px 12px", borderRadius: 6, border: `1px solid ${t.border}`
+              }}>
+                <RichFormattedText text={output.copy_specs} t={t} />
               </div>
             </div>
-          ) : (
-            <>
-              <div>
-                <b style={{ color: t.text }}>Target Audience:</b> {
-                  (output.target_audience && output.target_audience.trim().toUpperCase() !== "ANALYSIS" && output.target_audience.length > 5)
-                    ? output.target_audience
-                    : "Target Demographics & Key Consumers"
-                }
-              </div>
-              {output.copy_specs && (
-                <div style={{ color: t.text2, marginTop: 8 }}>
-                  <div style={{ fontWeight: 700, color: t.text, fontSize: 11, marginBottom: 4 }}>Strategy Specs:</div>
-                  <div style={{
-                    fontSize: 11, lineHeight: 1.6, color: t.text2, whiteSpace: "pre-wrap",
-                    background: t.surface, padding: "8px 10px", borderRadius: 6, border: `1px solid ${t.border}`
-                  }}>
-                    {output.copy_specs
-                      .replace(/\*\*/g, "")
-                      .replace(/\n{3,}/g, "\n\n")
-                      .trim()}
-                  </div>
-                </div>
-              )}
-            </>
           )}
         </div>
       )}
 
+      {/* 3. Copy Agent Output — Rock-solid Integrated Copy Box (Headline, Body & CTA) */}
       {node.id === "copy" && (
         <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
-          <div style={{ fontWeight: 700, fontSize: 10, color: "#8B5CF6", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Generated Copy</div>
-          {isEditing ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <input type="text" value={editHeadline} onChange={e => setEditHeadline(e.target.value)} placeholder="Headline" style={{ ...cfgSelect(t), fontWeight: 700 }} />
-              <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={5} style={cfgTextarea(t)} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ fontWeight: 700, fontSize: 10, color: "#8B5CF6", textTransform: "uppercase", fontFamily: MONO }}>
+              Generated Copy
             </div>
-          ) : (
-            <>
-              {output.headline && <div style={{ fontWeight: 700, color: t.text, fontSize: 13, marginBottom: 4 }}>{cleanRawJson(output.headline)}</div>}
-              <div style={{ whiteSpace: "pre-wrap", color: t.text }}>{cleanRawJson(output.bodyText)}</div>
-              {output.cta && <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: "#8B5CF6" }}>CTA: {output.cta}</div>}
-              
-              {output.refinements && output.refinements.length > 0 && (
-                <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px dashed ${t.border}` }}>
-                  <div style={{ fontWeight: 700, fontSize: 9.5, color: t.text3, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Refinement History</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {output.refinements.map((ref, rIdx) => (
-                      <div key={rIdx} style={{ fontSize: 11, color: t.text2 }}>
-                        <span style={{ fontWeight: 600, color: "#8B5CF6", marginRight: 4 }}>v{rIdx + 1}:</span>
-                        <span style={{ fontStyle: "italic" }}>"{ref.request}"</span>
-                      </div>
-                    ))}
+          </div>
+
+          {output.error && (
+            <div style={{
+              padding: "8px 12px", borderRadius: 6, marginBottom: 8,
+              background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.35)",
+              color: "#EF4444", fontSize: 11.5, fontWeight: 700,
+            }}>
+              ⚠️ Upstream Error: {output.error}
+            </div>
+          )}
+
+          {/* Unified copy box: headline, auto-growing clean textarea body, and nested CTA inside */}
+          <IntegratedCopyBox
+            output={output}
+            onUpdateOutput={onUpdateOutput}
+            nodeId={node.id}
+            t={t}
+          />
+
+          {output.refinements && output.refinements.length > 0 && (
+            <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px dashed ${t.border}` }}>
+              <div style={{ fontWeight: 700, fontSize: 9.5, color: t.text3, textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Refinement History</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {output.refinements.map((ref, rIdx) => (
+                  <div key={rIdx} style={{ fontSize: 11, color: t.text2 }}>
+                    <span style={{ fontWeight: 600, color: "#8B5CF6", marginRight: 4 }}>v{rIdx + 1}:</span>
+                    <span style={{ fontStyle: "italic" }}>"{ref.request}"</span>
                   </div>
-                </div>
-              )}
-            </>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
 
+      {/* 4. Art Director Agent Output */}
       {node.id === "agent_artdir" && (
         <div style={{ fontSize: 11.5, color: t.text2, lineHeight: 1.5, background: t.surface2, padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}` }}>
           <div style={{ fontWeight: 700, fontSize: 10, color: "#E8552A", textTransform: "uppercase", marginBottom: 4, fontFamily: MONO }}>Art Director Specs</div>
-          {isEditing ? (
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: t.text3 }}>Image Prompt</label>
-              <textarea value={editPrompt} onChange={e => setEditPrompt(e.target.value)} rows={3} style={cfgTextarea(t)} />
+          {output.error && (
+            <div style={{
+              padding: "8px 12px", borderRadius: 6, marginBottom: 8,
+              background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.35)",
+              color: "#EF4444", fontSize: 11.5, fontWeight: 700,
+            }}>
+              ⚠️ Upstream Error: {output.error}
             </div>
-          ) : (
-            <>
-              <div><b style={{ color: t.text }}>Image Prompt:</b> {output.image_prompt}</div>
-              <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                {["ratio", "quality", "style", "lighting", "medium"].map(k => output[k] && (
-                  <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
-                    {k}: {output[k]}
-                  </span>
-                ))}
-                {output.categories && Object.entries(output.categories).map(([k, v]) => (
-                  <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
-                    {k}: {v}
-                  </span>
-                ))}
-              </div>
-            </>
           )}
+          <div><b style={{ color: t.text }}>Image Prompt:</b> {output.image_prompt}</div>
+          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            {["ratio", "quality", "style", "lighting", "medium"].map(k => output[k] && (
+              <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
+                {k}: {output[k]}
+              </span>
+            ))}
+            {output.categories && Object.entries(output.categories).map(([k, v]) => (
+              <span key={k} style={{ fontFamily: MONO, fontSize: 10, background: t.surface, padding: "3px 8px", borderRadius: 5, color: t.text, border: `1px solid ${t.border}` }}>
+                {k}: {v}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
+      {/* 5. Genfy Image Engine Output */}
       {node.id === "genfy" && (output.url || output.base64) && (
         <div style={{
           borderRadius: 12, overflow: "hidden",
@@ -415,7 +1044,6 @@ function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, onPrev
           position: "relative",
           transition: "all 0.25s ease",
         }}>
-          {/* Top-Right Full Preview Badge */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -452,49 +1080,274 @@ function NodeOutputPreview({ node, output, onUpdateOutput, onRunFromNode, onPrev
         </div>
       )}
 
-      {/* Action Buttons: Manual Edit & AI Prompt Tweaker */}
+      {/* AI Prompt Tweaker Bar (Always accessible, triggers full-card spinner overlay) */}
       {node.id !== "genfy" && (
-        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-          {isEditing ? (
-            <div style={{ display: "flex", gap: 6, width: "100%", justifyContent: "flex-end" }}>
-              <button onClick={() => setIsEditing(false)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface, color: t.text2, fontSize: 11, cursor: "pointer" }}>
-                Cancel
-              </button>
-              <button onClick={handleSaveManual} style={{ padding: "4px 12px", borderRadius: 6, border: "none", background: "#22C55E", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                Save Tweaks ✓
-              </button>
-            </div>
-          ) : (
-            <>
-              <button onClick={() => setIsEditing(true)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface2, color: t.text, fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                ✏️ Edit Manually
-              </button>
-
-              <div style={{ display: "flex", gap: 6, flex: 1, maxWidth: 300 }}>
-                <input
-                  type="text"
-                  placeholder="✨ AI Tweak (e.g. make punchier...)"
-                  value={aiPrompt}
-                  onChange={e => setAiPrompt(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleAiRefine()}
-                  style={{ ...cfgSelect(t), fontSize: 11, padding: "4px 8px" }}
-                />
-                <button
-                  onClick={handleAiRefine}
-                  disabled={isTweaking || !aiPrompt.trim()}
-                  style={{
-                    padding: "4px 10px", borderRadius: 6, border: "none",
-                    background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
-                    color: "#fff", fontWeight: 700, fontSize: 10.5, cursor: "pointer", flexShrink: 0,
-                  }}
-                >
-                  {isTweaking ? "..." : "Refine"}
-                </button>
-              </div>
-            </>
-          )}
+        <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, flex: 1, maxWidth: 360, marginLeft: "auto" }}>
+            <input
+              type="text"
+              placeholder="✨ AI Tweak (e.g. make punchier, bolder...)"
+              value={aiPrompt}
+              onChange={e => setAiPrompt(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAiRefine()}
+              style={{ ...cfgSelect(t), fontSize: 11, padding: "5px 9px", borderRadius: 6 }}
+            />
+            <button
+              onClick={handleAiRefine}
+              disabled={isTweaking || !aiPrompt.trim()}
+              style={{
+                padding: "5px 12px", borderRadius: 6, border: "none",
+                background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
+                color: "#fff", fontWeight: 700, fontSize: 11, cursor: isTweaking ? "not-allowed" : "pointer", flexShrink: 0,
+                display: "inline-flex", alignItems: "center", gap: 4,
+              }}
+            >
+              {isTweaking ? <Loader2 size={11} className="spin" /> : "Refine"}
+            </button>
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Node Data Box (Supports Structured/Readable and Raw JSON Views) ────────────
+function NodeDataBox({ label, data, t }) {
+  const [mode, setMode] = useState("readable"); // 'readable' | 'raw'
+  const [copied, setCopied] = useState(false);
+
+  if (!data) {
+    return (
+      <CfgField label={label} t={t}>
+        <div style={dataBoxStyle(t)}>
+          <span style={{ color: t.text3 }}>No data recorded for this node yet.</span>
+        </div>
+      </CfgField>
+    );
+  }
+
+  const handleCopy = () => {
+    try {
+      const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_) {}
+  };
+
+  const renderReadableContent = () => {
+    if (typeof data === "string") {
+      return (
+        <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
+          {cleanRawJson(data)}
+        </div>
+      );
+    }
+
+    if (typeof data === "object" && data !== null) {
+      // 1. CopyAgent / LLM input payload (user_message, llm_model)
+      if (data.user_message) {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {data.llm_model && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3 }}>MODEL:</span>
+                <span style={{
+                  fontSize: 10, fontFamily: MONO, fontWeight: 700,
+                  padding: "2px 7px", borderRadius: 4, background: "#8B5CF618",
+                  color: "#8B5CF6", border: "1px solid #8B5CF633"
+                }}>
+                  {data.llm_model}
+                </span>
+              </div>
+            )}
+            <div style={{
+              fontSize: 11, lineHeight: 1.55, color: t.text,
+              background: t.surface, padding: "8px 10px", borderRadius: 6,
+              border: `1px solid ${t.border}`, whiteSpace: "pre-wrap"
+            }}>
+              {data.user_message}
+            </div>
+          </div>
+        );
+      }
+
+      // 2. CopyAgent output (headline, bodyText, cta)
+      if (data.headline || data.bodyText) {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {data.headline && (
+              <div>
+                <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, textTransform: "uppercase" }}>Headline:</span>
+                <div style={{ fontWeight: 800, fontSize: 13, color: t.text, marginTop: 2 }}>
+                  {cleanHeadline(data.headline)}
+                </div>
+              </div>
+            )}
+            {data.bodyText && (
+              <div>
+                <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3, textTransform: "uppercase" }}>Body Copy:</span>
+                <div style={{
+                  fontSize: 11.5, lineHeight: 1.6, color: t.text2, marginTop: 4,
+                  background: t.surface, padding: "8px 10px", borderRadius: 6,
+                  border: `1px solid ${t.border}`, whiteSpace: "pre-wrap"
+                }}>
+                  {stripMarkdownSymbols(stripHeadlineFromBody(data.bodyText, data.headline))}
+                </div>
+              </div>
+            )}
+            {data.cta && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3 }}>CTA:</span>
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+                  background: "#8B5CF615", color: "#8B5CF6", border: "1px solid #8B5CF644"
+                }}>
+                  {cleanHeadline(data.cta)}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // 3. Strategy output (target_audience, copy_specs)
+      if (data.target_audience || data.copy_specs) {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {data.target_audience && (
+              <div>
+                <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3 }}>TARGET AUDIENCE:</span>
+                <div style={{ fontWeight: 700, fontSize: 12, color: t.text, marginTop: 2 }}>
+                  {data.target_audience}
+                </div>
+              </div>
+            )}
+            {data.copy_specs && (
+              <div>
+                <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3 }}>SPECS:</span>
+                <div style={{
+                  fontSize: 11, lineHeight: 1.55, color: t.text2, marginTop: 4,
+                  background: t.surface, padding: "8px 10px", borderRadius: 6,
+                  border: `1px solid ${t.border}`, whiteSpace: "pre-wrap"
+                }}>
+                  {stripMarkdownSymbols(data.copy_specs)}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // 4. Genfy image or Art Dir prompt
+      if (data.image_prompt || data.url) {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {data.image_prompt && (
+              <div>
+                <span style={{ fontSize: 9.5, fontFamily: MONO, color: t.text3 }}>PROMPT:</span>
+                <div style={{ fontSize: 11, lineHeight: 1.5, color: t.text, marginTop: 2 }}>
+                  {data.image_prompt}
+                </div>
+              </div>
+            )}
+            {data.url && (
+              <div>
+                <img src={data.url} alt="Output" style={{ maxWidth: "100%", maxHeight: 140, borderRadius: 6, display: "block" }} />
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+              {["ratio", "quality", "style"].map(k => data[k] && (
+                <span key={k} style={{ fontFamily: MONO, fontSize: 9.5, background: t.surface, padding: "2px 6px", borderRadius: 4, border: `1px solid ${t.border}`, color: t.text2 }}>
+                  {k}: {data[k]}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // 5. Generic object: render key/values cleanly
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {Object.entries(data).map(([k, v]) => (
+            <div key={k} style={{ fontSize: 11 }}>
+              <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3 }}>{k}: </span>
+              <span style={{ color: t.text, wordBreak: "break-word" }}>
+                {typeof v === "object" ? JSON.stringify(v) : String(v)}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return String(data);
+  };
+
+  return (
+    <div style={{ marginTop: 2 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <label style={{ fontSize: 10.5, fontWeight: 700, color: t.text2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {label}
+        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          {/* Toggle buttons: Readable vs Raw */}
+          <div style={{
+            display: "inline-flex", background: t.surface, padding: 2,
+            borderRadius: 6, border: `1px solid ${t.border}`
+          }}>
+            <button
+              onClick={() => setMode("readable")}
+              style={{
+                border: "none",
+                background: mode === "readable" ? t.brain : "transparent",
+                color: mode === "readable" ? "#fff" : t.text3,
+                fontSize: 9.5, fontWeight: 700, fontFamily: MONO,
+                padding: "2px 7px", borderRadius: 4, cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Readable
+            </button>
+            <button
+              onClick={() => setMode("raw")}
+              style={{
+                border: "none",
+                background: mode === "raw" ? t.brain : "transparent",
+                color: mode === "raw" ? "#fff" : t.text3,
+                fontSize: 9.5, fontWeight: 700, fontFamily: MONO,
+                padding: "2px 7px", borderRadius: 4, cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Raw
+            </button>
+          </div>
+          {/* Copy Button */}
+          <button
+            onClick={handleCopy}
+            title="Copy to clipboard"
+            style={{
+              padding: "2px 6px", borderRadius: 4, border: `1px solid ${t.border}`,
+              background: t.surface2, color: copied ? "#22C55E" : t.text3,
+              fontSize: 9.5, fontFamily: MONO, cursor: "pointer"
+            }}
+          >
+            {copied ? "✓ Copied" : "Copy"}
+          </button>
+        </div>
+      </div>
+
+      <div style={dataBoxStyle(t)}>
+        {mode === "raw" ? (
+          <pre style={{ margin: 0, fontFamily: MONO, fontSize: 10, lineHeight: 1.5, overflowX: "auto", whiteSpace: "pre-wrap" }}>
+            {typeof data === "string" ? data : JSON.stringify(data, null, 2)}
+          </pre>
+        ) : (
+          renderReadableContent()
+        )}
+      </div>
     </div>
   );
 }
@@ -512,24 +1365,6 @@ function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
 
   return (
     <div style={{ padding: "16px 18px", fontFamily: FONT }}>
-      {/* Node header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, paddingBottom: 14, borderBottom: `1px solid ${t.border}` }}>
-        <div style={{
-          width: 34, height: 34, borderRadius: 9,
-          background: `linear-gradient(135deg, ${node.color}, ${node.color}BB)`,
-          display: "grid", placeItems: "center",
-          boxShadow: `0 3px 12px ${node.color}44`,
-        }}>
-          <node.icon size={16} color="#fff" />
-        </div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13.5, color: t.text }}>{node.label}</div>
-          <div style={{ fontFamily: MONO, fontSize: 10, color: t.text3, marginTop: 1 }}>
-            {isAgent ? "Agent Bridge · LLM" : "Tool Node · API"}
-          </div>
-        </div>
-      </div>
-
       {/* Config fields */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
@@ -548,10 +1383,10 @@ function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
             <CfgField label="Brand Name" t={t}>
               <input
                 type="text"
-                value={config.brandName || "FrostBrew"}
+                value={config.brandName || ""}
                 onChange={e => onChange("brandName", e.target.value)}
                 style={cfgInput(t)}
-                placeholder="e.g. FrostBrew, Nike, Apple"
+                placeholder="e.g. Nike, Apple, Lumina"
               />
             </CfgField>
             <CfgField label="Asset Type" t={t}>
@@ -566,21 +1401,13 @@ function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
         {isAgent && (
           <>
             <CfgField label="LLM Model" t={t}>
-              <select value={config.model || "claude-4-sonnet"} onChange={e => onChange("model", e.target.value)} style={cfgSelect(t)}>
-                {MODELS.map(m => <option key={m}>{m}</option>)}
+              <select value={config.model || "claude-sonnet-5"} onChange={e => onChange("model", e.target.value)} style={cfgSelect(t)}>
+                {MODELS.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} · {m.description}
+                  </option>
+                ))}
               </select>
-            </CfgField>
-            <CfgField label="Temperature" t={t}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input type="range" min="0" max="1" step="0.1"
-                  value={config.temperature ?? 0.7}
-                  onChange={e => onChange("temperature", parseFloat(e.target.value))}
-                  style={{ flex: 1, accentColor: node.color }}
-                />
-                <span style={{ fontFamily: MONO, fontSize: 11, color: t.text3, width: 28, textAlign: "right" }}>
-                  {(config.temperature ?? 0.7).toFixed(1)}
-                </span>
-              </div>
             </CfgField>
             <CfgField label="System Prompt" t={t}>
               <textarea
@@ -597,29 +1424,14 @@ function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
         {node.id === "copy" && (
           <>
             <CfgField label="LLM Model" t={t}>
-              <select value={config.model || "claude-4-sonnet"} onChange={e => onChange("model", e.target.value)} style={cfgSelect(t)}>
-                {MODELS.map(m => <option key={m}>{m}</option>)}
+              <select value={config.model || "claude-sonnet-5"} onChange={e => onChange("model", e.target.value)} style={cfgSelect(t)}>
+                {MODELS.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} · {m.description}
+                  </option>
+                ))}
               </select>
             </CfgField>
-            <CfgField label="Temperature" t={t}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input type="range" min="0" max="1" step="0.1"
-                  value={config.temperature ?? 0.7}
-                  onChange={e => onChange("temperature", parseFloat(e.target.value))}
-                  style={{ flex: 1, accentColor: "#8B5CF6" }}
-                />
-                <span style={{ fontFamily: MONO, fontSize: 11, color: t.text3, width: 28, textAlign: "right" }}>
-                  {(config.temperature ?? 0.7).toFixed(1)}
-                </span>
-              </div>
-            </CfgField>
-            <div style={{ padding: "10px 12px", borderRadius: R.md, background: t.surface2, border: `1px solid ${t.border}` }}>
-              <div style={{ fontFamily: MONO, fontSize: 10, color: t.text3 }}>Powered by</div>
-              <div style={{ fontWeight: 700, fontSize: 12.5, color: t.text, marginTop: 3 }}>CopyAgent · copyagennt.in</div>
-              <div style={{ fontFamily: MONO, fontSize: 10, color: t.text3, marginTop: 2 }}>
-                POST /api/integration/v1/chat/completions
-              </div>
-            </div>
           </>
         )}
 
@@ -652,18 +1464,10 @@ function ConfigPanel({ node, config, onChange, t, inputs, outputs, status }) {
           </div>
         )}
 
-        {/* Node input / output */}
+        {/* Node input / output with Structured (Readable) vs Raw Toggle */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 2 }}>
-          <CfgField label="Node Input" t={t}>
-            <div style={dataBoxStyle(t)}>
-              {formatNodeData(inputs?.[node.id], t)}
-            </div>
-          </CfgField>
-          <CfgField label="Node Output" t={t}>
-            <div style={dataBoxStyle(t)}>
-              {formatNodeData(outputs?.[node.id], t)}
-            </div>
-          </CfgField>
+          <NodeDataBox label="Node Input" data={inputs?.[node.id]} t={t} />
+          <NodeDataBox label="Node Output" data={outputs?.[node.id]} t={t} />
         </div>
       </div>
     </div>
@@ -721,16 +1525,6 @@ function dataBoxStyle(t) {
   };
 }
 
-function formatNodeData(data, t) {
-  if (!data) return <span style={{ color: t.text3 }}>No data available for this node yet.</span>;
-  if (typeof data === "string") return data;
-  try {
-    return JSON.stringify(data, null, 2);
-  } catch {
-    return String(data);
-  }
-}
-
 // ── Tag mini-component ────────────────────────────────────────────────────────
 function Tag({ t, label, value }) {
   return (
@@ -758,24 +1552,21 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
   const buildDefaultConfigs = () => ({
     brief: {
-      brief: activeProject?.brief || "Create an Instagram Ad image for FrostBrew Organic Cold Brew Coffee — bold, energizing, modern aesthetic with rich golden hour lighting.",
-      brandName: activeProject?.brandName || "FrostBrew",
-      assetType: activeProject?.assetType || "Instagram Ad Image",
+      brief: activeProject?.brief || "",
+      brandName: activeProject?.brandName || activeProject?.brand_name || "",
+      assetType: activeProject?.assetType || activeProject?.asset_type || "Instagram Ad Image",
     },
     agent_strategy: {
-      model: "claude-4-sonnet",
-      temperature: 0.7,
+      model: "claude-sonnet-5",
       systemPrompt: defaultStrategyPrompt,
       ...(aiCfg.agent_strategy || {}),
     },
     copy: {
-      model: "claude-4-sonnet",
-      temperature: 0.7,
+      model: "claude-sonnet-5",
       ...(aiCfg.copy || {}),
     },
     agent_artdir: {
-      model: "claude-4-sonnet",
-      temperature: 0.5,
+      model: "claude-sonnet-5",
       systemPrompt: defaultArtDirPrompt,
       ...(aiCfg.agent_artdir || {}),
     },
@@ -869,7 +1660,52 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   });
 
   useEffect(() => {
+    if (false && !activeProject) {
+      setViewMode("history");
+    }
+  }, [activeProject]);
+
+  useEffect(() => {
+    fetch("/bff/projects", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((serverProjects) => {
+        const localProjects = JSON.parse(localStorage.getItem("studio-projects") || "[]");
+        const allProj = Array.isArray(serverProjects) && serverProjects.length > 0 ? serverProjects : localProjects;
+        if (!Array.isArray(allProj) || allProj.length === 0) return;
+
+        setHistoryItems((prev) => {
+          const list = [...prev];
+          allProj.forEach((p) => {
+            if (!p || (!p.brief && !p.name)) return;
+            const exists = list.some((item) => item.id === p.id || item.name === p.name);
+            if (!exists) {
+              list.push({
+                id: p.id || `proj-${Date.now()}`,
+                name: p.name,
+                brief: p.brief || "",
+                assetType: p.asset_type || p.assetType || "Instagram Ad Image",
+                status: p.status || "complete",
+                updatedAt: p.createdAt || p.created_at || new Date().toISOString(),
+                outputs: p.workflow_config?.outputs || p.outputs || null,
+              });
+            }
+          });
+          return list;
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  const initializedProjectIdRef = useRef(null);
+
+  useEffect(() => {
     if (!activeProject) return;
+
+    // Only run initialization ONCE per project ID to prevent overwriting user-added nodes
+    if (initializedProjectIdRef.current === activeProject.id) {
+      return;
+    }
+    initializedProjectIdRef.current = activeProject.id;
 
     let loadedOutputs = activeProject.outputs || activeProject.nodeOutputs || null;
     if (!loadedOutputs && activeProject.id) {
@@ -886,6 +1722,20 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         if (loadedOutputs[nodeId]) statusMap[nodeId] = "done";
       });
       setNodeStatus(statusMap);
+    }
+
+    let savedNodes = null;
+    try {
+      const savedStr = localStorage.getItem(`${stateStorageKey}-activeNodes`);
+      if (savedStr) savedNodes = JSON.parse(savedStr);
+    } catch (_) {}
+
+    if (Array.isArray(savedNodes) && savedNodes.length > 0) {
+      setActiveNodes(savedNodes);
+    } else if (activeProject.nodes && Array.isArray(activeProject.nodes)) {
+      updateActiveNodes(activeProject.nodes);
+    } else {
+      updateActiveNodes(PIPELINE.map(n => n.id));
     }
 
     if (activeProject.brief) {
@@ -919,6 +1769,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         status: statusVal || masterState || "complete",
         updatedAt: new Date().toISOString(),
         outputs: outputsVal || nodeOutputs,
+        nodes: activeNodes,
       };
       const existingIdx = list.findIndex(i => i.id === currentId);
       if (existingIdx >= 0) {
@@ -947,6 +1798,63 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     selectedNodeIdRef.current = id;
     setSelectedNodeIdState(id);
   };
+
+  const [activeNodes, setActiveNodes] = useState(() => {
+    if (activeProject?.nodes && Array.isArray(activeProject.nodes)) {
+      return activeProject.nodes;
+    }
+    if (activeProject) {
+      return PIPELINE.map(n => n.id);
+    }
+    try {
+      const saved = localStorage.getItem(`${stateStorageKey}-activeNodes`);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return [];
+  });
+  const [rightSidebarMode, setRightSidebarMode] = useState("closed");
+
+  const updateActiveNodes = (nodes) => {
+    setActiveNodes(nodes);
+    try {
+      localStorage.setItem(`${stateStorageKey}-activeNodes`, JSON.stringify(nodes));
+    } catch (_) {}
+    if (setActiveProject) {
+      setActiveProject(prev => (prev ? { ...prev, nodes } : prev));
+    }
+  };
+
+  const handleAddNode = (nodeId) => {
+    if (!activeNodes.includes(nodeId)) {
+      const next = [...activeNodes, nodeId];
+      updateActiveNodes(next);
+      setSelectedNodeId(nodeId);
+      setRightSidebarMode("config");
+    } else {
+      setSelectedNodeId(nodeId);
+      setRightSidebarMode("config");
+    }
+  };
+
+  const handleRemoveNode = (nodeId) => {
+    const next = activeNodes.filter(id => id !== nodeId);
+    updateActiveNodes(next);
+    if (selectedNodeId === nodeId) {
+      setSelectedNodeId(next[0] || null);
+      if (!next.length) setRightSidebarMode("closed");
+    }
+  };
+
+  const loadPredefinedWorkflow = (preset) => {
+    updateActiveNodes(preset.nodes);
+    setSelectedNodeId(preset.nodes[0]);
+    setRightSidebarMode("closed");
+    if (showToast) showToast(`Loaded "${preset.name}"`, "success");
+  };
+
+  const currentPipeline = activeNodes
+    .map(id => PIPELINE.find(n => n.id === id))
+    .filter(Boolean);
   const [isRunning, setIsRunning] = useState(false);
   const [imageModalUrl, setImageModalUrl] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -965,6 +1873,18 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   const [editorAlign, setEditorAlign] = useState("left");
   const [isDraggingText, setIsDraggingText] = useState(false);
   const containerRef = useRef(null);
+
+  // Close image modal on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && imageModalUrl) {
+        setImageModalUrl(null);
+        setEditorOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [imageModalUrl]);
 
   const handleExportCanvasImage = () => {
     if (!imageModalUrl) return;
@@ -1008,9 +1928,35 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     };
   };
 
+  // Persist pipeline generations & status to database
+  const persistProjectToDB = async (outputsToSave, statusToSave, nodesToSave) => {
+    if (!activeProject?.id) return;
+    try {
+      const payload = {
+        outputs: outputsToSave || nodeOutputs,
+        node_status: statusToSave || nodeStatus,
+        nodes: nodesToSave || activeNodes,
+        status: "complete"
+      };
+      await fetch(`/bff/projects/${activeProject.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+      if (setActiveProject) {
+        setActiveProject(prev => prev ? { ...prev, ...payload } : prev);
+      }
+    } catch (err) {
+      console.warn("[Workflow Persist Error]:", err);
+    }
+  };
+
   // Restore stored pipeline state whenever activeProject changes + handle Storyboard Card context
   useEffect(() => {
     if (activeProject?.id) {
+      let restoredOutputs = null;
+      let restoredStatus = null;
       try {
         const sStatus   = localStorage.getItem(`studio-wf-state-${activeProject.id}-status`);
         const sInputs   = localStorage.getItem(`studio-wf-state-${activeProject.id}-inputs`);
@@ -1018,12 +1964,58 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         const sMaster   = localStorage.getItem(`studio-wf-state-${activeProject.id}-masterState`);
         const sFeedback = localStorage.getItem(`studio-wf-state-${activeProject.id}-masterFeedback`);
 
-        if (sStatus)   setNodeStatus(JSON.parse(sStatus));   else setNodeStatus({});
-        if (sInputs)   setNodeInputs(JSON.parse(sInputs));   else setNodeInputs({});
-        if (sOutputs)  setNodeOutputs(JSON.parse(sOutputs));  else setNodeOutputs({});
-        if (sMaster)   setMasterState(JSON.parse(sMaster));  else setMasterState("idle");
-        if (sFeedback) setMasterFeedback(JSON.parse(sFeedback)); else setMasterFeedback("");
+        if (sOutputs)  restoredOutputs = JSON.parse(sOutputs);
+        if (sStatus)   restoredStatus = JSON.parse(sStatus);
+        if (sInputs)   setNodeInputs(JSON.parse(sInputs));
+        if (sMaster)   setMasterState(JSON.parse(sMaster));
+        if (sFeedback) setMasterFeedback(JSON.parse(sFeedback));
       } catch (_) {}
+
+      // Fallback to activeProject outputs from DB if not in localStorage
+      if (!restoredOutputs || Object.keys(restoredOutputs).length === 0) {
+        if (activeProject.outputs && Object.keys(activeProject.outputs).length > 0) {
+          restoredOutputs = activeProject.outputs;
+        } else if (activeProject.nodeOutputs && Object.keys(activeProject.nodeOutputs).length > 0) {
+          restoredOutputs = activeProject.nodeOutputs;
+        }
+      }
+
+      if (restoredOutputs && Object.keys(restoredOutputs).length > 0) {
+        setNodeOutputs(restoredOutputs);
+        if (!restoredStatus || Object.keys(restoredStatus).length === 0) {
+          const statusMap = {};
+          Object.keys(restoredOutputs).forEach(nodeId => {
+            if (restoredOutputs[nodeId]) statusMap[nodeId] = "done";
+          });
+          restoredStatus = statusMap;
+        }
+        setNodeStatus(restoredStatus);
+      }
+
+      // Query database for this project's outputs to ensure freshness and restore on page reload
+      fetch(`/bff/projects/${activeProject.id}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(serverProj => {
+          if (serverProj) {
+            const sOut = serverProj.outputs || {};
+            if (Object.keys(sOut).length > 0) {
+              setNodeOutputs(sOut);
+              const sMap = serverProj.node_status || {};
+              Object.keys(sOut).forEach(nodeId => {
+                if (sOut[nodeId] && !sMap[nodeId]) sMap[nodeId] = "done";
+              });
+              setNodeStatus(sMap);
+              try {
+                localStorage.setItem(`studio-wf-state-${activeProject.id}-outputs`, JSON.stringify(sOut));
+                localStorage.setItem(`studio-wf-state-${activeProject.id}-status`, JSON.stringify(sMap));
+              } catch (_) {}
+            }
+            if (serverProj.nodes && Array.isArray(serverProj.nodes) && serverProj.nodes.length > 0) {
+              setActiveNodes(serverProj.nodes);
+            }
+          }
+        })
+        .catch(() => {});
     }
 
     // Auto-populate brief from storyboard card if starting from a storyboard card
@@ -1039,11 +2031,14 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     }
   }, [activeProject]);
 
-  // Helper wrappers that update React state AND save to localStorage
+  // Helper wrappers that update React state, save to localStorage AND persist to database
   const setStatus = (id, s) => {
     setNodeStatus(prev => {
       const next = { ...prev, [id]: s };
       try { localStorage.setItem(`${stateStorageKey}-status`, JSON.stringify(next)); } catch (_) {}
+      if (s === "done" || s === "error") {
+        persistProjectToDB(null, next, null);
+      }
       return next;
     });
   };
@@ -1061,6 +2056,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       const next = { ...prev, [id]: d };
       try { localStorage.setItem(`${stateStorageKey}-outputs`, JSON.stringify(next)); } catch (_) {}
       syncHistoryItem("complete", next);
+      persistProjectToDB(next, null, null);
       return next;
     });
   };
@@ -1129,7 +2125,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       if (raw) brandContext = JSON.parse(raw);
     } catch (_) {}
 
-    const inferredBrandName = activeProject?.brand_name || activeProject?.brandName || brandContext?.brandName || (brief.split(" ")[0] || "FrostBrew");
+    const inferredBrandName = activeProject?.brand_name || activeProject?.brandName || brandContext?.brandName || configs.brief.brandName || (brief ? brief.split(" ")[0] : "");
     const inferredIndustry = brandContext?.industry || "Consumer Brand";
 
     const brandPrefix = `[CRITICAL DIRECTIVE: You MUST explicitly feature and mention the Product & Brand Name ("${inferredBrandName}") throughout the advertising copy.]\n\n` +
@@ -1155,13 +2151,18 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       log("⏸ Interactive Approval Mode active", "agent");
     }
 
-    const NODE_ORDER = ["brief", "agent_strategy", "copy", "agent_artdir", "genfy"];
-    const startIndex = NODE_ORDER.indexOf(startFromNodeId) !== -1 ? NODE_ORDER.indexOf(startFromNodeId) : 0;
+    const currentOrder = currentPipeline.map(n => n.id);
+    if (currentOrder.length === 0) {
+      showToast("Please add at least one node to launch the workflow.");
+      setIsRunning(false);
+      return;
+    }
+    const startIndex = currentOrder.indexOf(startFromNodeId) !== -1 ? currentOrder.indexOf(startFromNodeId) : 0;
 
     try {
       // ── STEP 1: Brief node ─────────────────────────────────────────────────
       let briefOutput = nodeOutputs.brief || { brief, assetType: configs.brief.assetType };
-      if (startIndex <= 0) {
+      if (currentOrder.includes("brief") && startIndex <= currentOrder.indexOf("brief")) {
         setStatus("brief", "active");
         setSelectedNodeId("brief");
         log("Node 1: Campaign Brief — locked and loaded", "info");
@@ -1181,7 +2182,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
       // ── STEP 2: Strategy Agent ─────────────────────────────────────────────
       let strategyData = nodeOutputs.agent_strategy || null;
-      if (startIndex <= 1) {
+      if (currentOrder.includes("agent_strategy") && startIndex <= currentOrder.indexOf("agent_strategy")) {
         setStatus("agent_strategy", "active");
         setSelectedNodeId("agent_strategy");
         log("⬡ Strategy Agent: analyzing brief & building copy specs...", "agent");
@@ -1202,20 +2203,32 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               brand_id: activeProject?.brand_id || activeProject?.brandId || null,
             }),
           });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          if (!r.ok) {
+            let errorText = `HTTP ${r.status}`;
+            try {
+              const errJson = await r.json();
+              errorText = errJson.detail || errJson.error || JSON.stringify(errJson);
+            } catch {}
+            throw new Error(errorText);
+          }
           strategyData = await r.json();
           log(`Strategy Agent: audience = "${strategyData.target_audience}"`, "success");
+          setOutput("agent_strategy", strategyData);
+          setStatus("agent_strategy", "done");
         } catch (err) {
-          console.warn("[Strategy Agent Error]:", err);
-          strategyData = {
-            target_audience: "Target Demographics & Key Consumers",
-            copy_specs: `📊 STRATEGIC MARKET INTELLIGENCE REPORT:\n\n1. TARGET AUDIENCE ANALYSIS:\n   • Primary Demographics & Target Consumers for: ${brief ? brief.slice(0, 60) : "Product Campaign"}.\n   • Key Motivations: Product quality, active lifestyle, high value.\n\n2. BRAND DNA & POSITIONING:\n   • High-converting positioning tailored to product USP.\n   • Distinctive brand tone and market resonance.\n\n3. COMPETITOR BENCHMARKING:\n   • Strategic Advantage: Superior product formulation, modern aesthetic, premium brand appeal.\n\n4. STRATEGIC MESSAGING PILLARS:\n   • Pillar 1: High Performance & Energizing Value.\n   • Pillar 2: Premium Craftsmanship & Uncompromised Quality.`,
-            recommended_copy_prompt: `CAMPAIGN BRIEF & PRODUCT: ${brief}\nASSET FORMAT: ${configs.brief.assetType}\n\nCRITICAL REQUIREMENT: You MUST explicitly feature and mention the exact product name and brand ("${inferredBrandName}") in the copy. DO NOT use generic placeholder words like 'Our Product' or 'The Product'.`
-          };
-          log("Strategy Agent: generated deep strategic analysis", "info");
+          console.error("[Strategy Agent Error]:", err);
+          const errMsg = err.message || "Failed to generate strategy";
+          log(`Strategy Agent Error: ${errMsg}`, "error");
+          setMasterFeedback(`Strategy Node Failed: ${errMsg}`);
+          setStatus("agent_strategy", "error");
+          setOutput("agent_strategy", {
+            error: errMsg,
+            target_audience: "Rate Limit / Strategy Error",
+            copy_specs: `⚠️ Strategy Agent Error:\n${errMsg}`,
+          });
+          setIsRunning(false);
+          return;
         }
-        setOutput("agent_strategy", strategyData);
-        setStatus("agent_strategy", "done");
 
         if (approvalMode) {
           log("⏸ Strategy Step complete. Review Strategy Output and click Approve to run Copy Agent...", "agent");
@@ -1232,7 +2245,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
 
       // ── STEP 3: Copy Agent ─────────────────────────────────────────────────
       let copyData = nodeOutputs.copy || null;
-      if (startIndex <= 2) {
+      if (currentOrder.includes("copy") && startIndex <= currentOrder.indexOf("copy")) {
         setStatus("copy", "active");
         setSelectedNodeId("copy");
         log("Node 3: Copy Agent — generating campaign copy via CopyAgent API...", "info");
@@ -1245,13 +2258,11 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         setInput("copy", {
           user_message: copyPrompt,
           llm_model: configs.copy.model,
-          temperature: configs.copy.temperature,
         });
         try {
           const payload = {
             user_message: `${copyPrompt}\n\n[Run Variation Nonce: ${Date.now()}]`,
             llm_model: configs.copy.model,
-            temperature: configs.copy.temperature || 0.8,
             stream: false,
           };
           if (activeProject && (activeProject.brand_id || activeProject.brandId)) {
@@ -1287,21 +2298,24 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             (raw.choices && raw.choices[0]?.message?.content) ||
             (raw.choices && raw.choices[0]?.text);
 
+          if (!generatedText) {
+            throw new Error("Copy Agent returned an empty response.");
+          }
           const cleanText = cleanRawJson(generatedText);
           copyData = { headline: extractHeadline(cleanText, configs.brief.assetType), bodyText: cleanText, cta: "Shop Now" };
           log("Copy Agent: unique copy generated successfully", "success");
+          setOutput("copy", copyData);
+          setStatus("copy", "done");
         } catch (err) {
-          console.warn("[Workflow CopyAgent Error]:", err);
-          const dynamicId = Math.floor(Math.random() * 899 + 100);
-          copyData = {
-            headline: `${configs.brief.assetType} — High-Impact Edition #${dynamicId}`,
-            bodyText: `Experience peak performance with ${configs.brief.assetType}. Specially engineered for modern professionals seeking uncompromised quality.`,
-            cta: "Discover More",
-          };
-          log(`Copy Agent: API fallback engaged (#${dynamicId})`, "info");
+          console.error("[Workflow CopyAgent Error]:", err);
+          const errMsg = err.message || "Failed to generate copy";
+          log(`Copy Agent Error: ${errMsg}`, "error");
+          setMasterFeedback(`Copy Agent Node Failed: ${errMsg}`);
+          setStatus("copy", "error");
+          setOutput("copy", { error: errMsg, headline: "Copy Generation Error", bodyText: `⚠️ Copy Agent Failed:\n${errMsg}` });
+          setIsRunning(false);
+          return;
         }
-        setOutput("copy", copyData);
-        setStatus("copy", "done");
 
         if (approvalMode) {
           log("⏸ Copy Generation complete. Review Copy Output and click Approve to run Art Director...", "agent");
@@ -1317,8 +2331,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // ── STEP 4: Art Director Agent ─────────────────────────────────────────
-      let artDirData = (startIndex > 3 ? nodeOutputs.agent_artdir : null);
-      if (startIndex <= 3 || !artDirData) {
+      let artDirData = (currentOrder.indexOf("agent_artdir") !== -1 && startIndex > currentOrder.indexOf("agent_artdir") ? nodeOutputs.agent_artdir : null);
+      if (currentOrder.includes("agent_artdir") && (startIndex <= currentOrder.indexOf("agent_artdir") || !artDirData)) {
         setStatus("agent_artdir", "active");
         setSelectedNodeId("agent_artdir");
         log("⬡ Art Director Agent: mapping copy to Genfy visual parameters...", "agent");
@@ -1340,22 +2354,31 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               copy_output: copyTextForArtDir,
               asset_type: configs.brief.assetType,
               brand_id: activeProject?.brand_id || activeProject?.brandId || null,
-              brand_name: configs.brief.brandName || inferredBrandName || "FrostBrew",
+              brand_name: configs.brief.brandName || inferredBrandName || "",
             }),
           });
+          if (!r.ok) {
+            let errorText = `HTTP ${r.status}`;
+            try {
+              const errJson = await r.json();
+              errorText = errJson.detail || errJson.error || JSON.stringify(errJson);
+            } catch {}
+            throw new Error(errorText);
+          }
           artDirData = await r.json();
           log(`Art Director: image prompt ready — "${artDirData.image_prompt?.slice(0, 50)}..."`, "success");
-        } catch {
-          artDirData = {
-            image_prompt: `Professional ${configs.brief.assetType} visual — dramatic golden hour lighting, 85mm lens, cinematic quality`,
-            ratio: configs.genfy.ratio, quality: configs.genfy.quality,
-            models: ["Nanobanana 2"],
-            categories: { style: "cinematic", medium: "photography", lighting: "golden", camera: "low-angle", lens: "85mm", mood: "epic", color: "warm" },
-          };
-          log("Art Director: using synthesized visual concept", "info");
+          setOutput("agent_artdir", artDirData);
+          setStatus("agent_artdir", "done");
+        } catch (err) {
+          console.error("[Art Director Error]:", err);
+          const errMsg = err.message || "Failed to generate visual prompt";
+          log(`Art Director Error: ${errMsg}`, "error");
+          setMasterFeedback(`Art Director Node Failed: ${errMsg}`);
+          setStatus("agent_artdir", "error");
+          setOutput("agent_artdir", { error: errMsg, image_prompt: `⚠️ Art Director Error:\n${errMsg}` });
+          setIsRunning(false);
+          return;
         }
-        setOutput("agent_artdir", artDirData);
-        setStatus("agent_artdir", "done");
 
         if (approvalMode) {
           log("⏸ Art Director Step complete. Review Visual Prompt and click Approve to render Image...", "agent");
@@ -1366,8 +2389,8 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // ── STEP 5: Genfy Image Engine ─────────────────────────────────────────
-      let genfyResult = (startIndex > 4 ? nodeOutputs.genfy : null);
-      if (startIndex <= 4 || !genfyResult) {
+      let genfyResult = (currentOrder.indexOf("genfy") !== -1 && startIndex > currentOrder.indexOf("genfy") ? nodeOutputs.genfy : null);
+      if (currentOrder.includes("genfy") && (startIndex <= currentOrder.indexOf("genfy") || !genfyResult)) {
         setStatus("genfy", "active");
         setSelectedNodeId("genfy");
         log("Node 5: Image Engine — requesting generation via ChatGPT...", "info");
@@ -1414,13 +2437,15 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         }
       }
 
-      if (genfyResult) {
-        setOutput("genfy", genfyResult);
-        setStatus("genfy", "done");
-        log("✓ Image generation complete", "success");
-      } else {
-        setStatus("genfy", "error");
-        throw new Error("ChatGPT image generation failed and returned no output.");
+      if (currentOrder.includes("genfy")) {
+        if (genfyResult) {
+          setOutput("genfy", genfyResult);
+          setStatus("genfy", "done");
+          log("✓ Image generation complete", "success");
+        } else {
+          setStatus("genfy", "error");
+          throw new Error("ChatGPT image generation failed and returned no output.");
+        }
       }
 
       // Save generated image to assets store so Assets screen can display it
@@ -1441,22 +2466,27 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
       }
 
       // ── Master Final Audit ─────────────────────────────────────────────────
-      log("👑 Master Supervisor: running final campaign audit...", "agent");
-      setMasterFeedback("Running final multi-agent pipeline audit...");
-      let auditFeedback = "Campaign assets fully aligned with brief. Copy tone, visual style, and audience targeting are coherent. Approved for production.";
-      try {
-        const r = await fetch("/bff/workflow/orchestrate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ master_goal: brief, current_step: "5. Final Audit", step_data: { copy: copyData, image: genfyResult } }),
-        });
-        const auditData = await r.json();
-        auditFeedback = auditData.supervisor_feedback || auditFeedback;
-      } catch (_) {}
+      if (currentOrder.includes("copy") || currentOrder.includes("genfy")) {
+        log("👑 Master Supervisor: running final campaign audit...", "agent");
+        setMasterFeedback("Running final multi-agent pipeline audit...");
+        let auditFeedback = "Campaign assets fully aligned with brief. Copy tone, visual style, and audience targeting are coherent. Approved for production.";
+        try {
+          const r = await fetch("/bff/workflow/orchestrate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ master_goal: brief, current_step: "5. Final Audit", step_data: { copy: copyData, image: genfyResult } }),
+          });
+          const auditData = await r.json();
+          auditFeedback = auditData.supervisor_feedback || auditFeedback;
+        } catch (_) {}
 
-      updateMasterState("approved", auditFeedback);
-      log("👑 Master Supervisor: CAMPAIGN APPROVED ✓", "success");
-      showToast("🎉 Multi-Agent Workflow complete!");
+        updateMasterState("approved", auditFeedback);
+        log("👑 Master Supervisor: CAMPAIGN APPROVED ✓", "success");
+        showToast("🎉 Multi-Agent Workflow complete!");
+      } else {
+        updateMasterState("approved", "Custom workflow pipeline completed successfully.");
+        showToast("🎉 Workflow complete!");
+      }
 
       // Update project status in localStorage
       if (activeProject?.id) {
@@ -1551,6 +2581,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
           <button
             onClick={() => {
               setActiveProject(null);
+              updateActiveNodes([]);
+              setSelectedNodeId(null);
+              setRightSidebarMode("closed");
               setViewMode("canvas");
             }}
             style={{
@@ -1590,7 +2623,13 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             <h3 style={{ fontSize: 16, fontWeight: 700, color: t.text, margin: "0 0 6px" }}>No workflow history found</h3>
             <p style={{ fontSize: 12.5, color: t.text2, margin: "0 0 16px" }}>Launch a new autonomous campaign pipeline to generate strategy, copy, and visuals.</p>
             <button
-              onClick={() => { setActiveProject(null); setViewMode("canvas"); }}
+              onClick={() => {
+                setActiveProject(null);
+                updateActiveNodes([]);
+                setSelectedNodeId(null);
+                setRightSidebarMode("closed");
+                setViewMode("canvas");
+              }}
               style={{
                 padding: "9px 20px", borderRadius: 8, border: "none", background: "#000",
                 color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6
@@ -1612,8 +2651,18 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                       brief: item.brief,
                       assetType: item.assetType,
                       outputs: item.outputs,
-                      nodeOutputs: item.outputs
+                      nodeOutputs: item.outputs,
+                      nodes: item.nodes
                     });
+                    if (item.nodes && item.nodes.length) {
+                      updateActiveNodes(item.nodes);
+                      setSelectedNodeId(item.nodes[0]);
+                      setRightSidebarMode("closed");
+                    } else {
+                      updateActiveNodes(PIPELINE.map(n => n.id));
+                      setSelectedNodeId("brief");
+                      setRightSidebarMode("closed");
+                    }
                   }
                   setViewMode("canvas");
                 }}
@@ -1684,68 +2733,44 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
   return (
     <div style={{ fontFamily: FONT, minHeight: "100vh" }}>
 
-      {/* ── Storyboard Card Context Header & Back Navigation ───────────────────── */}
-      <div style={{
-        background: activeProject?.storyboard_card ? `linear-gradient(135deg, ${t.brainSoft}, ${t.accentSoft})` : t.surface2,
-        borderBottom: `1px solid ${t.border}`,
-        padding: "10px 24px",
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            onClick={() => nav(activeProject?.storyboard_card ? "storyboard" : "projects", activeProject)}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 5,
-              fontFamily: FONT, fontSize: 12, fontWeight: 700,
-              color: t.text, background: t.surface, border: `1px solid ${t.borderStrong}`,
-              padding: "4px 10px", borderRadius: R.md, cursor: "pointer",
-            }}
-          >
-            ← {activeProject?.storyboard_card ? "Back to Storyboard" : "Back to Projects"}
-          </button>
-
-          {activeProject?.storyboard_card && (
-            <>
-              <span style={{
-                fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase",
-                background: t.brain, color: "#fff", padding: "3px 9px", borderRadius: 20,
-              }}>
-                📌 STORYBOARD CARD
-              </span>
-              <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: t.text }}>
-                {activeProject.storyboard_card.channel} · {activeProject.storyboard_card.format}
-              </span>
-            </>
-          )}
-        </div>
-
-        {activeProject?.storyboard_card && (
-          <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.brainText, fontWeight: 600 }}>
-            Context & Tool Sequence Pre-Loaded ✓
-          </span>
-        )}
-      </div>
-
-      {/* ── Master Supervisor Banner ──────────────────────────────────────── */}
+      {/* ── Master Supervisor Banner with Inline Back Navigation ─────────── */}
       <div style={{
         margin: "0",
-        padding: "14px 24px",
+        padding: "12px 24px",
         background: mc.bg,
         borderBottom: `1px solid ${mc.border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap",
         transition: "all .4s ease",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <button
+            onClick={() => nav(activeProject?.storyboard_card ? "storyboard" : "projects", activeProject)}
+            title="Back"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              fontFamily: FONT, fontSize: 12, fontWeight: 700,
+              color: t.text, background: t.surface, border: `1px solid ${t.borderStrong}`,
+              padding: "5px 12px", borderRadius: R.md, cursor: "pointer",
+              transition: "all .15s", flexShrink: 0,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.accent; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.borderStrong; }}
+          >
+            <ArrowLeft size={13} />
+            {activeProject?.storyboard_card ? "Back to Storyboard" : "Back to Projects"}
+          </button>
+
           <div style={{
-            width: 38, height: 38, borderRadius: 11, flexShrink: 0,
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
             background: `linear-gradient(145deg, ${t.brain}, ${t.brain2})`,
             display: "grid", placeItems: "center",
             boxShadow: `0 4px 14px ${t.brain}55`,
           }}>
-            <Crown size={18} color="#fff" />
+            <Crown size={17} color="#fff" />
           </div>
+
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <b style={{ fontSize: 13.5, color: t.text }}>Master Workflow Supervisor Agent</b>
               <span style={{
                 fontFamily: MONO, fontSize: 9.5, fontWeight: 700, padding: "2px 9px", borderRadius: 20,
@@ -1754,15 +2779,30 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               }}>
                 {masterState === "approved" ? "✓ APPROVED" : masterState === "supervising" ? "SUPERVISING..." : "READY"}
               </span>
+              {activeProject?.storyboard_card && (
+                <span style={{
+                  fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase",
+                  background: t.brain, color: "#fff", padding: "2px 8px", borderRadius: 20,
+                }}>
+                  📌 {activeProject.storyboard_card.channel} · {activeProject.storyboard_card.format}
+                </span>
+              )}
             </div>
-            <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, marginTop: 2 }}>
-              {masterFeedback || "Monitors every node transition · validates outputs · writes final campaign audit"}
-            </div>
+            {masterFeedback && (
+              <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, marginTop: 2 }}>
+                {masterFeedback}
+              </div>
+            )}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Btn t={t} kind="secondary" small onClick={() => nav("tool-detail")} icon={MessageSquare}>Copy Tool</Btn>
-          <Btn t={t} kind="secondary" small onClick={() => nav("genfy-detail")} icon={ImageIcon}>Genfy Tool</Btn>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {activeProject?.storyboard_card && (
+            <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.brainText, fontWeight: 600 }}>
+              Context Pre-Loaded ✓
+            </span>
+          )}
+          <Btn t={t} kind="secondary" small onClick={() => setViewMode("history")} icon={Clock}>Workflow History</Btn>
         </div>
       </div>
 
@@ -1773,40 +2813,9 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         <div style={{ flex: 1, minWidth: 0, padding: "24px 28px 40px" }}>
 
           {/* Canvas header */}
-          <button
-            onClick={() => setViewMode("history")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 16,
-              fontFamily: MONO,
-              fontSize: 11,
-              color: t.text2,
-              background: t.surface2,
-              border: `1px solid ${t.border}`,
-              borderRadius: R.pill,
-              padding: "5px 12px",
-              cursor: "pointer",
-              transition: "all 0.15s"
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = t.surface3;
-              e.currentTarget.style.borderColor = t.borderStrong;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = t.surface2;
-              e.currentTarget.style.borderColor = t.border;
-            }}
-          >
-            ← Back to Workflow History
-          </button>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
             <div>
-              <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.text3, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                Autonomous Workflow Canvas
-              </div>
-              <div style={{ fontWeight: 800, fontSize: 20, color: t.text, marginTop: 3 }}>
+              <div style={{ fontWeight: 800, fontSize: 20, color: t.text }}>
                 {activeProject ? activeProject.name : "Multi-Agent Campaign Pipeline"}
               </div>
               {aiDesigned && aiWorkflowName && (
@@ -1838,6 +2847,27 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                 Step-by-Step Approval
               </label>
 
+              <button
+                onClick={() => setRightSidebarMode(prev => prev === "nodes" ? "closed" : "nodes")}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "7px 14px", borderRadius: 8,
+                  border: `1px solid ${rightSidebarMode === "nodes" ? t.brain : t.borderStrong}`,
+                  background: rightSidebarMode === "nodes" ? `${t.brain}15` : t.surface2,
+                  color: rightSidebarMode === "nodes" ? t.brain : t.text,
+                  fontFamily: FONT, fontSize: 12, fontWeight: 700,
+                  cursor: "pointer", transition: "all 0.15s ease"
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.brain; e.currentTarget.style.background = t.surface3; }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = rightSidebarMode === "nodes" ? t.brain : t.borderStrong;
+                  e.currentTarget.style.background = rightSidebarMode === "nodes" ? `${t.brain}15` : t.surface2;
+                }}
+              >
+                <Plus size={14} color={t.brain} />
+                Add Node
+              </button>
+
               {(isRunning || Object.keys(nodeStatus).length > 0) && (
                 <Btn t={t} kind="secondary" small icon={RotateCcw} onClick={handleReset} disabled={isRunning}>
                   Reset
@@ -1856,7 +2886,7 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                   }}
                 >
                   <CheckCircle size={16} />
-                  Approve Node Output & Proceed ▶
+                  Approve & Proceed ▶
                 </button>
               ) : (
                 <Btn t={t} kind="accent" loading={isRunning} icon={Play} onClick={handleRun} disabled={isRunning}
@@ -1867,37 +2897,15 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             </div>
           </div>
 
-          {/* Pending Approval Banner when pipeline is paused for user review */}
+          {/* Status strip when waiting for step approval */}
           {pendingApproval && (
             <div style={{
-              marginBottom: 20, padding: "16px 20px", borderRadius: R.lg,
-              background: "linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04))",
-              border: "1.5px solid rgba(34,197,94,0.4)",
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
-              boxShadow: "0 6px 20px rgba(34,197,94,0.12)",
+              marginBottom: 16, padding: "8px 14px", borderRadius: 8,
+              background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+              color: "#16A34A", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8
             }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#15803D", fontWeight: 800, fontSize: 14 }}>
-                  <CheckCircle size={18} />
-                  NODE COMPLETED — AWAITING YOUR APPROVAL
-                </div>
-                <div style={{ color: t.text, fontSize: 13, marginTop: 3 }}>
-                  Review the output below for <b>{PIPELINE.find(n => n.id === pendingApproval.nodeId)?.label}</b>. Click <b>Approve Node Output & Proceed</b> to run the next step.
-                </div>
-              </div>
-              <button
-                onClick={handleApproveStep}
-                style={{
-                  padding: "10px 22px", borderRadius: 10, border: "none",
-                  background: "#22C55E", color: "#fff", fontWeight: 800, fontSize: 13,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-                  fontFamily: FONT, flexShrink: 0,
-                  boxShadow: "0 4px 14px rgba(34,197,94,0.4)",
-                }}
-              >
-                <CheckCircle size={16} />
-                Approve & Proceed
-              </button>
+              <CheckCircle size={15} color="#22C55E" />
+              <span><b>{PIPELINE.find(n => n.id === pendingApproval.nodeId)?.label}</b> output ready for review — click <b>Approve & Proceed ▶</b> to continue.</span>
             </div>
           )}
 
@@ -1933,103 +2941,446 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             background: t.surface,
             padding: "28px 24px",
             position: "relative",
+            minHeight: 460,
             backgroundImage: `radial-gradient(circle, ${t.borderStrong}55 1px, transparent 1px)`,
             backgroundSize: "24px 24px",
           }}>
-            {/* Pipeline label */}
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <span style={{
-                fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain, letterSpacing: "0.1em",
-                background: `${t.brain}12`, padding: "4px 14px", borderRadius: 20, border: `1px solid ${t.brain}30`,
-              }}>
-                AGENT PIPELINE · {PIPELINE.length} NODES
-              </span>
-            </div>
-
-            {/* Nodes + connectors */}
-            <div style={{ maxWidth: 540, margin: "0 auto" }}>
-              {PIPELINE.map((node, i) => (
-                <div key={node.id}>
-                  <NodeCard
-                    node={node}
-                    config={configs[node.id]}
-                    status={nodeStatus[node.id] || "idle"}
-                    output={nodeOutputs[node.id] || null}
-                    isSelected={selectedNodeId === node.id}
-                    onSelect={setSelectedNodeId}
-                    onUpdateOutput={setOutput}
-                    onRunFromNode={handleRun}
-                    onPreviewImage={(url) => setImageModalUrl(url)}
-                    t={t}
-                  />
-                  {i < PIPELINE.length - 1 && (
-                    <Connector
-                      color={PIPELINE[i + 1].color}
-                      active={nodeStatus[node.id] === "done" && (nodeStatus[PIPELINE[i+1].id] === "active" || nodeStatus[PIPELINE[i+1].id] === "done")}
-                      done={nodeStatus[PIPELINE[i+1].id] === "done"}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Final output card */}
-            {nodeOutputs["genfy"] && (
+            {currentPipeline.length === 0 ? (
+              /* n8n-style Empty Canvas */
               <div style={{
-                marginTop: 28, padding: "16px 18px", borderRadius: R.lg,
-                background: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))",
-                border: "1px solid rgba(34,197,94,0.3)",
+                padding: "48px 20px 40px",
                 textAlign: "center",
+                maxWidth: 560,
+                margin: "0 auto",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
               }}>
-                <CheckCircle size={22} color="#22C55E" style={{ margin: "0 auto 8px" }} />
-                <div style={{ fontWeight: 700, fontSize: 14, color: t.text }}>Pipeline Complete</div>
-                <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, marginTop: 4 }}>
-                  All 5 nodes executed successfully · Master Supervisor approved
+                <button
+                  onClick={() => setRightSidebarMode("nodes")}
+                  style={{
+                    width: 64, height: 64, borderRadius: "50%",
+                    background: `${t.brain}18`, border: `2px dashed ${t.brain}88`,
+                    display: "grid", placeItems: "center", marginBottom: 18,
+                    color: t.brain, cursor: "pointer", transition: "all 0.2s ease",
+                    boxShadow: "0 6px 20px rgba(0,0,0,0.06)"
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.borderColor = t.brain; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = `${t.brain}88`; }}
+                  title="Add node"
+                >
+                  <Plus size={30} />
+                </button>
+
+                <h3 style={{ fontSize: 19, fontWeight: 800, color: t.text, margin: "0 0 6px", letterSpacing: "-0.01em" }}>
+                  Empty Workflow Canvas
+                </h3>
+                <p style={{ fontSize: 13, color: t.text2, margin: "0 0 20px", maxWidth: 420, lineHeight: 1.5 }}>
+                  Build your autonomous workflow step-by-step from the node library on the right, or pick a predefined pipeline below.
+                </p>
+
+                <div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+                  <button
+                    onClick={() => setRightSidebarMode("nodes")}
+                    style={{
+                      padding: "10px 22px", borderRadius: R.md, border: "none",
+                      background: "#000", color: "#fff", fontWeight: 700, fontSize: 13,
+                      cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
+                      fontFamily: FONT, boxShadow: "0 4px 14px rgba(0,0,0,0.25)"
+                    }}
+                  >
+                    <Plus size={16} />
+                    Add Node
+                  </button>
+                </div>
+
+                {/* Predefined Workflows Quick Grid */}
+                <div style={{ width: "100%", borderTop: `1px dashed ${t.border}`, paddingTop: 20, textAlign: "left" }}>
+                  <div style={{
+                    fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3,
+                    letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12, textAlign: "center"
+                  }}>
+                    Or Start With a Predefined Workflow
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
+                    {PREDEFINED_WORKFLOWS.map((preset) => (
+                      <div
+                        key={preset.id}
+                        onClick={() => loadPredefinedWorkflow(preset)}
+                        style={{
+                          padding: "12px 14px", borderRadius: R.md,
+                          border: `1px solid ${t.border}`, background: t.surface2,
+                          cursor: "pointer", transition: "all 0.18s ease"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.brain; e.currentTarget.style.background = t.surface3; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.background = t.surface2; }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                          <span style={{ fontWeight: 700, fontSize: 12.5, color: t.text }}>{preset.name}</span>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: t.brain, background: `${t.brain}15`, padding: "2px 6px", borderRadius: 4, fontWeight: 700 }}>
+                            {preset.badge.split(" · ")[0]}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: t.text3, lineHeight: 1.4 }}>{preset.desc}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
+            ) : (
+              <>
+                {/* Pipeline label */}
+                <div style={{ textAlign: "center", marginBottom: 20, display: "flex", justifyContent: "center", alignItems: "center", gap: 10 }}>
+                  <span style={{
+                    fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.brain, letterSpacing: "0.1em",
+                    background: `${t.brain}12`, padding: "4px 14px", borderRadius: 20, border: `1px solid ${t.brain}30`,
+                  }}>
+                    AGENT PIPELINE · {currentPipeline.length} {currentPipeline.length === 1 ? "NODE" : "NODES"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      updateActiveNodes([]);
+                      setSelectedNodeId(null);
+                      setRightSidebarMode("closed");
+                    }}
+                    style={{
+                      background: "transparent", border: "none", color: t.text3,
+                      fontSize: 11, fontFamily: MONO, cursor: "pointer", padding: "2px 6px",
+                      borderRadius: 4, textDecoration: "underline"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = "#EF4444"}
+                    onMouseLeave={(e) => e.currentTarget.style.color = t.text3}
+                  >
+                    Clear Flow
+                  </button>
+                </div>
+
+                {/* Nodes + connectors */}
+                <div style={{ maxWidth: 540, margin: "0 auto" }}>
+                  {currentPipeline.map((node, i) => {
+                    const prevNode = i > 0 ? currentPipeline[i - 1] : null;
+                    const isPrevDone = prevNode ? nodeStatus[prevNode.id] === "done" : true;
+                    const canRunThisStep = isPrevDone && (nodeStatus[node.id] === "idle" || !nodeOutputs[node.id]);
+                    const nextNode = i < currentPipeline.length - 1 ? currentPipeline[i + 1] : null;
+                    const nextStepId = nextNode?.id || null;
+                    const nextStepLabel = nextNode?.label || null;
+
+                    return (
+                      <div key={node.id}>
+                        <NodeCard
+                          node={node}
+                          config={configs[node.id]}
+                          status={nodeStatus[node.id] || "idle"}
+                          output={nodeOutputs[node.id] || null}
+                          isSelected={selectedNodeId === node.id}
+                          onSelect={(id) => {
+                            setSelectedNodeId(id);
+                            setRightSidebarMode("config");
+                          }}
+                          onUpdateOutput={setOutput}
+                          onRunFromNode={handleRun}
+                          onPreviewImage={(url) => setImageModalUrl(url)}
+                          onRemove={() => handleRemoveNode(node.id)}
+                          canRunThisStep={canRunThisStep}
+                          nextStepId={nextStepId}
+                          nextStepLabel={nextStepLabel}
+                          t={t}
+                        />
+                        {i < currentPipeline.length - 1 && (
+                          <Connector
+                            color={currentPipeline[i + 1].color}
+                            active={nodeStatus[node.id] === "done" && (nodeStatus[currentPipeline[i+1].id] === "active" || nodeStatus[currentPipeline[i+1].id] === "done")}
+                            done={nodeStatus[currentPipeline[i+1].id] === "done"}
+                            ready={nodeStatus[node.id] === "done" && nodeStatus[currentPipeline[i+1].id] === "idle"}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Add Next Step Inline Button */}
+                  <div style={{ textAlign: "center", marginTop: 14 }}>
+                    <button
+                      onClick={() => setRightSidebarMode("nodes")}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                        padding: "7px 16px", borderRadius: R.pill,
+                        border: `1px dashed ${t.borderStrong}`, background: t.surface2,
+                        color: t.text2, fontSize: 11.5, fontFamily: MONO, fontWeight: 600,
+                        cursor: "pointer", transition: "all 0.15s ease"
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.brain; e.currentTarget.style.color = t.text; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.borderStrong; e.currentTarget.style.color = t.text2; }}
+                    >
+                      <Plus size={13} /> Add Next Step
+                    </button>
+                  </div>
+                </div>
+
+                {/* Final output card */}
+                {nodeOutputs["genfy"] && (
+                  <div style={{
+                    marginTop: 28, padding: "16px 18px", borderRadius: R.lg,
+                    background: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))",
+                    border: "1px solid rgba(34,197,94,0.3)",
+                    textAlign: "center",
+                  }}>
+                    <CheckCircle size={22} color="#22C55E" style={{ margin: "0 auto 8px" }} />
+                    <div style={{ fontWeight: 700, fontSize: 14, color: t.text }}>Pipeline Complete</div>
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, marginTop: 4 }}>
+                      All pipeline nodes executed successfully · Master Supervisor approved
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* ── RIGHT: Config Panel (sticky) ──────────────────────────────────── */}
-        <div style={{
-          width: 290, flexShrink: 0,
-          borderLeft: `1px solid ${t.border}`,
-          position: "sticky", top: 0, alignSelf: "flex-start",
-          maxHeight: "calc(100vh - 56px)", overflowY: "auto",
-          background: t.surface2,
-        }}>
-          <div style={{
-            padding: "12px 18px 10px",
-            borderBottom: `1px solid ${t.border}`,
-            display: "flex", alignItems: "center", gap: 6,
+        {/* ── RIGHT: Node Options & Config Panel (sticky) ───────────────────── */}
+        {rightSidebarMode !== "closed" && (
+          <aside style={{
+            width: 330, flexShrink: 0,
+            borderLeft: `1px solid ${t.border}`,
+            position: "sticky", top: 0, alignSelf: "flex-start",
+            maxHeight: "calc(100vh - 56px)", overflowY: "auto",
+            background: t.surface2,
+            boxShadow: "-4px 0 20px rgba(0,0,0,0.03)",
+            display: "flex", flexDirection: "column"
           }}>
-            <Settings size={13} style={{ color: t.text3 }} />
-            <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Node Config
-            </span>
-          </div>
-          <ConfigPanel
-            node={selectedNode}
-            config={configs[selectedNodeId] || {}}
-            onChange={(field, value) => updateConfig(selectedNodeId, field, value)}
-            t={t}
-            inputs={nodeInputs}
-            outputs={nodeOutputs}
-            status={nodeStatus[selectedNodeId]}
-          />
-        </div>
+            {/* Dedicated Top Header with Close Button */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "12px 14px", borderBottom: `1px solid ${t.border}`,
+              background: t.surface, position: "sticky", top: 0, zIndex: 10
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                {rightSidebarMode === "nodes" ? (
+                  <>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 6,
+                      background: `${t.brain}18`, display: "grid", placeItems: "center"
+                    }}>
+                      <Plus size={14} color={t.brain} />
+                    </div>
+                    <div>
+                      <div style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: t.text, letterSpacing: "0.04em" }}>
+                        ADD NODES
+                      </div>
+                      <div style={{ fontSize: 10.5, color: t.text3 }}>Node Library</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {selectedNode ? (
+                      <NodeIconBadge node={selectedNode} isAgent={selectedNode.type === "agent"} containerSize={26} radius={6} size={13} />
+                    ) : (
+                      <div style={{
+                        width: 24, height: 24, borderRadius: 6,
+                        background: `${t.brain}18`, display: "grid", placeItems: "center"
+                      }}>
+                        <Settings size={13} color={t.brain} />
+                      </div>
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: MONO, fontSize: 11, fontWeight: 800, color: t.text,
+                        letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150
+                      }}>
+                        {selectedNode ? selectedNode.label : "CONFIGURATION"}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: t.text3 }}>Node Settings</div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {rightSidebarMode === "config" && (
+                  <button
+                    onClick={() => setRightSidebarMode("nodes")}
+                    title="Add more nodes"
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 4,
+                      padding: "4px 8px", borderRadius: 6, border: `1px solid ${t.border}`,
+                      background: t.surface2, color: t.text2, fontSize: 10.5, fontFamily: MONO,
+                      fontWeight: 600, cursor: "pointer"
+                    }}
+                  >
+                    <Plus size={11} /> Add Node
+                  </button>
+                )}
+                <button
+                  onClick={() => setRightSidebarMode("closed")}
+                  title="Close sidebar"
+                  style={{
+                    width: 26, height: 26, borderRadius: 6, border: `1px solid ${t.border}`,
+                    background: t.surface2, color: t.text2, display: "grid", placeItems: "center",
+                    cursor: "pointer", transition: "all 0.15s ease"
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = t.surface3; e.currentTarget.style.color = t.text; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = t.surface2; e.currentTarget.style.color = t.text2; }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Sidebar Content: Add Nodes vs Node Config */}
+            {rightSidebarMode === "nodes" ? (
+              <div style={{ padding: "16px 14px", fontFamily: FONT }}>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>
+                    Available Nodes
+                  </div>
+                  <div style={{ fontSize: 11.5, color: t.text2 }}>
+                    Click a node to add it to your pipeline
+                  </div>
+                </div>
+
+                {/* Node Options */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                  {PIPELINE.map((pNode) => {
+                    const isAdded = activeNodes.includes(pNode.id);
+                    const Icon = pNode.icon;
+                    return (
+                      <div
+                        key={pNode.id}
+                        onClick={() => handleAddNode(pNode.id)}
+                        style={{
+                          padding: "10px 12px", borderRadius: R.md,
+                          border: `1px solid ${isAdded ? pNode.color + "55" : t.border}`,
+                          background: isAdded ? `${pNode.color}0A` : t.surface,
+                          cursor: "pointer", transition: "all 0.18s ease",
+                          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+                          boxShadow: isAdded ? `0 2px 8px ${pNode.color}15` : "none"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = pNode.color;
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = isAdded ? pNode.color + "55" : t.border;
+                          e.currentTarget.style.transform = "translateY(0)";
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                          <NodeIconBadge node={pNode} isAgent={pNode.type === "agent"} containerSize={28} radius={7} size={14} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 12, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {pNode.label}
+                            </div>
+                            <div style={{ fontFamily: MONO, fontSize: 9.5, color: t.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {pNode.subtitle.split(" · ")[0]}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddNode(pNode.id);
+                          }}
+                          style={{
+                            padding: "4px 8px", borderRadius: 6, border: "none",
+                            background: isAdded ? `${pNode.color}22` : "#000",
+                            color: isAdded ? pNode.color : "#fff",
+                            fontSize: 10.5, fontWeight: 700, fontFamily: MONO,
+                            cursor: "pointer", flexShrink: 0
+                          }}
+                        >
+                          {isAdded ? "✓ Added" : "+ Add"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Predefined Workflows Section */}
+                <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 14 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: t.text3, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>
+                    Predefined Workflows
+                  </div>
+                  <div style={{ fontSize: 11.5, color: t.text2, marginBottom: 10 }}>
+                    Load ready-to-run multi-agent templates
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                    {PREDEFINED_WORKFLOWS.map((preset) => (
+                      <div
+                        key={preset.id}
+                        onClick={() => loadPredefinedWorkflow(preset)}
+                        style={{
+                          padding: "9px 11px", borderRadius: R.md,
+                          border: `1px solid ${t.border}`, background: t.surface,
+                          cursor: "pointer", transition: "all 0.15s ease"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.brain; e.currentTarget.style.background = t.surface3; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.background = t.surface; }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                          <div style={{ fontWeight: 700, fontSize: 11.5, color: t.text }}>{preset.name}</div>
+                          <span style={{ fontFamily: MONO, fontSize: 8.5, fontWeight: 700, color: t.brain, background: `${t.brain}15`, padding: "1px 5px", borderRadius: 4 }}>
+                            {preset.badge.split(" · ")[0]}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 10.5, color: t.text3, lineHeight: 1.35 }}>
+                          {preset.desc}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ConfigPanel
+                node={selectedNode}
+                config={configs[selectedNodeId] || {}}
+                onChange={(field, value) => updateConfig(selectedNodeId, field, value)}
+                t={t}
+                inputs={nodeInputs}
+                outputs={nodeOutputs}
+                status={nodeStatus[selectedNodeId]}
+              />
+            )}
+          </aside>
+        )}
       </div>
 
 
 
-      {/* Spinner animation */}
+      {/* Spinner animation & Rich Markdown Output Styling */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
+        }
+        .rich-copy-output p {
+          margin: 0 0 8px 0;
+          line-height: 1.6;
+        }
+        .rich-copy-output p:last-child {
+          margin-bottom: 0;
+        }
+        .rich-copy-output strong, .rich-copy-output b {
+          font-weight: 750;
+          color: inherit;
+        }
+        .rich-copy-output h1, .rich-copy-output h2, .rich-copy-output h3, .rich-copy-output h4 {
+          font-weight: 800;
+          margin: 10px 0 4px 0;
+          font-size: 13px;
+          color: inherit;
+        }
+        .rich-copy-output ul, .rich-copy-output ol {
+          margin: 6px 0 8px 18px;
+          padding: 0;
+        }
+        .rich-copy-output li {
+          margin-bottom: 4px;
+          line-height: 1.5;
         }
       `}</style>
 
@@ -2038,30 +3389,82 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
         <div
           onClick={() => { setImageModalUrl(null); setEditorOpen(false); }}
           style={{
-            position: "fixed", inset: 0, zIndex: 9999,
-            background: "rgba(0, 0, 0, 0.88)", backdropFilter: "blur(10px)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+            position: "fixed", inset: 0, zIndex: 99999,
+            background: "rgba(0, 0, 0, 0.90)", backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            boxSizing: "border-box",
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "100%", maxWidth: editorOpen ? 1040 : 840, maxHeight: "92vh", borderRadius: R.xl,
-              overflow: "hidden", background: t.surface, border: "none",
-              boxShadow: "0 24px 70px rgba(0,0,0,0.7)", display: "flex", flexDirection: "column",
-              position: "relative", transition: "all 0.3s ease"
+              width: editorOpen ? "min(1080px, 94vw)" : "auto",
+              maxWidth: "94vw", maxHeight: "92vh", borderRadius: R.xl,
+              overflow: "hidden", background: t.surface, border: `1px solid ${t.border}`,
+              boxShadow: "0 28px 80px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08)",
+              display: "flex", flexDirection: "column",
+              position: "relative", transition: "all 0.25s ease"
             }}
           >
-            <button
-              onClick={() => { setImageModalUrl(null); setEditorOpen(false); }}
-              style={{
-                position: "absolute", top: 12, right: 12, width: 32, height: 32,
-                borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.6)",
-                color: "#fff", cursor: "pointer", display: "grid", placeItems: "center", zIndex: 20,
-              }}
-            >
-              <X size={18} />
-            </button>
+            {/* Top Modal Header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "12px 18px", background: t.surface2, borderBottom: `1px solid ${t.border}`,
+              flexShrink: 0, gap: 12,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
+                  display: "grid", placeItems: "center", color: "#fff",
+                  fontSize: 13, fontWeight: 900, flexShrink: 0,
+                }}>
+                  ✦
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 13.5, color: t.text, lineHeight: 1.2 }}>
+                    {editorOpen ? "Visual Typography Studio" : "Full Resolution Preview"}
+                  </div>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3, marginTop: 1 }}>
+                    {editorOpen ? "Drag text to reposition · Export layered visual" : "Genfy AI Image Engine · Lossless Creative Render"}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {!editorOpen && (
+                  <button
+                    onClick={() => setEditorOpen(true)}
+                    style={{
+                      padding: "6px 12px", borderRadius: 8,
+                      background: t.surface, border: `1px solid ${t.border}`,
+                      color: t.text, fontSize: 11.5, fontWeight: 700,
+                      cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.brain; e.currentTarget.style.color = t.brain; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text; }}
+                  >
+                    🎨 Overlay Typography
+                  </button>
+                )}
+                <button
+                  onClick={() => { setImageModalUrl(null); setEditorOpen(false); }}
+                  title="Close Preview (Esc)"
+                  style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    border: `1px solid ${t.border}`, background: t.surface,
+                    color: t.text, cursor: "pointer", display: "grid", placeItems: "center",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239, 68, 68, 0.15)"; e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "#ef4444"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = t.surface; e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text; }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
 
             {editorOpen ? (
               /* ── Interactive Typography Editor Studio ── */
@@ -2081,14 +3484,14 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
                   style={{
                     flex: 1, background: "#060608", position: "relative",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    userSelect: "none", padding: 16, overflow: "hidden"
+                    userSelect: "none", padding: 16, overflow: "hidden", minHeight: 0
                   }}
                 >
-                  <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "72vh" }}>
+                  <div style={{ position: "relative", display: "inline-block", maxWidth: "100%", maxHeight: "calc(92vh - 135px)" }}>
                     <img
                       src={imageModalUrl}
                       alt="Editor Canvas"
-                      style={{ maxWidth: "100%", maxHeight: "72vh", objectFit: "contain", display: "block", borderRadius: 8 }}
+                      style={{ maxWidth: "100%", maxHeight: "calc(92vh - 135px)", width: "auto", height: "auto", objectFit: "contain", display: "block", borderRadius: 8 }}
                     />
                     {/* Draggable Typography Bounding Box */}
                     <div
@@ -2244,27 +3647,65 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
             ) : (
               /* ── Standard Full Resolution Modal ── */
               <>
-                <div style={{ background: "#000", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: 16, overflow: "hidden" }}>
+                <div style={{
+                  background: "#060609",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: 16, overflow: "hidden", flex: "1 1 auto", minHeight: 0,
+                }}>
                   <img
                     src={imageModalUrl}
                     alt="Full Resolution Visual Render"
-                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block", borderRadius: 8 }}
+                    style={{
+                      maxWidth: "min(88vw, 940px)",
+                      maxHeight: "calc(92vh - 135px)",
+                      width: "auto",
+                      height: "auto",
+                      objectFit: "contain",
+                      display: "block",
+                      borderRadius: 8,
+                      boxShadow: "0 10px 40px rgba(0, 0, 0, 0.8)",
+                    }}
                   />
                 </div>
-                <div style={{ padding: "14px 20px", background: t.surface2, borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: t.text }}>Full Resolution Visual Render</div>
-                    <div style={{ fontFamily: MONO, fontSize: 11, color: t.text3, marginTop: 2 }}>Original resolution output from Genfy Image Engine</div>
+                <div style={{
+                  padding: "12px 20px", background: t.surface2, borderTop: `1px solid ${t.border}`,
+                  display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10,
+                  flexShrink: 0,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: "#10b981", boxShadow: "0 0 8px #10b981", display: "inline-block"
+                    }} />
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: t.text2 }}>
+                      100% Quality · Lossless Genfy Render
+                    </span>
                   </div>
-                  <div style={{ display: "flex", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <a
+                      href={imageModalUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        padding: "7px 14px", borderRadius: 8,
+                        background: t.surface, border: `1px solid ${t.border}`,
+                        color: t.text, fontWeight: 700, fontSize: 11.5,
+                        textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5,
+                      }}
+                    >
+                      Open in New Tab ↗
+                    </a>
                     <a
                       href={imageModalUrl}
                       download="campaign-creative.png"
                       target="_blank"
                       rel="noreferrer"
                       style={{
-                        padding: "8px 18px", borderRadius: 8, background: t.brain, color: "#fff",
-                        fontWeight: 700, fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6,
+                        padding: "7px 16px", borderRadius: 8,
+                        background: `linear-gradient(135deg, ${t.brain}, ${t.brain2})`,
+                        color: "#fff", fontWeight: 700, fontSize: 11.5,
+                        textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6,
+                        boxShadow: `0 4px 14px ${t.brain}35`,
                       }}
                     >
                       Download High-Res ⬇

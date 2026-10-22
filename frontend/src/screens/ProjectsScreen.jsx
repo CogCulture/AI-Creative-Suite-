@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, X, Zap, Clock, Trash2, ChevronRight, FolderOpen, Sparkles, Brain, CheckCircle, Loader2, Building2, Users, UserPlus, Mail, Shield, Trash } from "lucide-react";
+import { Plus, X, Zap, Clock, Trash2, ChevronRight, FolderOpen, Sparkles, Brain, CheckCircle, Loader2, Building2, Users, UserPlus, Mail, Shield, Trash, ArrowLeft } from "lucide-react";
 import { FONT, MONO, R } from "../tokens.js";
 import { Card, Btn, Eyebrow, H1 } from "../components/primitives/index.jsx";
 
@@ -40,9 +40,22 @@ function delay(ms) {
 export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) {
   const [projects, setProjects] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedBrandFilter, setSelectedBrandFilter] = useState("all");
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [modalStep, setModalStep] = useState("brand"); // "brand" | "campaign"
+
+  // Brand form state for Modal Step 1
+  const [brandForm, setBrandForm] = useState({
+    brandName: "",
+    industry: "",
+    website: "",
+    productDesc: "",
+    voice: "Bold & Playful",
+  });
+  const [brandFormError, setBrandFormError] = useState("");
+  const [savingBrand, setSavingBrand] = useState(false);
 
   // Team Invite Modal States
   const [teamModalProject, setTeamModalProject] = useState(null);
@@ -234,7 +247,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
   };
 
   const handleCreate = async () => {
-    const brandObj = brands.find(b => (b.id || b.brandName) === form.brandId) || brands[0];
+    const brandObj = selectedBrand || brands.find(b => (b.id || b.brandName) === form.brandId) || brands[0];
     const targetBrandId = brandObj ? (brandObj.id || brandObj.brandName) : "";
     const targetBrandName = brandObj ? brandObj.brandName : "";
 
@@ -299,19 +312,121 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
         setShowModal(false);
         setAiPhase(null);
         setAiResult(null);
+        setModalStep("brand");
         setForm({ name: "", brief: "", brandId: brands[0]?.id || "", assetType: "Instagram Ad Image" });
         setNameError(false);
         setBriefError(false);
         setBrandError(false);
-        showToast(`✨ Brand Project "${newProject.name}" linked to ${targetBrandName} — opening storyboard...`);
+        showToast(`✨ Campaign "${newProject.name}" linked to ${targetBrandName} — opening storyboard...`);
         setActiveProject(newProject);
         nav("storyboard", newProject);
       } else {
-        throw new Error("Failed to save brand project");
+        throw new Error("Failed to save campaign");
       }
     } catch (err) {
-      showToast("Failed to save brand project. Please try again.");
+      showToast("Failed to save campaign. Please try again.");
       setAiPhase(null);
+    }
+  };
+
+  const openNewBrandModal = () => {
+    setModalStep("brand");
+    setBrandForm({
+      brandName: "",
+      industry: "",
+      website: "",
+      productDesc: "",
+      voice: "Bold & Playful",
+    });
+    setBrandFormError("");
+    setShowModal(true);
+  };
+
+  const openNewCampaignModal = () => {
+    setModalStep("campaign");
+    setForm({
+      name: "",
+      brief: "",
+      brandId: selectedBrand?.id || selectedBrand?.brandName || (brands[0]?.id || ""),
+      assetType: "Instagram Ad Image",
+    });
+    setNameError(false);
+    setBriefError(false);
+    setShowModal(true);
+  };
+
+  const handleCreateBrand = async () => {
+    if (!brandForm.brandName.trim()) {
+      setBrandFormError("Brand name is required.");
+      return;
+    }
+    setSavingBrand(true);
+    setBrandFormError("");
+
+    const newBrandPayload = {
+      brandName: brandForm.brandName.trim(),
+      industry: brandForm.industry.trim(),
+      website: brandForm.website.trim(),
+      productDesc: brandForm.productDesc.trim(),
+      voice: brandForm.voice.trim(),
+    };
+
+    try {
+      const res = await fetch("/bff/brands", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newBrandPayload),
+      });
+      let createdBrand = newBrandPayload;
+      if (res.ok) {
+        createdBrand = await res.json();
+      }
+      const updatedBrands = deduplicateBrands([createdBrand, ...brands]);
+      setBrands(updatedBrands);
+      try {
+        localStorage.setItem("studio-brands", JSON.stringify(updatedBrands));
+        localStorage.setItem("studio-brand-context", JSON.stringify(createdBrand));
+      } catch (_) {}
+      window.dispatchEvent(new CustomEvent("studio-brand-created", { detail: createdBrand }));
+
+      setSelectedBrand(createdBrand);
+      setForm((f) => ({ ...f, brandId: createdBrand.id || createdBrand.brandName }));
+      showToast(`Brand "${createdBrand.brandName}" created.`);
+      setModalStep("campaign");
+    } catch (err) {
+      setBrandFormError("Failed to save brand. Please try again.");
+    } finally {
+      setSavingBrand(false);
+    }
+  };
+
+  const handleContinueWithoutCampaign = () => {
+    setShowModal(false);
+    setAiPhase(null);
+    setAiResult(null);
+    setModalStep("brand");
+    setActiveProject(null);
+    showToast("Opened Workflow History without campaign.");
+    nav("workflow");
+  };
+
+  const handleDeleteBrand = async (e, brandId) => {
+    e.stopPropagation();
+    if (!window.confirm("Delete this brand? All linked campaigns will also be unlinked.")) return;
+    try {
+      await fetch(`/bff/brands/${brandId}`, { method: "DELETE", credentials: "include" });
+      const updated = brands.filter((b) => b.id !== brandId);
+      setBrands(updated);
+      try {
+        localStorage.setItem("studio-brands", JSON.stringify(updated));
+      } catch (_) {}
+      if (selectedBrand?.id === brandId) {
+        setSelectedBrand(null);
+      }
+      showToast("Brand deleted");
+    } catch (_) {
+      showToast("Failed to delete brand");
     }
   };
 
@@ -320,9 +435,9 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
     try {
       await fetch(`/bff/projects/${id}`, { method: "DELETE", credentials: "include" });
       setProjects((prev) => prev.filter((p) => p.id !== id));
-      showToast("Brand project deleted");
+      showToast("Campaign deleted");
     } catch (err) {
-      showToast("Failed to delete project");
+      showToast("Failed to delete campaign");
     }
   };
 
@@ -333,209 +448,343 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "32px 40px 80px", fontFamily: FONT }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
-        <div>
-          <Eyebrow t={t}>Mode 02 · Orchestrated</Eyebrow>
-          <H1 t={t}>Brand Projects</H1>
-          <p style={{ fontFamily: FONT, fontSize: 13.5, color: t.text2, marginTop: 6, lineHeight: 1.5 }}>
-            Manage brand projects. Select a brand to view linked projects, invite team members, or launch multi-agent workflows.
-          </p>
-        </div>
-        <Btn t={t} kind="dark" icon={Plus} onClick={() => setShowModal(true)}>
-          New Brand Project
-        </Btn>
-      </div>
-
-      {/* Brand Selection Filter Bar */}
-      <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", background: t.surface, border: `1px solid ${t.border}`, padding: "12px 18px", borderRadius: R.md }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Building2 size={16} style={{ color: t.accent }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: t.text, fontFamily: FONT }}>Filter by Brand:</span>
-          <select
-            value={selectedBrandFilter}
-            onChange={(e) => setSelectedBrandFilter(e.target.value)}
-            style={{
-              padding: "7px 12px",
-              borderRadius: R.md,
-              border: `1px solid ${t.borderStrong}`,
-              background: t.surface2,
-              color: t.text,
-              fontFamily: FONT,
-              fontSize: 13,
-              outline: "none",
-              cursor: "pointer",
-            }}
-          >
-            <option value="all">All Brands ({brands.length})</option>
-            {brands.map((b) => (
-              <option key={b.id || b.brandName} value={b.id || b.brandName}>
-                {b.brandName} {b.industry ? `(${b.industry})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {brands.length === 0 && (
-          <span style={{ fontSize: 12, color: t.text3, fontFamily: FONT }}>
-            No brands onboarded yet. Create a brand to link brand projects.
-          </span>
-        )}
-      </div>
-
-      {/* Brand projects list */}
-      <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-        {loadingProjects ? (
-          <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
-            <Loader2 size={24} style={{ color: t.text3, margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
-            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3 }}>Loading brand projects...</div>
-          </Card>
-        ) : filteredProjects.length === 0 ? (
-          <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: 20, margin: "0 auto 16px",
-              background: `linear-gradient(135deg, ${t.accent}20, ${t.brain}10)`,
-              border: `1px solid ${t.border}`,
-              display: "grid", placeItems: "center",
-            }}>
-              <FolderOpen size={28} style={{ color: t.text3 }} />
+      {/* ── Brand Layer (when !selectedBrand) ─────────────────────────── */}
+      {!selectedBrand ? (
+        <>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+            <div>
+              <Eyebrow t={t}>Mode 02 · Orchestrated</Eyebrow>
+              <H1 t={t}>Brand Projects</H1>
+              <p style={{ fontFamily: FONT, fontSize: 13.5, color: t.text2, marginTop: 6, lineHeight: 1.5 }}>
+                Brand layer · Select a brand to explore campaigns, manage team members, or launch multi-agent workflows.
+              </p>
             </div>
-            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: t.text }}>No brand projects found</div>
-            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3, marginTop: 6, maxWidth: 360, margin: "6px auto 0" }}>
-              {selectedBrandFilter === "all"
-                ? "Create your first brand project to launch a multi-agent workflow — Strategy → Copy Agent → Image Engine."
-                : "No brand projects created for this brand yet."}
-            </div>
-            <Btn t={t} kind="dark" icon={Sparkles} onClick={() => setShowModal(true)}
-              style={{ marginTop: 20, display: "inline-flex" }}>
-              Create New Brand Project
+            <Btn t={t} kind="dark" icon={Plus} onClick={openNewBrandModal}>
+              New Brand Project
             </Btn>
-          </Card>
-        ) : (
-          filteredProjects.map((p) => {
-            const sc = STATUS_COLORS[p.status] || STATUS_COLORS.draft;
-            return (
-              <Card key={p.id} t={t} hoverable onClick={() => openProject(p)}
-                style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer" }}>
+          </div>
 
-                {/* Icon */}
+          <div style={{ marginTop: 24 }}>
+            {loadingProjects ? (
+              <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
+                <Loader2 size={24} style={{ color: t.text3, margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
+                <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3 }}>Loading brands...</div>
+              </Card>
+            ) : brands.length === 0 ? (
+              <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
                 <div style={{
-                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: `linear-gradient(135deg, ${t.accent}20, ${t.accent}06)`,
-                  border: `1px solid ${t.accent}30`,
+                  width: 64, height: 64, borderRadius: 20, margin: "0 auto 16px",
+                  background: `linear-gradient(135deg, ${t.accent}20, ${t.brain}10)`,
+                  border: `1px solid ${t.border}`,
                   display: "grid", placeItems: "center",
                 }}>
-                  <Zap size={20} style={{ color: t.accent }} />
+                  <Building2 size={28} style={{ color: t.text3 }} />
                 </div>
-
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15, color: t.text }}>{p.name}</span>
-                    {p.brand_name && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, fontFamily: MONO, color: t.accentText,
-                        background: t.accentSoft, border: `1px solid ${t.border}`, padding: "2px 8px", borderRadius: 999
-                      }}>
-                        {p.brand_name}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{
-                    fontSize: 12.5, color: t.text2, marginTop: 4,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>
-                    {p.brief}
-                  </div>
-                  <div style={{ display: "flex", gap: 12, marginTop: 6, alignItems: "center" }}>
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3, display: "flex", alignItems: "center", gap: 4 }}>
-                      <Clock size={10} /> {timeSince(p.createdAt)}
-                    </span>
-                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3 }}>{p.assetType || p.asset_type}</span>
-                  </div>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: t.text }}>No brands yet</div>
+                <div style={{ fontFamily: FONT, fontSize: 13, color: t.text2, marginTop: 6, maxWidth: 360, margin: "6px auto 0" }}>
+                  Create your first brand project to establish brand identity and manage downstream campaigns.
                 </div>
-
-                {/* Team Members Button & Status */}
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveProject(p);
-                      nav("storyboard", p);
-                    }}
-                    title="Open brand project storyboard planner"
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "6px 12px", borderRadius: R.md,
-                      border: `1px solid ${t.brain}55`, background: t.brainSoft,
-                      color: t.brainText, fontFamily: FONT, fontSize: 12, fontWeight: 700,
-                      cursor: "pointer", transition: "all .15s"
-                    }}
-                  >
-                    <Sparkles size={13} style={{ color: t.brain }} />
-                    <span>Storyboard</span>
-                  </button>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveProject(p);
-                      nav("workflow", p);
-                    }}
-                    title="Open node-based agent workflow canvas"
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "6px 12px", borderRadius: R.md,
-                      border: `1px solid ${t.borderStrong}`, background: t.surface2,
-                      color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
-                      cursor: "pointer", transition: "all .15s"
-                    }}
-                  >
-                    <Zap size={13} style={{ color: t.accent }} />
-                    <span>Workflow Canvas</span>
-                  </button>
-
-                  <button
-                    onClick={(e) => openTeamModal(e, p)}
-                    title="Invite & manage project team members"
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "6px 12px", borderRadius: R.md,
-                      border: `1px solid ${t.borderStrong}`, background: t.surface2,
-                      color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
-                      cursor: "pointer", transition: "all .15s"
-                    }}
-                  >
-                    <UserPlus size={13} style={{ color: t.accent }} />
-                    <span>Invite Team</span>
-                  </button>
-
-                  <span style={{
-                    fontFamily: MONO, fontSize: 10, padding: "3px 10px", borderRadius: 20, fontWeight: 700,
-                    background: sc.bg, color: sc.text,
-                  }}>
-                    ● {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
-                  </span>
-                  <button onClick={(e) => handleDelete(e, p.id)}
-                    title="Delete project"
-                    style={{
-                      background: "none", border: "none", color: t.text3,
-                      cursor: "pointer", padding: 6, borderRadius: R.md,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      transition: "color .15s, background .15s",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = t.text3; e.currentTarget.style.background = "none"; }}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                  <ChevronRight size={16} style={{ color: t.text3 }} />
-                </div>
+                <Btn t={t} kind="dark" icon={Sparkles} onClick={openNewBrandModal} style={{ marginTop: 20, display: "inline-flex" }}>
+                  Create New Brand Project
+                </Btn>
               </Card>
-            );
-          })
-        )}
-      </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 16 }}>
+                {brands.map((b) => {
+                  const bCampaigns = projects.filter((p) => {
+                    if (!p) return false;
+                    const pBrandId = (p.brand_id || p.brandId || "").toLowerCase();
+                    const pBrandName = (p.brand_name || p.brandName || "").toLowerCase();
+                    const targetId = (b.id || "").toLowerCase();
+                    const targetName = (b.brandName || "").toLowerCase();
+                    return (targetId && pBrandId === targetId) || (targetName && pBrandName === targetName);
+                  });
+                  const initial = (b.brandName || "B").charAt(0).toUpperCase();
+
+                  return (
+                    <div
+                      key={b.id || b.brandName}
+                      onClick={() => setSelectedBrand(b)}
+                      style={{
+                        background: t.surface,
+                        border: `1px solid ${t.border}`,
+                        borderRadius: R.lg,
+                        padding: "20px 22px",
+                        cursor: "pointer",
+                        transition: "all .18s ease",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        boxShadow: t.shadow,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = t.accent;
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = t.border;
+                        e.currentTarget.style.transform = "translateY(0)";
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                          <div style={{
+                            width: 44, height: 44, borderRadius: 12,
+                            background: `linear-gradient(135deg, ${t.accent}25, ${t.brain}15)`,
+                            border: `1px solid ${t.accent}40`,
+                            display: "grid", placeItems: "center",
+                            fontWeight: 800, fontSize: 18, color: t.accent,
+                            fontFamily: FONT
+                          }}>
+                            {initial}
+                          </div>
+                          <button
+                            onClick={(e) => handleDeleteBrand(e, b.id)}
+                            title="Delete brand"
+                            style={{
+                              background: "none", border: "none", color: t.text3,
+                              cursor: "pointer", padding: 6, borderRadius: R.md,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              transition: "color .15s",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = t.text3; }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+
+                        <div style={{ fontWeight: 800, fontSize: 16, color: t.text, marginBottom: 4 }}>
+                          {b.brandName}
+                        </div>
+
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+                          {b.industry && (
+                            <span style={{
+                              fontFamily: MONO, fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                              background: t.surface2, border: `1px solid ${t.border}`, color: t.text2
+                            }}>
+                              {b.industry}
+                            </span>
+                          )}
+                          {b.website && (
+                            <span style={{ fontFamily: MONO, fontSize: 10, color: t.text3 }}>
+                              {b.website.replace(/^https?:\/\//, "")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{
+                        paddingTop: 12, borderTop: `1px solid ${t.border}`,
+                        display: "flex", alignItems: "center", justifyContent: "space-between"
+                      }}>
+                        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: t.text2 }}>
+                          {bCampaigns.length} {bCampaigns.length === 1 ? "Campaign" : "Campaigns"}
+                        </span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: t.accent }}>
+                          Campaigns <ChevronRight size={14} />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* ── Campaign Layer (when selectedBrand is active) ─────────────────── */
+        <>
+          <div>
+            <button
+              onClick={() => setSelectedBrand(null)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "none", border: "none", cursor: "pointer",
+                color: t.text2, fontFamily: FONT, fontSize: 13, fontWeight: 600,
+                marginBottom: 16, padding: "4px 0", transition: "color .15s"
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = t.text; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = t.text2; }}
+            >
+              <ArrowLeft size={16} /> All Brands
+            </button>
+
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+              <div>
+                <Eyebrow t={t}>Brand: {selectedBrand.brandName}</Eyebrow>
+                <H1 t={t}>{selectedBrand.brandName} Campaigns</H1>
+                <p style={{ fontFamily: FONT, fontSize: 13.5, color: t.text2, marginTop: 6, lineHeight: 1.5 }}>
+                  Campaign layer · Manage campaigns, invite team members, or launch multi-agent workflows.
+                </p>
+              </div>
+              <Btn t={t} kind="dark" icon={Plus} onClick={openNewCampaignModal}>
+                New Campaign
+              </Btn>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
+            {projects.filter((p) => {
+              if (!p) return false;
+              const pBrandId = (p.brand_id || p.brandId || "").toLowerCase();
+              const pBrandName = (p.brand_name || p.brandName || "").toLowerCase();
+              const targetId = (selectedBrand.id || "").toLowerCase();
+              const targetName = (selectedBrand.brandName || "").toLowerCase();
+              return (targetId && pBrandId === targetId) || (targetName && pBrandName === targetName);
+            }).length === 0 ? (
+              <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 20, margin: "0 auto 16px",
+                  background: `linear-gradient(135deg, ${t.accent}20, ${t.brain}10)`,
+                  border: `1px solid ${t.border}`,
+                  display: "grid", placeItems: "center",
+                }}>
+                  <FolderOpen size={28} style={{ color: t.text3 }} />
+                </div>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: t.text }}>No campaigns for {selectedBrand.brandName}</div>
+                <div style={{ fontFamily: FONT, fontSize: 13, color: t.text2, marginTop: 6, maxWidth: 360, margin: "6px auto 0" }}>
+                  Launch a campaign for this brand to activate the multi-agent strategy, copy, and image pipeline.
+                </div>
+                <Btn t={t} kind="dark" icon={Sparkles} onClick={openNewCampaignModal} style={{ marginTop: 20, display: "inline-flex" }}>
+                  Create Campaign for {selectedBrand.brandName}
+                </Btn>
+              </Card>
+            ) : (
+              projects.filter((p) => {
+                if (!p) return false;
+                const pBrandId = (p.brand_id || p.brandId || "").toLowerCase();
+                const pBrandName = (p.brand_name || p.brandName || "").toLowerCase();
+                const targetId = (selectedBrand.id || "").toLowerCase();
+                const targetName = (selectedBrand.brandName || "").toLowerCase();
+                return (targetId && pBrandId === targetId) || (targetName && pBrandName === targetName);
+              }).map((p) => {
+                const sc = STATUS_COLORS[p.status] || STATUS_COLORS.draft;
+                return (
+                  <Card key={p.id} t={t} hoverable onClick={() => openProject(p)}
+                    style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer" }}>
+
+                    {/* Icon */}
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                      background: `linear-gradient(135deg, ${t.accent}20, ${t.accent}06)`,
+                      border: `1px solid ${t.accent}30`,
+                      display: "grid", placeItems: "center",
+                    }}>
+                      <Zap size={20} style={{ color: t.accent }} />
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: t.text }}>{p.name}</span>
+                        {p.brand_name && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, fontFamily: MONO, color: t.accentText,
+                            background: t.accentSoft, border: `1px solid ${t.border}`, padding: "2px 8px", borderRadius: 999
+                          }}>
+                            {p.brand_name}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{
+                        fontSize: 12.5, color: t.text2, marginTop: 4,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {p.brief}
+                      </div>
+                      <div style={{ display: "flex", gap: 12, marginTop: 6, alignItems: "center" }}>
+                        <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3, display: "flex", alignItems: "center", gap: 4 }}>
+                          <Clock size={10} /> {timeSince(p.createdAt)}
+                        </span>
+                        <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.text3 }}>{p.assetType || p.asset_type}</span>
+                      </div>
+                    </div>
+
+                    {/* Team Members Button & Status */}
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveProject(p);
+                          nav("storyboard", p);
+                        }}
+                        title="Open brand project storyboard planner"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "6px 12px", borderRadius: R.md,
+                          border: `1px solid ${t.brain}55`, background: t.brainSoft,
+                          color: t.brainText, fontFamily: FONT, fontSize: 12, fontWeight: 700,
+                          cursor: "pointer", transition: "all .15s"
+                        }}
+                      >
+                        <Sparkles size={13} style={{ color: t.brain }} />
+                        <span>Storyboard</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveProject(p);
+                          nav("workflow", p);
+                        }}
+                        title="Open node-based agent workflow canvas"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "6px 12px", borderRadius: R.md,
+                          border: `1px solid ${t.borderStrong}`, background: t.surface2,
+                          color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                          cursor: "pointer", transition: "all .15s"
+                        }}
+                      >
+                        <Zap size={13} style={{ color: t.accent }} />
+                        <span>Workflow Canvas</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => openTeamModal(e, p)}
+                        title="Invite & manage project team members"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "6px 12px", borderRadius: R.md,
+                          border: `1px solid ${t.borderStrong}`, background: t.surface2,
+                          color: t.text2, fontFamily: FONT, fontSize: 12, fontWeight: 600,
+                          cursor: "pointer", transition: "all .15s"
+                        }}
+                      >
+                        <UserPlus size={13} style={{ color: t.accent }} />
+                        <span>Invite Team</span>
+                      </button>
+
+                      <span style={{
+                        fontFamily: MONO, fontSize: 10, padding: "3px 10px", borderRadius: 20, fontWeight: 700,
+                        background: sc.bg, color: sc.text,
+                      }}>
+                        ● {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
+                      </span>
+                      <button onClick={(e) => handleDelete(e, p.id)}
+                        title="Delete project"
+                        style={{
+                          background: "none", border: "none", color: t.text3,
+                          cursor: "pointer", padding: 6, borderRadius: R.md,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          transition: "color .15s, background .15s",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = t.text3; e.currentTarget.style.background = "none"; }}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                      <ChevronRight size={16} style={{ color: t.text3 }} />
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── Team Invites Modal ── */}
       {teamModalProject && (
@@ -691,19 +940,19 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
       {/* New Project Modal */}
       {showModal && (
         <div
-          onClick={() => { if (!aiPhase) { setShowModal(false); setAiPhase(null); setAiResult(null); } }}
+          onClick={() => { if (!aiPhase && !savingBrand) { setShowModal(false); setAiPhase(null); setAiResult(null); } }}
           style={{
             position: "fixed", inset: 0, zIndex: 1000,
             background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)",
             display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-            cursor: aiPhase ? "wait" : "default",
+            cursor: (aiPhase || savingBrand) ? "wait" : "default",
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             className="studio-scroll"
             style={{
-              width: "100%", maxWidth: 500, background: t.surface, borderRadius: R.xl,
+              width: "100%", maxWidth: 520, background: t.surface, borderRadius: R.xl,
               border: `1px solid ${t.border}`, boxShadow: t.shadowLg, padding: "22px 24px", fontFamily: FONT,
               position: "relative", overflowY: "auto", maxHeight: "calc(100vh - 60px)",
             }}
@@ -719,179 +968,265 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                   }}>
                     <Sparkles size={16} color="#fff" />
                   </div>
-                  <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>New Brand Project</span>
+                  <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>
+                    {modalStep === "brand" ? "New Brand Project" : `Campaign Setup · ${selectedBrand?.brandName || "Brand"}`}
+                  </span>
                 </div>
                 <p style={{ fontSize: 12.5, color: t.text3, margin: 0, paddingLeft: 40 }}>
-                  Link project to a brand and launch the multi-agent workflow.
+                  {modalStep === "brand"
+                    ? "Step 1 of 2 · Set up brand identity and context"
+                    : "Step 2 of 2 · Campaign configuration (Non-essential)"}
                 </p>
               </div>
               <button
-                onClick={() => { if (!aiPhase) { setShowModal(false); setAiPhase(null); setAiResult(null); } }}
-                disabled={!!aiPhase}
-                style={{ background: "none", border: "none", cursor: aiPhase ? "not-allowed" : "pointer", color: aiPhase ? t.text3 + "55" : t.text3, padding: 4, marginTop: -2, transition: "color .15s" }}>
+                onClick={() => { if (!aiPhase && !savingBrand) { setShowModal(false); setAiPhase(null); setAiResult(null); } }}
+                disabled={!!aiPhase || savingBrand}
+                style={{ background: "none", border: "none", cursor: (aiPhase || savingBrand) ? "not-allowed" : "pointer", color: (aiPhase || savingBrand) ? t.text3 + "55" : t.text3, padding: 4, marginTop: -2, transition: "color .15s" }}>
                 <X size={18} />
               </button>
             </div>
 
-            {/* Form fields */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              
-              {/* Brand Selector */}
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Select Brand <span style={{ color: "#EF4444" }}>*</span>
-                </label>
-                <select
-                  value={form.brandId}
-                  onChange={(e) => { setForm((f) => ({ ...f, brandId: e.target.value })); setBrandError(false); }}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
-                    border: `1px solid ${brandError ? "#EF4444" : t.border}`, background: t.surface2,
-                    color: t.text, fontFamily: FONT, fontSize: 13.5, outline: "none",
-                  }}
-                >
-                  {brands.length === 0 && <option value="">No brands available</option>}
-                  {brands.map((b) => (
-                    <option key={b.id || b.brandName} value={b.id || b.brandName}>
-                      {b.brandName} {b.industry ? `(${b.industry})` : ""}
-                    </option>
-                  ))}
-                </select>
-                {brandError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Brand selection is required.</p>}
-              </div>
+            {/* STEP 1: BRAND FORM */}
+            {modalStep === "brand" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                    Brand Name <span style={{ color: "#EF4444" }}>*</span>
+                  </label>
+                  <input
+                    value={brandForm.brandName}
+                    onChange={(e) => { setBrandForm((f) => ({ ...f, brandName: e.target.value })); setBrandFormError(""); }}
+                    placeholder="e.g. Nike, FrostBrew, Lumina Tech"
+                    autoFocus
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                      border: `1px solid ${brandFormError ? "#EF4444" : t.border}`,
+                      background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13.5, outline: "none",
+                    }}
+                  />
+                  {brandFormError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>{brandFormError}</p>}
+                </div>
 
-              {/* Project Name */}
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Project Name <span style={{ color: "#EF4444" }}>*</span>
-                </label>
-                <input
-                  value={form.name}
-                  onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setNameError(false); }}
-                  placeholder="e.g. Q3 Festive Push"
-                  autoFocus
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
-                    border: `1px solid ${nameError ? "#EF4444" : t.border}`,
-                    background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13.5, outline: "none",
-                    transition: "border-color .15s",
-                  }}
-                />
-                {nameError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Project name is required.</p>}
-              </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                    Industry
+                  </label>
+                  <input
+                    value={brandForm.industry}
+                    onChange={(e) => setBrandForm((f) => ({ ...f, industry: e.target.value }))}
+                    placeholder="e.g. Athleisure, SaaS, FMCG"
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                      border: `1px solid ${t.border}`,
+                      background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13.5, outline: "none",
+                    }}
+                  />
+                </div>
 
-              {/* Project Brief */}
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Project Brief <span style={{ color: "#EF4444" }}>*</span>
-                </label>
-                <textarea
-                  value={form.brief}
-                  onChange={(e) => { setForm((f) => ({ ...f, brief: e.target.value })); setBriefError(false); }}
-                  placeholder="Describe your project — product, target audience, key message, visual goals..."
-                  rows={3}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
-                    border: `1px solid ${briefError ? "#EF4444" : t.border}`,
-                    background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13, outline: "none",
-                    resize: "vertical", lineHeight: 1.55, transition: "border-color .15s",
-                  }}
-                />
-                {briefError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Brief is required.</p>}
-              </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                    Website URL
+                  </label>
+                  <input
+                    value={brandForm.website}
+                    onChange={(e) => setBrandForm((f) => ({ ...f, website: e.target.value }))}
+                    placeholder="https://example.com"
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                      border: `1px solid ${t.border}`,
+                      background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13.5, outline: "none",
+                    }}
+                  />
+                </div>
 
-              {/* Asset Type */}
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Primary Target Asset Type
-                </label>
-                <select
-                  value={form.assetType}
-                  onChange={(e) => setForm((f) => ({ ...f, assetType: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
-                    border: `1px solid ${t.border}`, background: t.surface2,
-                    color: t.text, fontFamily: FONT, fontSize: 13, outline: "none",
-                  }}
-                >
-                  {ASSET_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                    Brand Description & Voice
+                  </label>
+                  <textarea
+                    value={brandForm.productDesc}
+                    onChange={(e) => setBrandForm((f) => ({ ...f, productDesc: e.target.value }))}
+                    placeholder="Brief description of product, core values, voice and tone..."
+                    rows={2}
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                      border: `1px solid ${t.border}`,
+                      background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13, outline: "none",
+                      resize: "vertical", lineHeight: 1.5,
+                    }}
+                  />
+                </div>
 
-              {/* AI analysis overlay */}
-              {aiPhase && (
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
+                  <Btn t={t} kind="ghost" onClick={() => setShowModal(false)} disabled={savingBrand}>
+                    Cancel
+                  </Btn>
+                  <Btn t={t} kind="dark" icon={ChevronRight} onClick={handleCreateBrand} disabled={savingBrand}>
+                    {savingBrand ? "Saving Brand..." : "Next: Campaign Setup →"}
+                  </Btn>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: CAMPAIGN FORM (NON-ESSENTIAL) */}
+            {modalStep === "campaign" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {/* Non-essential notice */}
                 <div style={{
-                  position: "absolute", inset: 0, borderRadius: R.xl,
-                  background: aiPhase === "done"
-                    ? "rgba(34,197,94,0.04)"
-                    : `linear-gradient(135deg, ${t.brain}12, ${t.brain}04)`,
-                  backdropFilter: "blur(2px)",
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                  zIndex: 10, gap: 14, padding: 24, transition: "background .3s",
+                  padding: "8px 12px", borderRadius: R.md,
+                  background: t.accentSoft, border: `1px solid ${t.border}`,
+                  fontSize: 12, color: t.accentText, lineHeight: 1.45
                 }}>
+                  Campaign setup is optional. You can launch a campaign now or click <strong>"Continue without campaign"</strong> to jump straight to Workflow History.
+                </div>
+
+                {/* Campaign Name */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                    Campaign Name <span style={{ color: t.text3, fontWeight: 400 }}>(Optional)</span>
+                  </label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setNameError(false); }}
+                    placeholder="e.g. Q3 Festive Push"
+                    autoFocus
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                      border: `1px solid ${nameError ? "#EF4444" : t.border}`,
+                      background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13.5, outline: "none",
+                    }}
+                  />
+                  {nameError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Campaign name is required to launch campaign.</p>}
+                </div>
+
+                {/* Campaign Brief */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                    Campaign Brief <span style={{ color: t.text3, fontWeight: 400 }}>(Optional)</span>
+                  </label>
+                  <textarea
+                    value={form.brief}
+                    onChange={(e) => { setForm((f) => ({ ...f, brief: e.target.value })); setBriefError(false); }}
+                    placeholder="Describe your campaign — product, target audience, key message, visual goals..."
+                    rows={3}
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                      border: `1px solid ${briefError ? "#EF4444" : t.border}`,
+                      background: t.surface2, color: t.text, fontFamily: FONT, fontSize: 13, outline: "none",
+                      resize: "vertical", lineHeight: 1.55,
+                    }}
+                  />
+                  {briefError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Brief is required to launch campaign.</p>}
+                </div>
+
+                {/* Asset Type */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
+                    Primary Target Asset Type
+                  </label>
+                  <select
+                    value={form.assetType}
+                    onChange={(e) => setForm((f) => ({ ...f, assetType: e.target.value }))}
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
+                      border: `1px solid ${t.border}`, background: t.surface2,
+                      color: t.text, fontFamily: FONT, fontSize: 13, outline: "none",
+                    }}
+                  >
+                    {ASSET_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+
+                {/* AI analysis overlay */}
+                {aiPhase && (
                   <div style={{
-                    width: 56, height: 56, borderRadius: 16,
+                    position: "absolute", inset: 0, borderRadius: R.xl,
                     background: aiPhase === "done"
-                      ? "rgba(34,197,94,0.15)"
-                      : `linear-gradient(135deg, ${t.brain}, ${t.accent})`,
-                    display: "grid", placeItems: "center",
-                    boxShadow: aiPhase === "done" ? "0 8px 24px rgba(34,197,94,0.2)" : `0 8px 24px ${t.brain}33`,
+                      ? "rgba(34,197,94,0.04)"
+                      : `linear-gradient(135deg, ${t.brain}12, ${t.brain}04)`,
+                    backdropFilter: "blur(2px)",
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    zIndex: 10, gap: 14, padding: 24, transition: "background .3s",
                   }}>
-                    {aiPhase === "done" ? (
-                      <CheckCircle size={28} style={{ color: "#22C55E" }} />
-                    ) : (
-                      <Brain size={28} color="#fff" style={{ animation: "pulse 1.5s ease-in-out infinite" }} />
+                    <div style={{
+                      width: 56, height: 56, borderRadius: 16,
+                      background: aiPhase === "done"
+                        ? "rgba(34,197,94,0.15)"
+                        : `linear-gradient(135deg, ${t.brain}, ${t.accent})`,
+                      display: "grid", placeItems: "center",
+                      boxShadow: aiPhase === "done" ? "0 8px 24px rgba(34,197,94,0.2)" : `0 8px 24px ${t.brain}33`,
+                    }}>
+                      {aiPhase === "done" ? (
+                        <CheckCircle size={28} style={{ color: "#22C55E" }} />
+                      ) : (
+                        <Brain size={28} color="#fff" style={{ animation: "pulse 1.5s ease-in-out infinite" }} />
+                      )}
+                    </div>
+
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: t.text, marginBottom: 4 }}>
+                        {aiPhase === "analyzing" && "Analyzing Campaign Brief..."}
+                        {aiPhase === "designing" && "Configuring Multi-Agent Workflow..."}
+                        {aiPhase === "done" && "Workflow Configured!"}
+                      </div>
+                      <div style={{ fontFamily: MONO, fontSize: 11.5, color: t.text3 }}>
+                        {aiPhase === "analyzing" && "Extracting brand voice, audience & key message"}
+                        {aiPhase === "designing" && "Setting up Strategy → Copy → Image Agents"}
+                        {aiPhase === "done" && `${aiResult?.recommended_flow?.length || 4} workflow steps initialized`}
+                      </div>
+                    </div>
+
+                    {aiPhase === "done" && aiResult?.recommended_flow && (
+                      <div style={{
+                        display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center",
+                        maxWidth: 380, marginTop: 4,
+                      }}>
+                        {aiResult.recommended_flow.map((step, idx) => (
+                          <span key={idx} style={{
+                            fontFamily: MONO, fontSize: 10, padding: "3px 8px", borderRadius: 4,
+                            background: t.surface2, border: `1px solid ${t.border}`, color: t.text2,
+                          }}>
+                            {idx + 1}. {step.agent || step}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {aiPhase !== "done" && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                        <Loader2 size={14} style={{ color: t.brain, animation: "spin 1s linear infinite" }} />
+                        <span style={{ fontFamily: MONO, fontSize: 11, color: t.brain }}>AI Studio Engine active</span>
+                      </div>
                     )}
                   </div>
+                )}
 
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontWeight: 800, fontSize: 16, color: t.text, marginBottom: 4 }}>
-                      {aiPhase === "analyzing" && "Analyzing Project Brief..."}
-                      {aiPhase === "designing" && "Configuring Multi-Agent Workflow..."}
-                      {aiPhase === "done" && "Workflow Configured!"}
-                    </div>
-                    <div style={{ fontFamily: MONO, fontSize: 11.5, color: t.text3 }}>
-                      {aiPhase === "analyzing" && "Extracting brand voice, audience & key message"}
-                      {aiPhase === "designing" && "Setting up Strategy → Copy → Image Agents"}
-                      {aiPhase === "done" && `${aiResult?.recommended_flow?.length || 4} workflow steps initialized`}
-                    </div>
+                {/* Modal actions */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.border}`, flexWrap: "wrap" }}>
+                  <button
+                    onClick={handleContinueWithoutCampaign}
+                    disabled={!!aiPhase}
+                    style={{
+                      padding: "8px 14px", borderRadius: R.md,
+                      border: `1px solid ${t.borderStrong}`, background: t.surface2,
+                      color: t.text, fontFamily: FONT, fontSize: 12.5, fontWeight: 700,
+                      cursor: aiPhase ? "not-allowed" : "pointer", transition: "all .15s",
+                    }}
+                  >
+                    Continue without campaign →
+                  </button>
+
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn t={t} kind="ghost" onClick={() => setShowModal(false)} disabled={!!aiPhase}>
+                      Cancel
+                    </Btn>
+                    <Btn t={t} kind="dark" icon={Sparkles} onClick={handleCreate} disabled={!!aiPhase}>
+                      Launch Campaign →
+                    </Btn>
                   </div>
-
-                  {aiPhase === "done" && aiResult?.recommended_flow && (
-                    <div style={{
-                      display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center",
-                      maxWidth: 380, marginTop: 4,
-                    }}>
-                      {aiResult.recommended_flow.map((step, idx) => (
-                        <span key={idx} style={{
-                          fontFamily: MONO, fontSize: 10, padding: "3px 8px", borderRadius: 4,
-                          background: t.surface2, border: `1px solid ${t.border}`, color: t.text2,
-                        }}>
-                          {idx + 1}. {step.agent || step}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {aiPhase !== "done" && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                      <Loader2 size={14} style={{ color: t.brain, animation: "spin 1s linear infinite" }} />
-                      <span style={{ fontFamily: MONO, fontSize: 11, color: t.brain }}>AI Studio Engine active</span>
-                    </div>
-                  )}
                 </div>
-              )}
-            </div>
-
-            {/* Modal actions */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
-              <Btn t={t} kind="ghost" onClick={() => { setShowModal(false); setAiPhase(null); setAiResult(null); }} disabled={!!aiPhase}>
-                Cancel
-              </Btn>
-              <Btn t={t} kind="dark" icon={Sparkles} onClick={handleCreate} disabled={!!aiPhase}>
-                Launch Workflow →
-              </Btn>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

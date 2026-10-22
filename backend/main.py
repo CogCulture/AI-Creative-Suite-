@@ -674,7 +674,7 @@ class FileAttachment(BaseModel):
 class ChatRequest(BaseModel):
     user_message: str
     promptTitle: Optional[str] = None
-    llm_model: Optional[str] = "claude-4-sonnet"
+    llm_model: Optional[str] = "claude-sonnet-5"
     temperature: Optional[float] = 0.7
     stream: Optional[bool] = False
     conversation_id: Optional[str] = None
@@ -1055,6 +1055,10 @@ class ProjectUpdateRequest(BaseModel):
     asset_type: Optional[str] = None
     status: Optional[str] = None
     workflow_config: Optional[dict] = None
+    inputs: Optional[dict] = None
+    outputs: Optional[dict] = None
+    nodes: Optional[List[str]] = None
+    node_status: Optional[dict] = None
 
 
 def _get_current_user_id(suite_session: Optional[str]) -> Optional[str]:
@@ -1633,17 +1637,49 @@ async def list_projects(
         query = query.filter(SuiteProject.brand_id == brand_id)
 
     projects = query.order_by(SuiteProject.created_at.desc()).all()
-    return [
-        {
+    res = []
+    for p in projects:
+        wf = json.loads(p.workflow_config) if p.workflow_config else {}
+        res.append({
             "id": p.id, "name": p.name, "brief": p.brief,
             "asset_type": p.asset_type, "status": p.status,
             "brand_id": p.brand_id, "brand_name": p.brand_name,
             "isOwner": p.user_id == user_id,
-            "workflow_config": json.loads(p.workflow_config) if p.workflow_config else None,
-            "createdAt": p.created_at.isoformat(), "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
-        }
-        for p in projects
-    ]
+            "workflow_config": wf,
+            "inputs": wf.get("node_inputs") or wf.get("inputs") or {},
+            "outputs": wf.get("node_outputs") or wf.get("outputs") or {},
+            "nodes": wf.get("active_nodes") or wf.get("nodes") or None,
+            "node_status": wf.get("node_status") or {},
+            "createdAt": p.created_at.isoformat(),
+            "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
+        })
+    return res
+
+
+@app.get("/bff/projects/{project_id}")
+async def get_project(
+    project_id: str,
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    user_id = _get_current_user_id(suite_session)
+    project = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    wf = json.loads(project.workflow_config) if project.workflow_config else {}
+    return {
+        "id": project.id, "name": project.name, "brief": project.brief,
+        "asset_type": project.asset_type, "status": project.status,
+        "brand_id": project.brand_id, "brand_name": project.brand_name,
+        "isOwner": project.user_id == user_id,
+        "workflow_config": wf,
+        "inputs": wf.get("node_inputs") or wf.get("inputs") or {},
+        "outputs": wf.get("node_outputs") or wf.get("outputs") or {},
+        "nodes": wf.get("active_nodes") or wf.get("nodes") or None,
+        "node_status": wf.get("node_status") or {},
+        "createdAt": project.created_at.isoformat(),
+        "updatedAt": project.updated_at.isoformat() if project.updated_at else None,
+    }
 
 
 @app.post("/bff/projects")
@@ -1687,7 +1723,7 @@ async def update_project(
     user_id = _get_current_user_id(suite_session)
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated.")
-    project = db.query(SuiteProject).filter(SuiteProject.id == project_id, SuiteProject.user_id == user_id).first()
+    project = db.query(SuiteProject).filter(SuiteProject.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
     if body.name is not None:
@@ -1698,11 +1734,23 @@ async def update_project(
         project.asset_type = body.asset_type
     if body.status is not None:
         project.status = body.status
+    
+    wf = json.loads(project.workflow_config) if project.workflow_config else {}
     if body.workflow_config is not None:
-        project.workflow_config = json.dumps(body.workflow_config)
+        wf.update(body.workflow_config)
+    if body.inputs is not None:
+        wf["node_inputs"] = body.inputs
+    if body.outputs is not None:
+        wf["node_outputs"] = body.outputs
+    if body.nodes is not None:
+        wf["active_nodes"] = body.nodes
+    if body.node_status is not None:
+        wf["node_status"] = body.node_status
+    project.workflow_config = json.dumps(wf)
+
     project.updated_at = datetime.utcnow()
     db.commit()
-    return {"status": "updated"}
+    return {"status": "updated", "id": project_id}
 
 @app.delete("/bff/projects/{project_id}")
 async def delete_project(
@@ -2020,7 +2068,7 @@ async def chat_completions(
 
     upstream_payload = {
         "user_message":    effective_message,
-        "llm_model":       body.llm_model or "claude-4-sonnet",
+        "llm_model":       body.llm_model or "claude-sonnet-5",
         "temperature":     body.temperature if body.temperature is not None else 0.7,
         "stream":          body.stream or False,
         "conversation_id": body.conversation_id,
@@ -2781,34 +2829,34 @@ async def workflow_step_bridge(
 
         analysis_text = ""
         try:
-            async with httpx.AsyncClient(timeout=12.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.post(
                     COPYAGENT_URL,
                     headers=_upstream_headers(user_id or STATIC_USER_ID),
-                    json={"user_message": prompt_text, "llm_model": "claude-4-sonnet", "temperature": 0.5, "stream": False}
+                    json={"user_message": prompt_text, "llm_model": "claude-sonnet-5", "stream": False}
                 )
-                if resp.is_success:
-                    raw_data = resp.json()
-                    analysis_text = raw_data.get("assistant_message") or raw_data.get("content") or raw_data.get("response") or ""
+                if not resp.is_success:
+                    err_msg = ""
+                    try:
+                        err_payload = resp.json()
+                        err_msg = err_payload.get("detail") or err_payload.get("error") or err_payload.get("message") or str(err_payload)
+                    except Exception:
+                        err_msg = resp.text or f"HTTP {resp.status_code}"
+                    raise HTTPException(
+                        status_code=resp.status_code if resp.status_code in [400, 401, 403, 429, 500, 502, 503, 504] else 502,
+                        detail=f"Strategy Agent Error ({resp.status_code}): {err_msg}"
+                    )
+                raw_data = resp.json()
+                analysis_text = raw_data.get("assistant_message") or raw_data.get("content") or raw_data.get("response") or ""
+                if not analysis_text:
+                    raise HTTPException(status_code=502, detail="Strategy Agent upstream returned an empty response.")
+        except HTTPException:
+            raise
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Strategy Agent upstream call timed out (15s). Upstream model may be rate limited or overloaded.")
         except Exception as err:
-            print(f"[Strategy Agent Upstream Call Error]: {err}", flush=True)
+            raise HTTPException(status_code=500, detail=f"Strategy Agent upstream call failed: {str(err)}")
 
-        if not analysis_text:
-            subject_title = req.brief[:60] if req.brief else "Product Campaign"
-            analysis_text = (
-                f"📊 MARKET & BRAND INTELLIGENCE REPORT:\n\n"
-                f"1. TARGET AUDIENCE ANALYSIS:\n"
-                f"   • Primary Demographics & Target Consumers for: {subject_title}.\n"
-                f"   • Key Motivations: Premium product quality, active lifestyle, high convenience.\n\n"
-                f"2. BRAND DNA & POSITIONING:\n"
-                f"   • High-converting positioning tailored to product USP.\n"
-                f"   • Distinctive brand tone and market resonance.\n\n"
-                f"3. COMPETITOR BENCHMARKING:\n"
-                f"   • Strategic Advantage: Superior product formulation, modern aesthetic, premium brand appeal.\n\n"
-                f"4. MESSAGING PILLARS:\n"
-                f"   • Pillar 1: High Performance & Energizing Value.\n"
-                f"   • Pillar 2: Premium Craftsmanship & Uncompromised Quality."
-            )
         # Format-specific copywriting directive based on asset_type
         format_constraint = (
             "Write high-converting, short, bold, powerful, and crispy advertising copy filled with distinct personality and sharp wit.\n"
@@ -2898,12 +2946,14 @@ async def workflow_step_bridge(
         # Extract target brand name from explicit payload or infer from brief
         detected_brand_name = req.brand_name
         if not detected_brand_name:
-            detected_brand_name = brand_obj.brand_name if brand_obj else "FrostBrew"
-            if "brand" in (req.brief or "").lower():
+            detected_brand_name = brand_obj.brand_name if (brand_id and db and brand_obj) else ""
+            if not detected_brand_name and "brand" in (req.brief or "").lower():
                 for word in (req.brief or "").split():
                     if word[0].isupper() and len(word) > 2 and word.lower() not in ["create", "instagram", "story", "reels", "image", "hero", "ad"]:
                         detected_brand_name = word.strip(".,:-")
                         break
+        if not detected_brand_name:
+            detected_brand_name = "Product Brand"
 
         default_design_sys = "High quality commercial photography, professional lighting, cinematic framing, clean minimal aesthetic, brand-focused elements." if not rag_context_text else rag_context_text
 
@@ -2917,7 +2967,7 @@ async def workflow_step_bridge(
             f"BRAND DESIGN SYSTEM & GUIDELINES:\n{default_design_sys}\n\n"
             "STRICT INSTRUCTIONS:\n"
             f"1. BRAND PACKAGING & EMBLEM: The product brand name is strictly '{detected_brand_name}'. Emboss '{detected_brand_name}' on the product packaging label. DO NOT write 'CREATE' or any placeholder brand name.\n"
-            "2. OVERLAY TEXT: ONLY overlay text extracted directly from the Copy Agent output (e.g. 'Golden Hour, New Gear' or '9am Called. FrostBrew Answered'). DO NOT overlay asset format category titles like 'STORIES & REELS CREATIVE' or 'INSTAGRAM AD'.\n"
+            "2. OVERLAY TEXT: ONLY overlay text extracted directly from the Copy Agent output. DO NOT overlay asset format category titles like 'STORIES & REELS CREATIVE' or 'INSTAGRAM AD'.\n"
             "3. TYPOGRAPHY COMPOSITION & NEGATIVE SPACE: Direct the AI to place text cleanly in negative background space. TEXT MUST NOT TOUCH, OVERLAP, OR INTERSECT THE PRODUCT BOTTLE OR MAIN SUBJECT.\n"
             "4. PREMIUM GRAPHIC DESIGN: Specify ultra-luxury agency typography — clean architectural lettering, elegant custom tracking/kerning, high-end editorial styling with subtle ambient contrast, avoiding cheap flat blocky text.\n"
             f"5. BRAND EMBLEM: Ensure a sharp, high-precision '{detected_brand_name}' logo emblem is embossed cleanly on product packaging.\n"
@@ -2930,7 +2980,7 @@ async def workflow_step_bridge(
             '  "models": ["Nanobanana 2"],\n'
             '  "categories": {\n'
             '    "style": "photorealistic commercial",\n'
-            '    "medium": "advertising graphic",\n'
+            '    "medium": "advertising photography",\n'
             '    "lighting": "cinematic studio",\n'
             '    "camera": "eye-level macro",\n'
             '    "lens": "85mm prime",\n'
@@ -2947,82 +2997,67 @@ async def workflow_step_bridge(
                 resp = await client.post(
                     COPYAGENT_URL,
                     headers=_upstream_headers(user_id or STATIC_USER_ID),
-                    json={"user_message": prompt_text, "llm_model": "claude-4-sonnet", "temperature": 0.4, "stream": False}
+                    json={"user_message": prompt_text, "llm_model": "claude-sonnet-5", "stream": False}
                 )
-                if resp.is_success:
-                    raw_content = resp.json().get("assistant_message") or resp.json().get("content") or ""
-                    print(f"[ArtDirector Response]: {raw_content[:200]}...", flush=True)
-                    if "{" in raw_content and "}" in raw_content:
-                        try:
-                            json_str = raw_content[raw_content.find("{"):raw_content.rfind("}")+1]
-                            parsed = json.loads(json_str)
-                            clean_img_prompt = parsed.get("image_prompt", "")
-                            if clean_img_prompt:
-                                return {
-                                    "bridge_type": "copy_to_genfy",
-                                    "image_prompt": clean_img_prompt,
-                                    "ratio": parsed.get("ratio") or target_ratio,
-                                    "quality": parsed.get("quality", "High"),
-                                    "models": parsed.get("models", ["Nanobanana 2"]),
-                                    "categories": parsed.get("categories", {
-                                        "style": "photorealistic commercial",
-                                        "medium": "photography",
-                                        "lighting": "golden",
-                                        "camera": "low-angle",
-                                        "lens": "85mm",
-                                        "mood": "epic",
-                                        "color": "warm"
-                                    }),
-                                    "art_director_notes": parsed.get("art_director_notes", "Visual composition incorporates campaign brief and ad copy concepts.")
-                                }
-                        except Exception as parse_err:
-                            print(f"[ArtDirector Parse Error]: {parse_err}", flush=True)
+                if not resp.is_success:
+                    err_msg = ""
+                    try:
+                        err_payload = resp.json()
+                        err_msg = err_payload.get("detail") or err_payload.get("error") or err_payload.get("message") or str(err_payload)
+                    except Exception:
+                        err_msg = resp.text or f"HTTP {resp.status_code}"
+                    raise HTTPException(
+                        status_code=resp.status_code if resp.status_code in [400, 401, 403, 429, 500, 502, 503, 504] else 502,
+                        detail=f"Art Director Agent Error ({resp.status_code}): {err_msg}"
+                    )
+                raw_content = resp.json().get("assistant_message") or resp.json().get("content") or ""
+                if "{" in raw_content and "}" in raw_content:
+                    try:
+                        json_str = raw_content[raw_content.find("{"):raw_content.rfind("}")+1]
+                        parsed = json.loads(json_str)
+                        clean_img_prompt = parsed.get("image_prompt", "")
+                        if clean_img_prompt:
+                            return {
+                                "bridge_type": "copy_to_genfy",
+                                "image_prompt": clean_img_prompt,
+                                "ratio": parsed.get("ratio") or target_ratio,
+                                "quality": parsed.get("quality", "High"),
+                                "models": parsed.get("models", ["Nanobanana 2"]),
+                                "categories": parsed.get("categories", {
+                                    "style": "photorealistic commercial",
+                                    "medium": "advertising photography",
+                                    "lighting": "golden",
+                                    "camera": "low-angle",
+                                    "lens": "85mm",
+                                    "mood": "epic",
+                                    "color": "warm"
+                                }),
+                                "art_director_notes": parsed.get("art_director_notes", "Visual composition incorporates campaign brief and ad copy concepts.")
+                            }
+                    except Exception as parse_err:
+                        raise HTTPException(status_code=502, detail=f"Art Director Agent output parse error: {parse_err}")
+                raise HTTPException(status_code=502, detail="Art Director Agent upstream returned non-JSON visual specifications.")
+        except HTTPException:
+            raise
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Art Director Agent call timed out (45s). Upstream model may be overloaded.")
         except Exception as err:
-            print(f"[ArtDirector Upstream Error]: {err}", flush=True)
-
-        chosen_hook = "Fuel That Shows Up"
-        if req.copy_output:
-            lines = [l.strip(" •:-*#\"'") for l in req.copy_output.split("\n") if l.strip()]
-            if lines:
-                chosen_hook = lines[0].replace(".", "").strip()[:40]
-
-        rich_fallback_prompt = (
-            f"Award-winning commercial advertisement visual for {req.brief}. "
-            f"Asset Format: {req.asset_type} ({target_ratio} vertical framing). "
-            f"Professional studio product photography featuring a premium hero product container setup on a rustic tabletop during golden hour. "
-            f"Refined architectural graphic typography overlay rendered in crisp high-contrast lettering reading '{chosen_hook}', positioned in clean background negative space with zero bottle overlap. "
-            f"Prominently featuring an embossed luxury brand logo emblem on the product label, soft rim lighting, subtle condensation droplets, shallow depth of field, 85mm macro lens, 8k resolution commercial print render quality."
-        )
-
-        return {
-            "bridge_type": "copy_to_genfy",
-            "image_prompt": rich_fallback_prompt,
-            "ratio": target_ratio,
-            "quality": "High",
-            "quality": "High",
-            "models": ["Nanobanana 2"],
-            "categories": {
-                "style": "photorealistic",
-                "medium": "advertising graphic",
-                "lighting": "studio",
-                "camera": "eye-level",
-                "lens": "85mm",
-                "mood": "modern",
-                "color": "vibrant"
-            },
-            "art_director_notes": "Synthesized visual concept aligned with campaign brief and generated copy text."
-        }
+            raise HTTPException(status_code=500, detail=f"Art Director Agent failed: {str(err)}")
     
     raise HTTPException(status_code=400, detail="Invalid bridge_type")
 
 
 @app.post("/bff/workflow/orchestrate")
-async def workflow_orchestrate(req: MasterOrchestrateRequest):
+async def workflow_orchestrate(
+    req: MasterOrchestrateRequest,
+    suite_session: Optional[str] = Cookie(None),
+):
     """
     Master Workflow Supervisor Agent.
     Monitors workflow execution, audits outputs against the master task goal,
     and returns verification status + feedback guidance.
     """
+    user_id = _decode_jwt(suite_session) if suite_session else STATIC_USER_ID
     prompt_text = (
         f"You are the Master Workflow Supervisor Agent.\n"
         f"Master Campaign Goal: {req.master_goal}\n"
@@ -3035,8 +3070,8 @@ async def workflow_orchestrate(req: MasterOrchestrateRequest):
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 COPYAGENT_URL,
-                headers=_upstream_headers(STATIC_USER_ID),
-                json={"user_message": prompt_text, "llm_model": "claude-4-sonnet", "temperature": 0.3, "stream": False}
+                headers=_upstream_headers(user_id or STATIC_USER_ID),
+                json={"user_message": prompt_text, "llm_model": "claude-sonnet-5", "stream": False}
             )
             if resp.is_success:
                 msg = resp.json().get("content", "")
@@ -3090,12 +3125,16 @@ class AnalyzeBriefRequest(BaseModel):
     project_name: Optional[str] = ""
 
 @app.post("/bff/workflow/analyze-brief")
-async def analyze_brief_and_design_workflow(req: AnalyzeBriefRequest):
+async def analyze_brief_and_design_workflow(
+    req: AnalyzeBriefRequest,
+    suite_session: Optional[str] = Cookie(None),
+):
     """
     AI Workflow Designer Agent.
     Analyzes the campaign brief + available tools and returns a fully configured
     workflow JSON with custom system prompts, temperatures, and tool settings.
     """
+    user_id = _decode_jwt(suite_session) if suite_session else STATIC_USER_ID
     prompt_text = (
         f"You are an AI Workflow Designer Agent for a marketing creative suite.\n"
         f"Your job: analyze a campaign brief, understand the brand/industry/tone, "
@@ -3117,17 +3156,14 @@ async def analyze_brief_and_design_workflow(req: AnalyzeBriefRequest):
         '  },\n'
         '  "node_configs": {\n'
         '    "agent_strategy": {\n'
-        '      "model": "claude-4-sonnet",\n'
-        '      "temperature": 0.7,\n'
+        '      "model": "claude-sonnet-5",\n'
         '      "systemPrompt": "Tailored system prompt for Strategy Agent based on this specific brand/industry/brief"\n'
         '    },\n'
         '    "copy": {\n'
-        '      "model": "claude-4-sonnet",\n'
-        '      "temperature": 0.8\n'
+        '      "model": "claude-sonnet-5"\n'
         '    },\n'
         '    "agent_artdir": {\n'
-        '      "model": "claude-4-sonnet",\n'
-        '      "temperature": 0.5,\n'
+        '      "model": "claude-sonnet-5",\n'
         '      "systemPrompt": "Tailored system prompt for Art Director Agent specifying visual style, mood, camera angles based on this brand"\n'
         '    },\n'
         '    "genfy": {\n'
@@ -3151,8 +3187,8 @@ async def analyze_brief_and_design_workflow(req: AnalyzeBriefRequest):
         async with httpx.AsyncClient(timeout=45.0) as client:
             resp = await client.post(
                 COPYAGENT_URL,
-                headers=_upstream_headers(STATIC_USER_ID),
-                json={"user_message": prompt_text, "llm_model": "claude-4-sonnet", "temperature": 0.3, "stream": False}
+                headers=_upstream_headers(user_id or STATIC_USER_ID),
+                json={"user_message": prompt_text, "llm_model": "claude-sonnet-5", "stream": False}
             )
             if not resp.is_success:
                 print(f"[WorkflowDesigner] CopyAgent returned {resp.status_code}")
@@ -3205,14 +3241,12 @@ def _build_fallback_workflow(brief: str, asset_type: str) -> dict:
         "inferred": {"brand_tone": "professional and engaging", "industry": "general", "visual_style": "cinematic"},
         "node_configs": {
             "agent_strategy": {
-                "model": "claude-4-sonnet",
-                "temperature": 0.7,
+                "model": "claude-sonnet-5",
                 "systemPrompt": f"You are an expert marketing strategy agent. Analyze campaign briefs for {asset_type} campaigns. Extract target audience, key value propositions, tone of voice, and build structured copywriting specifications. Focus on what makes the brand unique and how to resonate with the target customer emotionally."
             },
-            "copy": {"model": "claude-4-sonnet", "temperature": 0.8},
+            "copy": {"model": "claude-sonnet-5"},
             "agent_artdir": {
-                "model": "claude-4-sonnet",
-                "temperature": 0.5,
+                "model": "claude-sonnet-5",
                 "systemPrompt": f"You are a world-class art director specializing in {asset_type} marketing visuals. Given campaign copy, select the optimal Genfy AI image generation parameters: detailed image prompt, visual style (cinematic/editorial/lifestyle), lighting mood, camera angle, and lens choice. Always output structured JSON with image_prompt, ratio ({ratio}), quality ({quality}), models, and categories."
             },
             "genfy": {"quality": quality, "ratio": ratio},
@@ -3368,7 +3402,7 @@ Output ONLY valid JSON with this exact schema:
             resp = await client.post(
                 COPYAGENT_URL,
                 headers=_upstream_headers(user_id),
-                json={"user_message": prompt, "llm_model": "claude-4-sonnet", "temperature": 0.5, "stream": False}
+                json={"user_message": prompt, "llm_model": "claude-sonnet-5", "stream": False}
             )
             if resp.is_success:
                 res_data = resp.json()
