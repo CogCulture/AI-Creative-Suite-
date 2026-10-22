@@ -644,7 +644,7 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.text2; }}
               >
                 <ArrowRight size={14} />
-                Create Campaign under {brand.brandName}
+                Create Brand Project under {brand.brandName}
               </button>
             </div>
           ))}

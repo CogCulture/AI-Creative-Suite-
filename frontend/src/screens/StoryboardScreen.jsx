@@ -495,7 +495,7 @@ export default function StoryboardScreen({ t, nav, showToast, activeProject }) {
     return (
       <div style={{ maxWidth: 520, margin: "80px auto", textAlign: "center", padding: "0 40px" }}>
         <div style={{ fontFamily: FONT, fontSize: 16, color: t.text2, marginBottom: 16 }}>No project selected.</div>
-        <Btn t={t} kind="dark" onClick={() => nav("projects")}>← Back to Projects</Btn>
+        <Btn t={t} kind="dark" onClick={() => nav("projects")}>← Back to Brand Projects</Btn>
       </div>
     );
   }
@@ -511,7 +511,7 @@ export default function StoryboardScreen({ t, nav, showToast, activeProject }) {
             onClick={() => nav("projects")}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11, color: t.text3, background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 14, letterSpacing: ".08em", textTransform: "uppercase" }}
           >
-            <ArrowLeft size={13} /> Campaign Projects
+            <ArrowLeft size={13} /> Brand Projects
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
             <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: t.text, letterSpacing: "-.025em", margin: 0 }}>

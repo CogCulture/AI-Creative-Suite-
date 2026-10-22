@@ -144,8 +144,8 @@ export const PROJECTS = [
 
 /* ── Navigation ──────────────────────────────────────────── */
 export const NAV = [
-  { id: "home",     label: "Home",        icon: Home },
-  { id: "projects", label: "Projects",    icon: Boxes },
+  { id: "home",     label: "Home",           icon: Home },
+  { id: "projects", label: "Brand Projects", icon: Boxes },
   { id: "tools",    label: "Tools",       icon: LayoutGrid },
   { id: "workspace", label: "Workspace",  icon: Users },
   { id: "brain",    label: "Brand Brain", icon: Brain,     brain: true },

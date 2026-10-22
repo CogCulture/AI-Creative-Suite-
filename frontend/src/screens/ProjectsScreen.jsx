@@ -303,14 +303,14 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
         setNameError(false);
         setBriefError(false);
         setBrandError(false);
-        showToast(`✨ Campaign "${newProject.name}" linked to ${targetBrandName} — opening storyboard...`);
+        showToast(`✨ Brand Project "${newProject.name}" linked to ${targetBrandName} — opening storyboard...`);
         setActiveProject(newProject);
         nav("storyboard", newProject);
       } else {
-        throw new Error("Failed to save campaign project");
+        throw new Error("Failed to save brand project");
       }
     } catch (err) {
-      showToast("Failed to save campaign project. Please try again.");
+      showToast("Failed to save brand project. Please try again.");
       setAiPhase(null);
     }
   };
@@ -320,7 +320,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
     try {
       await fetch(`/bff/projects/${id}`, { method: "DELETE", credentials: "include" });
       setProjects((prev) => prev.filter((p) => p.id !== id));
-      showToast("Campaign project deleted");
+      showToast("Brand project deleted");
     } catch (err) {
       showToast("Failed to delete project");
     }
@@ -337,13 +337,13 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
         <div>
           <Eyebrow t={t}>Mode 02 · Orchestrated</Eyebrow>
-          <H1 t={t}>Campaign Projects</H1>
+          <H1 t={t}>Brand Projects</H1>
           <p style={{ fontFamily: FONT, fontSize: 13.5, color: t.text2, marginTop: 6, lineHeight: 1.5 }}>
-            Manage brand campaigns. Select a brand to view linked campaigns, invite team members, or launch multi-agent workflows.
+            Manage brand projects. Select a brand to view linked projects, invite team members, or launch multi-agent workflows.
           </p>
         </div>
         <Btn t={t} kind="dark" icon={Plus} onClick={() => setShowModal(true)}>
-          New Campaign
+          New Brand Project
         </Btn>
       </div>
 
@@ -378,17 +378,17 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
         {brands.length === 0 && (
           <span style={{ fontSize: 12, color: t.text3, fontFamily: FONT }}>
-            No brands onboarded yet. Create a brand to link campaigns.
+            No brands onboarded yet. Create a brand to link brand projects.
           </span>
         )}
       </div>
 
-      {/* Campaign list */}
+      {/* Brand projects list */}
       <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
         {loadingProjects ? (
           <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
             <Loader2 size={24} style={{ color: t.text3, margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
-            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3 }}>Loading campaign projects...</div>
+            <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3 }}>Loading brand projects...</div>
           </Card>
         ) : filteredProjects.length === 0 ? (
           <Card t={t} style={{ padding: "48px 32px", textAlign: "center" }}>
@@ -400,15 +400,15 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
             }}>
               <FolderOpen size={28} style={{ color: t.text3 }} />
             </div>
-            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: t.text }}>No campaigns found</div>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: t.text }}>No brand projects found</div>
             <div style={{ fontFamily: FONT, fontSize: 13, color: t.text3, marginTop: 6, maxWidth: 360, margin: "6px auto 0" }}>
               {selectedBrandFilter === "all"
-                ? "Create your first campaign project to launch a multi-agent workflow — Strategy → Copy Agent → Image Engine."
-                : "No campaigns created for this brand yet."}
+                ? "Create your first brand project to launch a multi-agent workflow — Strategy → Copy Agent → Image Engine."
+                : "No brand projects created for this brand yet."}
             </div>
             <Btn t={t} kind="dark" icon={Sparkles} onClick={() => setShowModal(true)}
               style={{ marginTop: 20, display: "inline-flex" }}>
-              Create New Campaign
+              Create New Brand Project
             </Btn>
           </Card>
         ) : (
@@ -463,7 +463,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                       setActiveProject(p);
                       nav("storyboard", p);
                     }}
-                    title="Open campaign storyboard planner"
+                    title="Open brand project storyboard planner"
                     style={{
                       display: "flex", alignItems: "center", gap: 6,
                       padding: "6px 12px", borderRadius: R.md,
@@ -497,7 +497,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
                   <button
                     onClick={(e) => openTeamModal(e, p)}
-                    title="Invite & manage campaign team members"
+                    title="Invite & manage project team members"
                     style={{
                       display: "flex", alignItems: "center", gap: 6,
                       padding: "6px 12px", borderRadius: R.md,
@@ -559,7 +559,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                   <Users size={18} style={{ color: t.accent }} />
-                  <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>Campaign Collaborators</span>
+                  <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>Project Collaborators</span>
                 </div>
                 <div style={{ fontSize: 12, color: t.text3 }}>
                   Invite team members to work on <b style={{ color: t.text }}>{teamModalProject.name}</b>
@@ -719,10 +719,10 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                   }}>
                     <Sparkles size={16} color="#fff" />
                   </div>
-                  <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>New Campaign Project</span>
+                  <span style={{ fontWeight: 800, fontSize: 17, color: t.text }}>New Brand Project</span>
                 </div>
                 <p style={{ fontSize: 12.5, color: t.text3, margin: 0, paddingLeft: 40 }}>
-                  Link campaign to a brand and launch the multi-agent workflow.
+                  Link project to a brand and launch the multi-agent workflow.
                 </p>
               </div>
               <button
@@ -760,10 +760,10 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                 {brandError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Brand selection is required.</p>}
               </div>
 
-              {/* Campaign Name */}
+              {/* Project Name */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Campaign Name <span style={{ color: "#EF4444" }}>*</span>
+                  Project Name <span style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <input
                   value={form.name}
@@ -777,18 +777,18 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
                     transition: "border-color .15s",
                   }}
                 />
-                {nameError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Campaign name is required.</p>}
+                {nameError && <p style={{ fontSize: 11, color: "#EF4444", margin: "4px 0 0" }}>Project name is required.</p>}
               </div>
 
-              {/* Campaign Brief */}
+              {/* Project Brief */}
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: t.text, display: "block", marginBottom: 6 }}>
-                  Campaign Brief <span style={{ color: "#EF4444" }}>*</span>
+                  Project Brief <span style={{ color: "#EF4444" }}>*</span>
                 </label>
                 <textarea
                   value={form.brief}
                   onChange={(e) => { setForm((f) => ({ ...f, brief: e.target.value })); setBriefError(false); }}
-                  placeholder="Describe your campaign — product, target audience, key message, visual goals..."
+                  placeholder="Describe your project — product, target audience, key message, visual goals..."
                   rows={3}
                   style={{
                     width: "100%", padding: "10px 12px", borderRadius: R.md, boxSizing: "border-box",
@@ -846,7 +846,7 @@ export default function ProjectsScreen({ t, nav, showToast, setActiveProject }) 
 
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontWeight: 800, fontSize: 16, color: t.text, marginBottom: 4 }}>
-                      {aiPhase === "analyzing" && "Analyzing Campaign Brief..."}
+                      {aiPhase === "analyzing" && "Analyzing Project Brief..."}
                       {aiPhase === "designing" && "Configuring Multi-Agent Workflow..."}
                       {aiPhase === "done" && "Workflow Configured!"}
                     </div>
