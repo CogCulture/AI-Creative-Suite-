@@ -5,7 +5,7 @@ import { BRAND } from "../../data.js";
 
 const VIEW_LABELS = {
   home: "Home",
-  projects: "Projects",
+  projects: "Brand Projects",
   tools: "Tools",
   workspace: "Workspace",
   brain: "Brand Brain",

@@ -289,7 +289,7 @@ export default function PricingPage({ onLogin, onNavigate, autoTriggerLogin }) {
               <ul className="space-y-2 text-sm text-black">
                 <li><a href="#" onClick={(e) => { e.preventDefault(); onNavigate("home"); }} className="hover:underline">Create</a></li>
                 <li><a href="#" onClick={(e) => { e.preventDefault(); onNavigate("home"); }} className="hover:underline">Manage</a></li>
-                <li><a href="#" onClick={(e) => { e.preventDefault(); onNavigate("home"); }} className="hover:underline">Research</a></li>
+                <li><a href="#" onClick={(e) => { e.preventDefault(); onNavigate("home"); }} className="hover:underline">Analytics</a></li>
                 <li><a href="#" onClick={(e) => { e.preventDefault(); onNavigate("home"); }} className="hover:underline">Build</a></li>
               </ul>
             </div>

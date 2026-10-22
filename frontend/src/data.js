@@ -34,6 +34,14 @@ const ALL_TOOLS = [
     desc: "On-brand visuals with style, lighting and camera controls. Text-to-image + references.",
   },
   {
+    id: "geo",
+    name: "GEO Tool",
+    icon: Globe,
+    hue: "#0EA5E9",
+    tags: ["LOCAL AI", "SEARCH", "VISIBILITY"],
+    desc: "Generative Engine Optimization & local visibility engine across AI platforms and search.",
+  },
+  {
     id: "edit",
     name: "Image Editor",
     icon: Wand2,
@@ -64,14 +72,7 @@ const ALL_TOOLS = [
     hue: "#12A0A0",
     tags: ["JD", "COMMS"],
     desc: "Job posts, JDs and internal comms — in the company's own voice.",
-  },
-  {
-    id: "geo",
-    name: "GEO",
-    icon: Globe,
-    hue: "#0EA5E9",
-    tags: ["AI SEARCH", "VISIBILITY"],
-    desc: "Generative Engine Optimization — optimize your brand visibility across AI models and LLM search engines.",
+    url: "https://testhr.duckdns.org/",
   },
 ];
 
@@ -144,8 +145,8 @@ export const PROJECTS = [
 
 /* ── Navigation ──────────────────────────────────────────── */
 export const NAV = [
-  { id: "home",     label: "Home",        icon: Home },
-  { id: "projects", label: "Projects",    icon: Boxes },
+  { id: "home",     label: "Home",           icon: Home },
+  { id: "projects", label: "Brand Projects", icon: Boxes },
   { id: "tools",    label: "Tools",       icon: LayoutGrid },
   { id: "workspace", label: "Workspace",  icon: Users },
   { id: "brain",    label: "Brand Brain", icon: Brain,     brain: true },

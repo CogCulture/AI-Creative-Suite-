@@ -122,8 +122,8 @@ export default function LandingPage({ onLogin, onNavigate, autoTriggerLogin }) {
   const suiteTabs = [
     { name: "Create", desc: "Generate original content across every creative medium from visuals to motion, writing, and beyond." },
     { name: "Manage", desc: "Craft polished digital experiences, brand assets, interfaces, and layouts with intelligent design tools." },
-    { name: "Research", desc: "Transform ideas into fully functional websites, apps, and interactive products without starting from scratch." },
-    { name: "Build", desc: "Develop strategies, optimize discoverability, and accelerate growth with AI-powered insights." }
+    { name: "Analytics", desc: "Generative engine optimization (GEO), discoverability, and AI search visibility analytics." },
+    { name: "Build", desc: "Transform ideas into fully functional websites, apps, and interactive products without starting from scratch." }
   ];
 
   const faqs = [
@@ -511,7 +511,7 @@ export default function LandingPage({ onLogin, onNavigate, autoTriggerLogin }) {
               <ul className="space-y-2 text-sm text-black">
                 <li><a href="#" className="hover:underline">Create</a></li>
                 <li><a href="#" className="hover:underline">Manage</a></li>
-                <li><a href="#" className="hover:underline">Research</a></li>
+                <li><a href="#" className="hover:underline">Analytics</a></li>
                 <li><a href="#" className="hover:underline">Build</a></li>
               </ul>
             </div>

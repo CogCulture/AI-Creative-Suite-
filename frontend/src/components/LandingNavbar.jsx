@@ -27,8 +27,8 @@ export default function LandingNavbar({ currentHash, onLogin }) {
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
-            <div className="dropdown-panel" style={{ position: "absolute", left: "50%", top: "100%", zIndex: 50, width: "640px", transform: "translateX(-50%)", paddingTop: "8px" }}>
-              <div style={{ border: "1px solid #e6e8ee", backgroundColor: "#fff", padding: "24px", boxShadow: "0 20px 40px rgba(0,0,0,0.12)", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "32px" }}>
+            <div className="dropdown-panel" style={{ position: "absolute", left: "50%", top: "100%", zIndex: 50, width: "720px", transform: "translateX(-50%)", paddingTop: "8px" }}>
+              <div style={{ border: "1px solid #e6e8ee", backgroundColor: "#fff", padding: "24px", boxShadow: "0 20px 40px rgba(0,0,0,0.12)", display: "grid", gridTemplateColumns: "1fr 1fr 1.3fr 1fr", gap: "28px" }}>
                 <div>
                   <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#16192b", marginBottom: "12px", fontFamily: "Inter Tight, system-ui, sans-serif" }}>Create</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -44,7 +44,7 @@ export default function LandingNavbar({ currentHash, onLogin }) {
                   <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#16192b", marginBottom: "12px", fontFamily: "Inter Tight, system-ui, sans-serif" }}>Manage</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     {["HR", "Manage"].map(item => (
-                      <a key={item} href="#" style={{ display: "block", fontSize: "13px", color: "#6b7080", fontFamily: "Inter, system-ui, sans-serif", textDecoration: "none", transition: "color 0.15s" }}
+                      <a key={item} href={item === "HR" ? "https://testhr.duckdns.org/" : "#"} style={{ display: "block", fontSize: "13px", color: "#6b7080", fontFamily: "Inter, system-ui, sans-serif", textDecoration: "none", transition: "color 0.15s" }}
                         onMouseEnter={e => e.target.style.color = "#16192b"}
                         onMouseLeave={e => e.target.style.color = "#6b7080"}
                       >{item}</a>
@@ -52,14 +52,18 @@ export default function LandingNavbar({ currentHash, onLogin }) {
                   </div>
                 </div>
                 <div>
-                  <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#16192b", marginBottom: "12px", fontFamily: "Inter Tight, system-ui, sans-serif" }}>Research</span>
+                  <span style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#16192b", marginBottom: "12px", fontFamily: "Inter Tight, system-ui, sans-serif" }}>Analytics</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    {["Marketplace", "Dam"].map(item => (
-                      <a key={item} href="#" style={{ display: "block", fontSize: "13px", color: "#6b7080", fontFamily: "Inter, system-ui, sans-serif", textDecoration: "none", transition: "color 0.15s" }}
-                        onMouseEnter={e => e.target.style.color = "#16192b"}
-                        onMouseLeave={e => e.target.style.color = "#6b7080"}
-                      >{item}</a>
-                    ))}
+                    <a
+                      href="http://geocc.duckdns.org"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "block", fontSize: "13px", color: "#6b7080", fontFamily: "Inter, system-ui, sans-serif", textDecoration: "none", lineHeight: 1.35, transition: "color 0.15s" }}
+                      onMouseEnter={e => e.target.style.color = "#16192b"}
+                      onMouseLeave={e => e.target.style.color = "#6b7080"}
+                    >
+                      Generative engine optimization(GEO)
+                    </a>
                   </div>
                 </div>
                 <div>

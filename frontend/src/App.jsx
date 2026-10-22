@@ -76,8 +76,32 @@ export default function App() {
   }, []);
 
   const { t, mode, toggle } = useTheme();
-  const [view, setView] = useState("home");
-  const [activeProject, setActiveProject] = useState(null);
+  const [view, setViewState] = useState(() => {
+    try {
+      return localStorage.getItem("studio-current-view") || "home";
+    } catch (_) {
+      return "home";
+    }
+  });
+  const setView = (v) => {
+    setViewState(v);
+    try { localStorage.setItem("studio-current-view", v); } catch (_) {}
+  };
+
+  const [activeProject, setActiveProjectState] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("studio-active-project") || "null");
+    } catch (_) {
+      return null;
+    }
+  });
+  const setActiveProject = (p) => {
+    setActiveProjectState(p);
+    try {
+      if (p) localStorage.setItem("studio-active-project", JSON.stringify(p));
+      else localStorage.removeItem("studio-active-project");
+    } catch (_) {}
+  };
   const [activeWorkspace, setActiveWorkspace] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("studio-active-workspace") || "null");
@@ -213,6 +237,10 @@ export default function App() {
   };
 
   const nav = (id, projectData, options) => {
+    if (id === "hr") {
+      window.location.href = "https://testhr.duckdns.org/";
+      return;
+    }
     if (projectData !== undefined) setActiveProject(projectData);
     if (options?.fresh) {
       setActiveProject(null);

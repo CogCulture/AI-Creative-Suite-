@@ -1,9 +1,46 @@
-import { Plus, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { Plus, ChevronRight, ExternalLink } from "lucide-react";
 import { FONT, MONO, R } from "../tokens.js";
 import { TOOLS, WORKFLOW_TEMPLATES, toolById } from "../data.js";
 import { Card, Btn, Eyebrow, H1, Sub, SectionH } from "../components/primitives/index.jsx";
 
 export default function ToolsScreen({ t, nav, showToast }) {
+  const [launchingGeo, setLaunchingGeo] = useState(false);
+
+  const handleLaunchGeo = async () => {
+    try {
+      setLaunchingGeo(true);
+      showToast("Opening GEO Tool...");
+      const res = await fetch("/bff/tools/geo/launch", {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await res.json();
+      const targetUrl = data?.launch_url || "http://geocc.duckdns.org/";
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+      showToast("GEO Tool opened in a new tab");
+    } catch (err) {
+      window.open("http://geocc.duckdns.org/", "_blank", "noopener,noreferrer");
+      showToast("GEO Tool opened in a new tab");
+    } finally {
+      setLaunchingGeo(false);
+    }
+  };
+
+  const handleOpenTool = (tool) => {
+    if (tool.id === "copy") {
+      nav("tool-detail");
+    } else if (tool.id === "genfy") {
+      nav("genfy-detail");
+    } else if (tool.id === "geo") {
+      handleLaunchGeo();
+    } else if (tool.id === "hr" || tool.url) {
+      window.location.href = tool.url || "https://testhr.duckdns.org/";
+    } else {
+      showToast(`${tool.name} — coming soon`);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto", padding: "16px 40px 80px", fontFamily: FONT }}>
       <H1 t={t}>Tools</H1>
@@ -21,7 +58,14 @@ export default function ToolsScreen({ t, nav, showToast }) {
         }}
       >
         {TOOLS.map((tool) => (
-          <Card key={tool.id} t={t} hoverable accentTop={tool.hue} style={{ padding: 20 }}>
+          <Card
+            key={tool.id}
+            t={t}
+            hoverable
+            accentTop={tool.hue}
+            onClick={() => handleOpenTool(tool)}
+            style={{ padding: 20 }}
+          >
             <div
               style={{
                 width: 44,
@@ -92,21 +136,23 @@ export default function ToolsScreen({ t, nav, showToast }) {
               <Btn
                 t={t}
                 hue={tool.hue}
-                onClick={() =>
-                  tool.id === "copy"
-                    ? nav("tool-detail")
-                    : tool.id === "genfy"
-                    ? nav("genfy-detail")
-                    : showToast(`${tool.name} — coming soon`)
-                }
+                disabled={tool.id === "geo" && launchingGeo}
+                icon={tool.id === "geo" ? ExternalLink : undefined}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenTool(tool);
+                }}
                 style={{ flex: 1 }}
               >
-                Open
+                {tool.id === "geo" ? (launchingGeo ? "Launching..." : "Launch") : "Open"}
               </Btn>
               <Btn
                 t={t}
                 kind="secondary"
-                onClick={() => showToast(`${tool.name} added to workflow`)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  showToast(`${tool.name} added to workflow`);
+                }}
                 icon={Plus}
                 style={{ width: 36, padding: 0 }}
               />

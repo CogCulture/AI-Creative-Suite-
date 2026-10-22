@@ -173,7 +173,7 @@ export default function EnterprisePage({ onLogin, onNavigate }) {
       <footer style={{ backgroundColor: "#dddddd", paddingTop: "64px" }}>
         <div style={{ maxWidth: "80rem", margin: "0 auto", padding: "0 70px 64px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "48px" }}>
           {[
-            { title: "AI Intelligence Suite", links: ["Create", "Manage", "Research", "Build"] },
+            { title: "AI Intelligence Suite", links: ["Create", "Manage", "Analytics", "Build"] },
             { title: "Support", links: ["Help Centre", "Download and install", "Cog Community", "Cog Learn"] },
             { title: "Enterprise", links: ["Marketplace", "Company", "Blog"] },
             { title: "Company", links: ["Careers", "Contact", "Press"] },

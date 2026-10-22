@@ -352,12 +352,161 @@ function DamPanel({ t, brand, showToast }) {
 }
 
 
+// ── Project Doc Upload Modal ─────────────────────────────────────────────────
+function ProjectUploadModal({ t, onClose, showToast }) {
+  const [projects, setProjects]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [projectId, setProjectId]   = useState("");
+  const [uploading, setUploading]   = useState(false);
+  const fileRef                     = useRef(null);
+
+  useEffect(() => {
+    fetch("/bff/projects", { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setProjects(Array.isArray(data) ? data : []))
+      .catch(() => setProjects([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const project   = projects.find(p => p.id === projectId) || null;
+  const canUpload = !!(project && project.brand_id) && !uploading;
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !project?.brand_id) return;
+    setUploading(true);
+    const form = new FormData();
+    form.append("brand_id", project.brand_id);
+    form.append("project_id", project.id);
+    form.append("file", file);
+    try {
+      const res = await fetch("/bff/dam/files", {
+        method: "POST", credentials: "include", body: form,
+      });
+      const data = res.ok ? await res.json() : null;
+      if (data) showToast(data.message || "✅ Uploaded to Brand Brain");
+      else showToast("❌ Upload failed");
+    } catch (_) {
+      showToast("❌ Upload error");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+      }}
+    >
+      <div style={{
+        background: t.bg, border: `1px solid ${t.border}`,
+        borderRadius: 16, padding: "32px 36px",
+        maxWidth: 480, width: "100%",
+        boxShadow: t.shadowLg, fontFamily: FONT,
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <Upload size={20} color={t.brain} />
+              <span style={{ color: t.text, fontSize: 17, fontWeight: 700 }}>Upload Docs to Brand Brain</span>
+            </div>
+            <p style={{ color: t.text2, fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+              Pick an existing Brand Project — docs feed its brand's knowledge base (RAG)
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: t.text3, padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: t.text3, padding: "20px 0" }}>
+            <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+            <span>Loading projects…</span>
+          </div>
+        ) : projects.length === 0 ? (
+          <div style={{ color: t.text3, fontSize: 13, padding: "12px 0", marginBottom: 16 }}>
+            No Brand Projects yet. Create one first, then upload docs here.
+          </div>
+        ) : (
+          <>
+            {/* Project dropdown */}
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              style={{
+                width: "100%", padding: "10px 14px", borderRadius: 8,
+                background: t.surface, border: `1px solid ${t.borderStrong}`,
+                color: t.text, fontSize: 14, outline: "none",
+                boxSizing: "border-box", fontFamily: FONT,
+                marginBottom: 14, cursor: "pointer",
+              }}
+            >
+              <option value="" disabled>Select a Brand Project…</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.brand_name ? ` — ${p.brand_name}` : ""}
+                </option>
+              ))}
+            </select>
+
+            {/* Upload button */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.txt,.doc,.docx,.png,.jpg,.jpeg"
+              style={{ display: "none" }}
+              onChange={handleUpload}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={!canUpload}
+              style={{
+                width: "100%", padding: "11px 0", borderRadius: 8,
+                border: `1.5px dashed ${canUpload ? t.brain : t.border}`,
+                background: canUpload ? t.brainSoft : t.surface2,
+                color: canUpload ? t.brainText : t.text3,
+                fontSize: 13, fontWeight: 600,
+                cursor: canUpload ? "pointer" : "not-allowed",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                transition: "all 0.2s", fontFamily: FONT,
+              }}
+            >
+              {uploading ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Upload size={13} />}
+              {uploading ? "Uploading…" : "Upload PDF / Doc / Image"}
+            </button>
+            {project && !project.brand_id && (
+              <p style={{ color: t.warn, fontSize: 11, margin: "8px 0 0", fontFamily: FONT }}>
+                This project has no brand linked — select a project with a brand to enable upload.
+              </p>
+            )}
+
+            <button onClick={onClose} style={{
+              width: "100%", marginTop: 14, padding: "10px 0", borderRadius: 8,
+              border: `1px solid ${t.border}`, background: t.surface,
+              color: t.text2, cursor: "pointer", fontSize: 14, fontFamily: FONT,
+            }}>Done</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ── Main BrainScreen ──────────────────────────────────────────────────────────
 export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
   const [brands, setBrands]           = useState([]);
   const [loading, setLoading]         = useState(true);
   const [deletingId, setDeletingId]   = useState(null);
   const [ragModalBrand, setRagModalBrand] = useState(null);
+  const [uploadOpen, setUploadOpen]       = useState(false);
 
   const fetchBrands = () => {
     setLoading(true);
@@ -429,22 +578,40 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
             <p style={{ color: t.text2, fontSize: 13, margin: 0 }}>Onboarded brands + connected knowledge bases</p>
           </div>
         </div>
-        <button
-          onClick={onAddBrandDNA}
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "10px 22px", borderRadius: 8,
-            background: "#000000", color: "#fff",
-            border: "none", fontWeight: 700, fontSize: 13,
-            cursor: "pointer", fontFamily: FONT,
-            transition: "background 0.2s"
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = "#333333"}
-          onMouseLeave={e => e.currentTarget.style.background = "#000000"}
-        >
-          <Plus size={15} />
-          Add Brand DNA
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={() => setUploadOpen(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 22px", borderRadius: 8,
+              background: "transparent", color: t.text,
+              border: `1px solid ${t.borderStrong}`, fontWeight: 700, fontSize: 13,
+              cursor: "pointer", fontFamily: FONT,
+              transition: "background 0.2s"
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = t.surface2}
+            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+          >
+            <Upload size={15} />
+            Upload Docs
+          </button>
+          <button
+            onClick={onAddBrandDNA}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 22px", borderRadius: 8,
+              background: "#000000", color: "#fff",
+              border: "none", fontWeight: 700, fontSize: 13,
+              cursor: "pointer", fontFamily: FONT,
+              transition: "background 0.2s"
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "#333333"}
+            onMouseLeave={e => e.currentTarget.style.background = "#000000"}
+          >
+            <Plus size={15} />
+            Add Brand DNA
+          </button>
+        </div>
       </div>
 
       {/* ── RAG info banner ─────────────────────────────────────────────── */}
@@ -644,7 +811,7 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.text2; }}
               >
                 <ArrowRight size={14} />
-                Create Campaign under {brand.brandName}
+                Create Brand Project under {brand.brandName}
               </button>
             </div>
           ))}
@@ -658,6 +825,15 @@ export default function BrainScreen({ t, nav, showToast, onAddBrandDNA }) {
           brand={ragModalBrand}
           onClose={() => setRagModalBrand(null)}
           onLinked={handleRagLinked}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Project Doc Upload Modal */}
+      {uploadOpen && (
+        <ProjectUploadModal
+          t={t}
+          onClose={() => setUploadOpen(false)}
           showToast={showToast}
         />
       )}
