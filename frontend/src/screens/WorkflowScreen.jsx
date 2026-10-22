@@ -2602,6 +2602,38 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     }
   };
 
+  // Poll Genfy session for image
+  const pollGenfySession = (sessionId, log) => new Promise((resolve) => {
+    let attempts = 0;
+    if (genfyPollRef.current) clearInterval(genfyPollRef.current);
+    genfyPollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const r = await fetch(`/bff/genfy/sessions/${sessionId}`);
+        if (!r.ok) return;
+        const data = await r.json();
+        const imgs = data?.session?.images || data?.images || [];
+        const done = imgs.find((i) => (typeof i === "string" ? Boolean(i) : i.status === "completed" && i.url));
+        if (done) {
+          clearInterval(genfyPollRef.current);
+          if (log) log("Genfy: image generated and received", "success");
+          resolve(typeof done === "string" ? { url: done } : done);
+          return;
+        }
+        if (data?.status === "failed" || data?.status === "error") {
+          clearInterval(genfyPollRef.current);
+          if (log) log(data?.error || "Genfy generation failed", "error");
+          resolve(null);
+          return;
+        }
+      } catch (_) {}
+      if (attempts > 50) {
+        clearInterval(genfyPollRef.current);
+        resolve(null);
+      }
+    }, 2000);
+  });
+
   // ── Run Workflow (Supports Starting / Continuing from any Node) ───────────
   const handleRun = async (startFromNodeId = "brief") => {
     if (isRunning) return;
@@ -2993,27 +3025,38 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
               prompt: promptToSend,
               ratio: ratioToSend,
               quality: qualityToSend,
-              categories: genfyInput.categories || activeArtDir.categories || undefined
+              model_ids: ["Nanobanana 2"],
+              categories: genfyInput.categories || activeArtDir.categories || undefined,
             }),
           });
           if (r.ok) {
             const data = await r.json();
-            const imgUrl =
+            let imgUrl =
               data?.results?.[0]?.image_url ||
               data?.results?.[0]?.url ||
-              data?.images?.[0]?.url ||
+              (data?.images?.[0]?.status === "completed" ? data?.images?.[0]?.url : null) ||
               null;
+
+            if (!imgUrl && (data?.session_id || data?.id)) {
+              const sid = data.session_id || data.id;
+              log("Node 5: Genfy image generation started, rendering neural visual...", "info");
+              const polled = await pollGenfySession(sid, log);
+              if (polled && (polled.url || polled.image_url)) {
+                imgUrl = polled.url || polled.image_url;
+              }
+            }
+
             if (imgUrl) {
-              genfyResult = { url: imgUrl, status: "completed", model_id: "ChatGPT Image" };
-              log("✓ Image generated successfully using ChatGPT", "success");
+              genfyResult = { url: imgUrl, status: "completed", model_id: "Nanobanana 2", prompt: promptToSend };
+              log("✓ Image generated successfully via Genfy Image Engine", "success");
             } else {
-              throw new Error("No image URL returned in response.");
+              throw new Error("No image URL returned from Genfy after rendering.");
             }
           } else {
             throw new Error(`HTTP ${r.status}`);
           }
         } catch (e) {
-          log(`ChatGPT Image Generation failed: ${e.message || "API error"}`, "error");
+          log(`Genfy Image Generation failed: ${e.message || "API error"}`, "error");
         }
       }
 
@@ -3102,21 +3145,6 @@ export default function WorkflowScreen({ t, nav, showToast, activeProject, setAc
     } catch (_) {}
   };
 
-  // Poll Genfy session for image
-  const pollGenfySession = (sessionId, log) => new Promise((resolve) => {
-    let attempts = 0;
-    genfyPollRef.current = setInterval(async () => {
-      attempts++;
-      try {
-        const r = await fetch(`/bff/genfy/sessions/${sessionId}`);
-        const data = await r.json();
-        const imgs = data?.session?.images || data?.images || [];
-        const done = imgs.find(i => i.status === "completed");
-        if (done) { clearInterval(genfyPollRef.current); log("Genfy: image received", "success"); resolve(done); return; }
-      } catch (_) {}
-      if (attempts > 30) { clearInterval(genfyPollRef.current); resolve(null); }
-    }, 2000);
-  });
 
   const selectedNode = PIPELINE.find(n => n.id === selectedNodeId);
   const masterColors = {
