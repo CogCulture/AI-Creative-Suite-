@@ -123,6 +123,9 @@ if not SUITE_SECRET_KEY or SUITE_SECRET_KEY == "fallback-insecure-key":
         "and set it in your .env file."
     )
 
+SUITE_SSO_SECRET: str  = os.getenv("SUITE_SSO_SECRET", SUITE_SECRET_KEY)
+GEO_TOOL_URL: str      = os.getenv("GEO_TOOL_URL", "http://geocc.duckdns.org")
+
 SUITE_DB_URL: str      = os.getenv("SUITE_DB_URL", "sqlite:////app/data/suite.db")
 
 # Fallback for local development if Docker volume /app/data is not mounted
@@ -1058,6 +1061,62 @@ def _get_current_user_id(suite_session: Optional[str]) -> Optional[str]:
     if not suite_session:
         return None
     return _decode_jwt(suite_session)
+
+
+# ── GEO Tool Integration (SSO Launch Ticket) ───────────────────────────────────
+
+def generate_geo_sso_ticket(user_id: str, email: str, name: str = "") -> str:
+    """Creates a 60-second single-use signed ticket for GEO Tool SSO launch."""
+    now = datetime.utcnow()
+    payload = {
+        "jti": str(uuid.uuid4()),            # Unique Single-Use Ticket ID (prevents replay)
+        "user_id": user_id,
+        "email": email,
+        "name": name,
+        "purpose": "sso_launch",
+        "exp": now + timedelta(seconds=60), # Valid for only 60 seconds
+        "iat": now,
+    }
+    return jose_jwt.encode(payload, SUITE_SSO_SECRET, algorithm="HS256")
+
+
+@app.get("/bff/tools/geo/launch")
+@app.post("/bff/tools/geo/launch")
+async def launch_geo_tool(
+    suite_session: Optional[str] = Cookie(None),
+    db: Session = Depends(get_suite_db),
+):
+    """Generates a 60-second single-use signed SSO ticket and redirects/returns launch URL for GEO Tool."""
+    user_id = _get_current_user_id(suite_session)
+    if not user_id:
+        if STATIC_USER_ID:
+            user_id = STATIC_USER_ID
+        else:
+            raise HTTPException(status_code=401, detail="Please sign in to launch the GEO Tool.")
+
+    user = db.query(SuiteUser).filter(SuiteUser.id == user_id).first()
+    if not user:
+        if STATIC_USER_ID and user_id == STATIC_USER_ID:
+            email = STATIC_USER_EMAIL
+            name = "Creative Suite User"
+        else:
+            raise HTTPException(status_code=404, detail="User not found.")
+    else:
+        email = user.email
+        name = user.name or user.email.split("@")[0]
+
+    ticket = generate_geo_sso_ticket(user_id=user_id, email=email, name=name)
+    geo_base = (GEO_TOOL_URL or "http://geocc.duckdns.org").rstrip("/")
+    use_sso_route = os.getenv("GEO_USE_SSO_ROUTE", "false").lower() == "true"
+    launch_url = f"{geo_base}/sso?ticket={ticket}" if use_sso_route else f"{geo_base}/"
+
+    return {
+        "status": "success",
+        "launch_url": launch_url,
+        "sso_url": f"{geo_base}/sso?ticket={ticket}",
+        "expires_in": 60,
+    }
+
 
 
 @app.get("/bff/brands")
